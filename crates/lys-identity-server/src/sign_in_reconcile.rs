@@ -102,16 +102,16 @@ pub(crate) fn seen(state: &AppState) -> Result<Vec<Seen>, ServerError> {
                     many => (None, many.iter().map(|email| (*email).to_owned()).collect()),
                 };
                 Seen {
-                person,
-                active,
-                held,
-                several,
-                subjects: subjects
-                    .iter()
-                    .filter(|binding| binding.issuer() == issuer)
-                    .map(|binding| binding.subject().to_owned())
-                    .collect(),
-            }
+                    person,
+                    active,
+                    held,
+                    several,
+                    subjects: subjects
+                        .iter()
+                        .filter(|binding| binding.issuer() == issuer)
+                        .map(|binding| binding.subject().to_owned())
+                        .collect(),
+                }
             })
             .collect())
     })
@@ -183,7 +183,13 @@ pub(crate) fn judge(
         let others: Vec<&Seen> = everyone
             .iter()
             .filter(|other| other.person != seen.person)
-            .filter(|other| other.held.iter().chain(&other.several).any(|held| same(held, email)))
+            .filter(|other| {
+                other
+                    .held
+                    .iter()
+                    .chain(&other.several)
+                    .any(|held| same(held, email))
+            })
             .collect();
         return match others.as_slice() {
             [] => SignInHealth::Ready,
@@ -203,18 +209,29 @@ pub(crate) fn judge(
     let with: Vec<String> = everyone
         .iter()
         .filter(|other| other.person != seen.person)
-        .filter(|other| other.held.as_deref().is_some_and(|theirs| same(theirs, held)))
+        .filter(|other| {
+            other
+                .held
+                .as_deref()
+                .is_some_and(|theirs| same(theirs, held))
+        })
         .map(|other| name(other.person))
         .collect();
     if !with.is_empty() {
         return SignInHealth::SharedAddress { with };
     }
-    match read.under_address.as_ref().and_then(|user| user.get("id")?.as_str()) {
+    match read
+        .under_address
+        .as_ref()
+        .and_then(|user| user.get("id")?.as_str())
+    {
         Some(subject) => everyone
             .iter()
             .find(|other| other.subjects.iter().any(|theirs| theirs == subject))
-            .map_or(SignInHealth::Repairable, |other| SignInHealth::AddressTaken {
-                holder: name(other.person),
+            .map_or(SignInHealth::Repairable, |other| {
+                SignInHealth::AddressTaken {
+                    holder: name(other.person),
+                }
             }),
         None => SignInHealth::Repairable,
     }
@@ -272,7 +289,10 @@ pub(crate) async fn repair(state: &AppState, actor: &Actor) -> Result<Repaired, 
     for person in &everyone {
         let theirs = administrator.as_ref().is_some_and(|login| {
             login.issuer() == state.oidc.issuer()
-                && person.subjects.iter().any(|subject| subject == login.subject())
+                && person
+                    .subjects
+                    .iter()
+                    .any(|subject| subject == login.subject())
         });
         let who = name(person.person);
         match repair_one(state, api, actor, person, &everyone, &name, theirs).await {
@@ -306,7 +326,7 @@ async fn repair_one(
     actor: &Actor,
     person: &Seen,
     everyone: &[Seen],
-    name: &dyn Fn(PersonId) -> String,
+    name: &(dyn Fn(PersonId) -> String + Sync),
     theirs: bool,
 ) -> Result<Outcome, ServerError> {
     let read = read(api, person).await?;
@@ -334,7 +354,11 @@ async fn repair_one(
         return Ok(Outcome::Waiting);
     }
     let pruned = read.dead.len();
-    Ok(if made { Outcome::Made(pruned) } else { Outcome::Adopted(pruned) })
+    Ok(if made {
+        Outcome::Made(pruned)
+    } else {
+        Outcome::Adopted(pruned)
+    })
 }
 
 fn names(state: &AppState) -> Result<Vec<(PersonId, String)>, ServerError> {
@@ -388,12 +412,14 @@ pub(crate) async fn live_account(
 ) -> Result<Option<String>, ServerError> {
     let issuer = state.oidc.issuer().to_owned();
     let subjects = with_directory(state, |directory| {
-        Ok(crate::read_api::person_record(directory.projection()?, person)?
-            .bindings()
-            .iter()
-            .filter(|binding| binding.issuer() == issuer)
-            .map(|binding| binding.subject().to_owned())
-            .collect())
+        Ok(
+            crate::read_api::person_record(directory.projection()?, person)?
+                .bindings()
+                .iter()
+                .filter(|binding| binding.issuer() == issuer)
+                .map(|binding| binding.subject().to_owned())
+                .collect(),
+        )
     })?;
     let seen = Seen {
         person,
@@ -402,7 +428,11 @@ pub(crate) async fn live_account(
         several: Vec::new(),
         subjects,
     };
-    Ok(read(api, &seen).await?.live.first().map(|(subject, _, _)| subject.clone()))
+    Ok(read(api, &seen)
+        .await?
+        .live
+        .first()
+        .map(|(subject, _, _)| subject.clone()))
 }
 
 /// Hold `email` for `person`, who has no live account, so the repair finds
@@ -424,12 +454,19 @@ pub(crate) async fn hold_address(
     let subject = account
         .as_ref()
         .and_then(|user| user.get("id")?.as_str().map(str::to_owned));
-    let other = everyone.iter().filter(|other| other.person != person).find(|other| {
-        other.held.iter().chain(&other.several).any(|held| same(held, email))
-            || subject
-                .as_ref()
-                .is_some_and(|subject| other.subjects.contains(subject))
-    });
+    let other = everyone
+        .iter()
+        .filter(|other| other.person != person)
+        .find(|other| {
+            other
+                .held
+                .iter()
+                .chain(&other.several)
+                .any(|held| same(held, email))
+                || subject
+                    .as_ref()
+                    .is_some_and(|subject| other.subjects.contains(subject))
+        });
     if let Some(other) = other {
         return Err(ServerError::EmailHeldByAnother {
             person: other.person.to_string(),
@@ -472,7 +509,10 @@ fn commit(
         }
         // An account another record holds, a retired one included, is
         // never taken: an administrator moves it on People.
-        if projection.person_for(&LoginBinding::new(&issuer, &new)?).is_some() {
+        if projection
+            .person_for(&LoginBinding::new(&issuer, &new)?)
+            .is_some()
+        {
             return Ok(false);
         }
         let operation = OperationId::generate()?;
@@ -504,7 +544,9 @@ fn commit(
         }
         state.sessions.revoke_matching(|held| {
             held.binding().issuer() == issuer
-                && dead.iter().any(|subject| held.binding().subject() == subject)
+                && dead
+                    .iter()
+                    .any(|subject| held.binding().subject() == subject)
         })?;
         directory.commit_batch(&events)?;
         Ok(true)

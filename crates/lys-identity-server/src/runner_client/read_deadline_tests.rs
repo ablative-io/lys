@@ -35,7 +35,12 @@ async fn an_unanswered_status_read_ends_on_its_caller_and_closes_its_socket()
             .map_err(|()| std::io::Error::other("status entry receiver left"))?;
         let mut upstream = tokio::net::TcpStream::connect(address).await?;
         upstream.write_all(line.as_bytes()).await?;
-        tokio::io::copy_bidirectional(stream.get_mut(), &mut upstream).await?;
+        // The caller's close ends the relay; on macOS the closing shutdown
+        // answers NotConnected, which is that close, not a failure.
+        match tokio::io::copy_bidirectional(stream.get_mut(), &mut upstream).await {
+            Err(error) if error.kind() != std::io::ErrorKind::NotConnected => return Err(error),
+            _ => {}
+        }
         let (stream, _) = listener.accept().await?;
         let mut stream = BufReader::new(stream);
         let greeting = Greeting::fresh("0123456789abcdef0123456789abcdef");

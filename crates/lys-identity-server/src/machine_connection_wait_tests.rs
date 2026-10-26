@@ -15,7 +15,12 @@ async fn closing_a_local_control_caller_closes_its_peer_and_removes_its_wait()
     let relay = tokio::spawn(async move {
         let (mut local, _) = listener.accept().await?;
         let mut upstream = tokio::net::TcpStream::connect(address).await?;
-        tokio::io::copy_bidirectional(&mut local, &mut upstream).await
+        // On macOS the second side's shutdown after the first closed answers
+        // NotConnected: that is the close this test waits for, not a failure.
+        match tokio::io::copy_bidirectional(&mut local, &mut upstream).await {
+            Err(error) if error.kind() == std::io::ErrorKind::NotConnected => Ok((0, 0)),
+            copied => copied,
+        }
     });
     let mut asking = Box::pin(super::local_control(&socket, "control-close-test", b'S'));
     let (mut peer, _) = tokio::select! {
@@ -34,7 +39,6 @@ async fn closing_a_local_control_caller_closes_its_peer_and_removes_its_wait()
         .ok_or("control wait absent")?;
     drop(asking);
     assert_eq!(peer.read(&mut command).await?, 0);
-    peer.shutdown().await?;
     drop(peer);
     relay.await??;
     assert!(

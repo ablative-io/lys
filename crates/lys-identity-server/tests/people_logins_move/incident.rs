@@ -179,7 +179,9 @@ async fn october_26_link_email_and_google_each_refuse_becoming_dean() -> TestRes
     // The move's two leaves, then the repair's bind of Dean's new account.
     assert_eq!(service.log_size().await?, size + 3);
     assert_eq!(
-        source["events"].as_array().map(|events| events[events.len() - 2..].to_vec()),
+        source["events"]
+            .as_array()
+            .map(|events| events[events.len() - 2..].to_vec()),
         Some(vec![json!(size), json!(size + 2)])
     );
     let mut target_events = target_before["events"]

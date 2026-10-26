@@ -114,6 +114,14 @@ async fn a_runner_between_two_handoffs_remains_connected_and_serves_both_request
         .hub()
         .queue("machine", Act::Liveness { session: None })?;
     let (ticket, _) = bridge.await?;
+    // The runner keeps a second lane waiting before it answers on the first
+    // (lys-runner dial/bridge.rs), so the machine is never between bridges.
+    let mut next = Box::pin(runners.hub().next("machine"));
+    poll_fn(|cx| {
+        assert!(next.as_mut().poll(cx).is_pending());
+        Poll::Ready(())
+    })
+    .await;
     runners
         .hub()
         .reply("machine", &ticket, Ok("first".to_owned()))?;
@@ -121,7 +129,7 @@ async fn a_runner_between_two_handoffs_remains_connected_and_serves_both_request
     let second = runners
         .hub()
         .queue("machine", Act::Liveness { session: None })?;
-    let (ticket, _) = runners.hub().next("machine").await?;
+    let (ticket, _) = next.await?;
     runners
         .hub()
         .reply("machine", &ticket, Ok("second".to_owned()))?;

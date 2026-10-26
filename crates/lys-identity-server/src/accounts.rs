@@ -300,7 +300,11 @@ fn body_of<T>(body: Result<Json<T>, JsonRejection>) -> Result<T, ServerError> {
 
 /// The account of person `id`: their live account at this service's issuer,
 /// never a binding whose account the issuer no longer has (DIRECTORY-124).
-async fn account_id(state: &AppState, api: &SignInProviders, id: &str) -> Result<String, ServerError> {
+async fn account_id(
+    state: &AppState,
+    api: &SignInProviders,
+    id: &str,
+) -> Result<String, ServerError> {
     crate::sign_in_reconcile::live_account(state, api, PersonId::from_str(id)?)
         .await?
         .ok_or_else(|| refused("this person has no Lys account to change"))
@@ -317,8 +321,12 @@ async fn account_of(
     let api = api(&state)?;
     // A person with no live account is read as missing, so People can set
     // the address Lys makes their account under (DIRECTORY-124 R3).
-    let Some(id) = crate::sign_in_reconcile::live_account(&state, api, PersonId::from_str(&person)?).await? else {
-        return Ok(Json(json!({ "email": null, "enabled": false, "missing": true })));
+    let Some(id) =
+        crate::sign_in_reconcile::live_account(&state, api, PersonId::from_str(&person)?).await?
+    else {
+        return Ok(Json(
+            json!({ "email": null, "enabled": false, "missing": true }),
+        ));
     };
     shown(api, &id).await
 }
@@ -349,7 +357,9 @@ async fn set_email(
         crate::sign_in_reconcile::after_change(&state, &actor).await;
         return match crate::sign_in_reconcile::live_account(&state, api, held).await? {
             Some(made) => shown(api, &made).await,
-            None => Ok(Json(json!({ "email": null, "enabled": false, "missing": true }))),
+            None => Ok(Json(
+                json!({ "email": null, "enabled": false, "missing": true }),
+            )),
         };
     };
     let guard = api.lock_account(&id).await?;

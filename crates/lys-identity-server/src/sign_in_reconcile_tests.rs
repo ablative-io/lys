@@ -68,7 +68,12 @@ fn an_account_carrying_another_persons_address_is_not_theirs_and_names_whose_it_
         seen(2, Some("annabel@example.test"), &["gone"]),
     ];
     assert_eq!(
-        judge(&dean, &live("d", "annabel@example.test", true), &everyone, &name),
+        judge(
+            &dean,
+            &live("d", "annabel@example.test", true),
+            &everyone,
+            &name
+        ),
         SignInHealth::NotTheirs {
             account_email: "annabel@example.test".to_owned(),
             belongs_to: Some(person(2).to_string()),
@@ -81,9 +86,17 @@ fn a_second_login_under_an_address_nobody_else_holds_is_ready() {
     // A person may hold a work and a personal login; only another person's
     // address makes an account not theirs.
     let annabel = seen(2, Some("annabel.personal@example.test"), &["d"]);
-    let everyone = [seen(1, Some("dean@example.test"), &[]), seen(2, Some("annabel.personal@example.test"), &["d"])];
+    let everyone = [
+        seen(1, Some("dean@example.test"), &[]),
+        seen(2, Some("annabel.personal@example.test"), &["d"]),
+    ];
     assert_eq!(
-        judge(&annabel, &live("d", "annabel@example.test", true), &everyone, &name),
+        judge(
+            &annabel,
+            &live("d", "annabel@example.test", true),
+            &everyone,
+            &name
+        ),
         SignInHealth::Ready
     );
 }
@@ -91,11 +104,17 @@ fn a_second_login_under_an_address_nobody_else_holds_is_ready() {
 #[test]
 fn two_addresses_held_for_one_person_wait_for_an_administrator_even_with_a_live_account() {
     let mut mixed = seen(1, None, &["d"]);
-    mixed.several = vec!["annabel@example.test".to_owned(), "dean@example.test".to_owned()];
+    mixed.several = vec![
+        "annabel@example.test".to_owned(),
+        "dean@example.test".to_owned(),
+    ];
     assert_eq!(
         judge(&mixed, &live("d", "annabel@example.test", true), &[], &name),
         SignInHealth::SeveralAddresses {
-            addresses: vec!["annabel@example.test".to_owned(), "dean@example.test".to_owned()],
+            addresses: vec![
+                "annabel@example.test".to_owned(),
+                "dean@example.test".to_owned()
+            ],
         }
     );
 }
@@ -152,5 +171,8 @@ fn an_address_two_people_hold_is_shared_and_never_repaired() {
 #[test]
 fn no_address_and_no_live_account_is_no_address() {
     let early = seen(1, None, &["gone"]);
-    assert_eq!(judge(&early, &none(None), &[], &name), SignInHealth::NoAddress);
+    assert_eq!(
+        judge(&early, &none(None), &[], &name),
+        SignInHealth::NoAddress
+    );
 }
