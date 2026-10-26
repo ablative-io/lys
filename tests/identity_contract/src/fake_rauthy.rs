@@ -37,6 +37,9 @@ struct Inner {
     providers: Mutex<Vec<Value>>,
     users: Mutex<Vec<Value>>,
     requests: AtomicUsize,
+    /// The highest account number issued: a real issuer never gives a
+    /// forgotten account's id to a new one.
+    issued: AtomicUsize,
     /// Whether the next account creation is refused, once, as a service
     /// that will not take the request does.
     refuse_create: AtomicBool,
@@ -88,6 +91,7 @@ impl FakeRauthy {
             providers: Mutex::new(Vec::new()),
             users: Mutex::new(Vec::new()),
             requests: AtomicUsize::new(0),
+            issued: AtomicUsize::new(0),
             refuse_create: AtomicBool::new(false),
             issuer: Mutex::new(None),
             keys,
@@ -194,6 +198,15 @@ impl FakeRauthy {
     /// Returns the named fixture fault if a state lock is poisoned.
     pub fn forget(&self, id: &str) -> std::io::Result<()> {
         held(&self.inner.users)?.retain(|user| user["id"] != id);
+        Ok(())
+    }
+
+    /// Hold `user` as an account the issuer already has, under its own id.
+    ///
+    /// # Errors
+    /// Names a poisoned account store.
+    pub fn remember(&self, user: Value) -> std::io::Result<()> {
+        held(&self.inner.users)?.push(user);
         Ok(())
     }
 
@@ -339,7 +352,9 @@ async fn create_user(
             .into_response();
     }
     let mut held = fixture!(held(&inner.users));
-    let id = format!("user-{}", held.len() + 1);
+    let number = held.len().max(inner.issued.load(Ordering::SeqCst)) + 1;
+    inner.issued.store(number, Ordering::SeqCst);
+    let id = format!("user-{number}");
     if let Value::Object(fields) = &mut body {
         fields.insert("id".to_owned(), Value::String(id));
         fields.entry("language").or_insert_with(|| json!("en"));

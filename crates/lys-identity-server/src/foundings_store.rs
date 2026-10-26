@@ -194,7 +194,7 @@ impl Foundings {
     /// mix-up an administrator settles (DIRECTORY-124 R4).
     pub(crate) fn addresses_for(&self, person: &str) -> Vec<&str> {
         if let Some(email) = self.stored.admitted_email.get(person) {
-            return vec![email.as_str()];
+            return vec![email.trim()];
         }
         let mut held: Vec<&str> = self
             .stored

@@ -114,7 +114,7 @@ async fn transition(service: &Service, ada: &str, person: &Value, transition: &s
         .post(
             &format!("/identities/{id}/transitions"),
             Some(ada),
-            &json!({"operation": OperationId::generate()?.to_string(), "transition": transition}),
+            &json!({"operation": OperationId::generate()?.to_string(), "transition": transition, "reason": "DIRECTORY-124 test"}),
         )
         .await?;
     assert_eq!(status, 200, "{answer}");
@@ -282,6 +282,11 @@ async fn october_26_annabel_inside_dean_is_refused_then_one_move_and_one_address
                 .ok_or("Dean's admission")?;
             second["email"] = json!("annabel@example.test");
             rows.insert("second-admission-of-annabel-to-dean".to_owned(), second);
+            // As on the live install, no address was ever set for Dean's record
+            // by an administrator, so both admissions stand for it.
+            if let Some(admitted) = held["admitted_email"].as_object_mut() {
+                admitted.remove(&dean_for_both);
+            }
             std::fs::write(&foundings, serde_json::to_vec(&held)?)?;
             Ok(())
         })

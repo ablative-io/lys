@@ -2,7 +2,7 @@
 //! Local runner control is request-owned, like its signed session asks.
 
 use std::error::Error;
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::io::AsyncReadExt;
 
 #[tokio::test]
 async fn closing_a_local_control_caller_closes_its_peer_and_removes_its_wait()

@@ -55,6 +55,10 @@ async fn table(
         }
         Ok(person)
     }).await?;
+    rauthy.remember(
+        json!({"id": ADMINISTRATOR, "email": "ada@example.test", "email_verified": true,
+        "enabled": true, "language": "en", "roles": [], "user_values": {}}),
+    )?;
     Ok((
         service,
         rauthy,
