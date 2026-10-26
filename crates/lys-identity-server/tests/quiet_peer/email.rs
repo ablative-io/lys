@@ -65,7 +65,7 @@ async fn quiet_email_change_releases_admission_and_another_persons_change() -> O
                 from: "Lys <lys@example.test>".to_owned(),
                 tls: lys_identity_server::mail::Tls::None,
                 sent_file: config.log_dir.with_file_name("sent"),
-            })
+            });
         },
         |config| {
             // The seed holds the administrator and A; B is registered beside them.
