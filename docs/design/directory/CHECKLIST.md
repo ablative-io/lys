@@ -743,8 +743,8 @@
 ## Nobody becomes someone else by a link, an email change or a provider; a mix-up shows and is repaired by one act (DIRECTORY-122)
 
 - [ ] **C850** — A handed link's page names the person and masked email it opens before anything is spent; 'Not me' spends nothing; a browser signed in as another person is refused by name (SignedInAsAnother). DIRECTORY-122/R1.
-- [ ] **C851** — A person's own email change never marks the address verified and never takes effect until a code mailed to it is returned; with no mail, the change is refused and names the administrator route. DIRECTORY-122/R2.
-- [ ] **C852** — A provider login begins a session only on an account whose email is verified and equal to the provider's verified email; otherwise the callback refuses by name and no session is made. DIRECTORY-122/R3.
+- [ ] **C851** — A person's own email change never marks the address verified and never takes effect until codes mailed to the new address and to the address being left are both returned; an address another person holds is refused; with no mail, the change is refused and names the administrator route. DIRECTORY-122/R2.
+- [ ] **C852** — A provider login begins a session only on an account whose email is the address Lys holds for that person, checked by Lys with no change to the issuer; otherwise the callback refuses by name and no session is made. DIRECTORY-122/R3.
 - [ ] **C853** — People shows each person's sign-in email and flags, by name, a person whose sign-in email is not the email they were admitted under. DIRECTORY-122/R4.
 - [ ] **C854** — An administrator moves a sign-in from one person to another person, or to a new person made in the same act, in one signed directory batch with both persons' events naming the actor; refusals by name. DIRECTORY-122/R5.
 - [ ] **C855** — Standing bars hold for DIRECTORY-122; the incident is a red end to end; no fixed wait; no test proves less than before. DIRECTORY-122/R6.

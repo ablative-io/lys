@@ -198,7 +198,7 @@
 
 **S486.** As a person, I want my account's email to change only once I have proved I hold the new address, so that nobody, me included, can quietly put an address on an account that isn't theirs.
 
-**S487.** As a person signing in with Google, I want Google to open only the account whose proven email is mine, so that my Google login never joins someone else's record.
+**S487.** As a person signing in with Google, I want Google to open only the account whose email is the one I was added under or have since proven, so that my Google login never joins someone else's record.
 
 ## Directory administrator — Resolves a refused act
 

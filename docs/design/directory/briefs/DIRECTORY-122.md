@@ -11,15 +11,15 @@ title: Nobody becomes someone else by opening a link, changing an email or signi
 > **Depends on:** DIRECTORY-112, DIRECTORY-121
 > **Checklist:**
 > - C850 — A handed link's page names the person and masked email it opens before anything is spent; 'Not me' spends nothing; a browser signed in as another person is refused by name (SignedInAsAnother). DIRECTORY-122/R1.
-> - C851 — A person's own email change never marks the address verified and never takes effect until a code mailed to it is returned; with no mail, the change is refused and names the administrator route. DIRECTORY-122/R2.
-> - C852 — A provider login begins a session only on an account whose email is verified and equal to the provider's verified email; otherwise the callback refuses by name and no session is made. DIRECTORY-122/R3.
+> - C851 — A person's own email change never marks the address verified and never takes effect until codes mailed to the new address and to the address being left are both returned; an address another person holds is refused; with no mail, the change is refused and names the administrator route. DIRECTORY-122/R2.
+> - C852 — A provider login begins a session only on an account whose email is the address Lys holds for that person, checked by Lys with no change to the issuer; otherwise the callback refuses by name and no session is made. DIRECTORY-122/R3.
 > - C853 — People shows each person's sign-in email and flags, by name, a person whose sign-in email is not the email they were admitted under. DIRECTORY-122/R4.
 > - C854 — An administrator moves a sign-in from one person to another person, or to a new person made in the same act, in one signed directory batch with both persons' events naming the actor; refusals by name. DIRECTORY-122/R5.
 > - C855 — Standing bars hold for DIRECTORY-122; the incident is a red end to end; no fixed wait; no test proves less than before. DIRECTORY-122/R6.
 > **Stories:**
 > - S485 (Person who signs in, Keeps their sign-in identities to themselves) — As a person opening a sign-in link, I want to be told whose account it opens before it signs me in, and to stop without using it up if it is not mine, so that I never become someone else by clicking the wrong link.
 > - S486 (Person who signs in, Keeps their sign-in identities to themselves) — As a person, I want my account's email to change only once I have proved I hold the new address, so that nobody, me included, can quietly put an address on an account that isn't theirs.
-> - S487 (Person who signs in, Keeps their sign-in identities to themselves) — As a person signing in with Google, I want Google to open only the account whose proven email is mine, so that my Google login never joins someone else's record.
+> - S487 (Person who signs in, Keeps their sign-in identities to themselves) — As a person signing in with Google, I want Google to open only the account whose email is the one I was added under or have since proven, so that my Google login never joins someone else's record.
 > - S488 (Administrator, Suspends, reinstates and retires identities, and reads why a check refused) — As an administrator reading People, I want each person's sign-in email beside their name and a mismatch with the email they were added under called out, so that I see a mix-up the day it happens.
 > - S489 (Administrator, Suspends, reinstates and retires identities, and reads why a check refused) — As an administrator, I want to move a sign-in that landed on the wrong person to the right person in one recorded act, so that a mix-up is repaired in Lys and never by hand.
 > - S490 (Directory administrator, Resolves a refused act) — As a directory administrator, I want the 26 October incident replayed as a failing test that passes only with this change, so that it is proven it cannot happen again.
@@ -58,10 +58,10 @@ THE SYSTEM SHALL answer GET /organisations/found/{proof}/whom, without spending 
 
 ### R2: A person's own email change takes effect only when the new address is proven
 
-WHEN a person asks POST /me/account/email THE SYSTEM SHALL leave the account's email unchanged, mail a single-use code to the new address, and change the email (verified) only when POST /me/account/email/confirm returns that code from the same signed-in person; the code is spent on use and replaced by a newer ask; no write ever sets email_verified true for an address that was not proven this way or typed by an administrator. WHEN Lys has no mail settings THE SYSTEM SHALL refuse the ask with 409 EmailChangeNeedsMail, which names that an administrator changes the email from the person's Account page (POST /directory/people/{id}/account/email). An administrator's change is unchanged. The password confirmation for accounts that have one stays as it is.
+WHEN a person asks POST /me/account/email THE SYSTEM SHALL leave the account's email unchanged and mail a single-use code to the new address and a second single-use code to the address Lys holds for the person's sign-in (R3), and change the email (verified) only when POST /me/account/email/confirm returns both codes from the same signed-in person; each code is spent on use and both are replaced by a newer ask; a new address held by another person is refused EmailHeldByAnother (DIRECTORY-121) before any letter is sent; no write ever sets email_verified true for an address that was not proven this way or typed by an administrator. A confirmed change replaces the address Lys holds for the person. WHEN Lys has no mail settings THE SYSTEM SHALL refuse the ask with 409 EmailChangeNeedsMail, which names that an administrator changes the email from the person's Account page (POST /directory/people/{id}/account/email). An administrator's change is unchanged except that it also replaces the address Lys holds. The password confirmation for accounts that have one stays as it is.
 
 **Acceptance:**
-- Red first (crates/lys-identity-server/src/accounts_own_tests.rs): with no mail, a password-less account's own email change is refused EmailChangeNeedsMail and the issuer's account is unchanged (email and email_verified); with mail, the ask changes nothing until the mailed code is confirmed, a wrong or spent code is refused by name, and the confirmed change is verified.
+- Red first (crates/lys-identity-server/src/accounts_own_tests.rs): with no mail, a password-less account's own email change is refused EmailChangeNeedsMail and the issuer's account is unchanged (email and email_verified); with mail, the ask changes nothing until both mailed codes are confirmed, a wrong, missing or spent code is refused by name, a new address another person holds is refused EmailHeldByAnother with no letter sent, and the confirmed change is verified and becomes the held address; an administrator's change also becomes the held address.
 - surface/identity/tests/account.test.tsx: the Account page's email change shows the code step with mail and the ask-an-administrator words without it; it never shows the new email as the account's before confirmation.
 
 **Files:**
@@ -73,29 +73,31 @@ WHEN a person asks POST /me/account/email THE SYSTEM SHALL leave the account's e
 - modify: surface/identity/tests/account.test.tsx
 
 **Checklist:**
-- C851 — A person's own email change never marks the address verified and never takes effect until a code mailed to it is returned; with no mail, the change is refused and names the administrator route. DIRECTORY-122/R2.
+- C851 — A person's own email change never marks the address verified and never takes effect until codes mailed to the new address and to the address being left are both returned; an address another person holds is refused; with no mail, the change is refused and names the administrator route. DIRECTORY-122/R2.
 
 **Stories:**
 - S486 (Person who signs in, Keeps their sign-in identities to themselves) — As a person, I want my account's email to change only once I have proved I hold the new address, so that nobody, me included, can quietly put an address on an account that isn't theirs.
 
-### R3: A provider login opens only the account whose proven email is the provider's
+### R3: A provider login opens only the account whose email is the address Lys holds for that person
 
-WHEN an issuer callback completes for a login made through a provider (Google or any configured upstream) THE SYSTEM SHALL, before beginning any session, read the issuer account and require that its email is verified and equal (case-insensitively, after trimming) to the email the provider asserted as verified for that login; otherwise it SHALL refuse with ProviderEmailMismatch, naming the provider and both addresses masked, begin no session, and record the refusal where sign-in refusals are recorded. The provider join stays as configured; Lys does not trust it alone.
+Lys keeps, for each person, the address it holds for their sign-in: the address they were founded or admitted under (the first, kept when a link is replaced), replaced only by an administrator's email change or a confirmed R2 change. WHEN an issuer callback completes for a login made through a provider (Google or any configured upstream) THE SYSTEM SHALL, before beginning any session, read the issuer account through the administration API Lys already uses and require that its email equals (case-insensitively, after trimming) the address Lys holds for the person the account is bound to; otherwise it SHALL refuse with ProviderEmailMismatch, naming the provider and both addresses masked (the account's and the held one), begin no session, and record the refusal where sign-in refusals are recorded. The issuer's provider join stays as configured and its authentication code is not changed: it joins only on an equal email, so the account's email being the held address is what ties the login to the person. The issuer's email_verified flag is not consulted, since accounts made by an admit are unverified there and the old own-email route wrote it for unproven addresses. A person for whom Lys holds no address has the account's email recorded at their first provider sign-in after install, and People (R4) says it was recorded at sign-in.
 
 **Acceptance:**
-- Red first (crates/lys-identity-server/src/sign_in_callback_tests.rs, against the FakeRauthy the account tests use): a Google login joined to an account whose email was set unverified is refused ProviderEmailMismatch and no session cookie is set; a Google login on an account whose verified email equals Google's verified email signs in as today; a Google login whose asserted email is unverified is refused.
+- Red first (crates/lys-identity-server/src/sign_in_callback_tests.rs, against the FakeRauthy the account tests use, with no issuer change): a Google login on an account whose email is not the held address is refused ProviderEmailMismatch, no session cookie is set and the refusal is recorded; a Google login on an account whose email is the held address signs in as today, whether or not the issuer marks it verified; a person with no held address signs in and the account's email becomes held.
+- surface/identity/issuer/rauthy-0.36.2-lys.patch and surface/identity/issuer/README.md are unchanged from origin/main; no header from the issuer is read.
 
 **Files:**
 - create: crates/lys-identity-server/src/sign_in_callback_tests.rs
-- modify: crates/lys-identity-server/src/sign_in_callback.rs
+- modify: crates/lys-identity-server/src/foundings_store.rs
 - modify: crates/lys-identity-server/src/session_admission.rs
+- modify: crates/lys-identity-server/src/sign_in_callback.rs
 - modify: crates/lys-identity-server/src/sign_in_providers.rs
 
 **Checklist:**
-- C852 — A provider login begins a session only on an account whose email is verified and equal to the provider's verified email; otherwise the callback refuses by name and no session is made. DIRECTORY-122/R3.
+- C852 — A provider login begins a session only on an account whose email is the address Lys holds for that person, checked by Lys with no change to the issuer; otherwise the callback refuses by name and no session is made. DIRECTORY-122/R3.
 
 **Stories:**
-- S487 (Person who signs in, Keeps their sign-in identities to themselves) — As a person signing in with Google, I want Google to open only the account whose proven email is mine, so that my Google login never joins someone else's record.
+- S487 (Person who signs in, Keeps their sign-in identities to themselves) — As a person signing in with Google, I want Google to open only the account whose email is the one I was added under or have since proven, so that my Google login never joins someone else's record.
 
 ### R4: People shows each person's sign-in email and calls out a mismatch
 
@@ -170,3 +172,12 @@ THE SYSTEM SHALL hold every standing bar on the exact final commit: cargo fmt, c
 - Red first: every new test, the replay included, is run before the code and its failing lines kept in the handback.
 - Walked on the installed Lys: open a handed link while signed in as another person and read the refusal; open it signed out and read whose it is; press This isn't me and confirm the link still works for its person; try an own email change with no mail and read the administrator words; then, as Tom, move Annabel's sign-in off Dean's record with R5's act and sign in as each to confirm who they are. Each step's screen is read, not assumed.
 - Hospital line: If this code were used in a hospital, the worst credible failure is a nurse who opens a colleague's sign-in link by mistake and works the rest of the week as that colleague, every order and every note under someone else's name, and it could harm about every patient either of them touches until an audit notices.
+
+## Amendments
+
+### Amendment 1: R3 is enforced by Lys alone; R2 proves the address being left as well as the new one
+
+- **Date:** 2026-10-26
+- **By:** Waffles
+
+The first writing of R3 required the provider's asserted email, which Lys can only learn from a patched issuer; the lane patched Rauthy's authentication code to send it. That is refused: the issuer is a pinned image swapped by hand, and a callback that needs the new image refuses every provider sign-in until the swap, which is the wrong refusal that cannot happen. Rauthy's auto_link joins a provider login only to an account whose email equals the provider's, so R3 now requires the account's email to equal the address Lys holds for the person, read through the administration API, and never consults the issuer's email_verified flag (unset on every admitted account, wrongly set by the old own-email route). Equality alone would let a link holder move the account to their own proven inbox, so R2 now also mails a code to the address being left and refuses a new address another person holds. The 26 October record (Dean's person, account email Annabel's, held address Dean's from the retained link) is refused at sign-in after install until R5 moves the login, which is the repair Tom asked for.

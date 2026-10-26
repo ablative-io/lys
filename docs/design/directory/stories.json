@@ -413,7 +413,7 @@
         },
         {
           "id": "S487",
-          "text": "As a person signing in with Google, I want Google to open only the account whose proven email is mine, so that my Google login never joins someone else's record."
+          "text": "As a person signing in with Google, I want Google to open only the account whose email is the one I was added under or have since proven, so that my Google login never joins someone else's record."
         }
       ]
     },
