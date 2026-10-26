@@ -155,7 +155,9 @@ describe('Sign-in mix-ups (DIRECTORY-122)', () => {
     expect($('form[aria-label="Move sign-in"]')).not.toBeNull();
   });
   it('offers no move to a non-administrator', async () => {
-    await mount('#/file/' + BEA + '/credentials', { ...accountRoutes, ...BEA_SERVICE });
+    await mount('#/file/' + BEA + '/credentials', { ...accountRoutes, ...BEA_SERVICE,
+      '/directory/people': refused(403, 'NotAdmitted', 'Only administrators'),
+    });
     expect($('button[aria-label="This sign-in belongs to someone else"]')).toBeNull();
   });
 });

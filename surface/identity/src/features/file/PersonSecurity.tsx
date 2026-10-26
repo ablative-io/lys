@@ -6,6 +6,7 @@ import { DirectoryGate as Gate } from '../people/Words';
 import { RecordedForm } from '../people/RecordedForm';
 import { AdmissionWaiting, PersonAccount } from '../people/Account';
 import { reasonOf } from '../sign-in/SignIn';
+import { Act } from '../../shell/Act';
 import type { PersonSummary } from '../../generated';
 
 export function PersonCredentials({ id }: { id: string }) {
@@ -53,7 +54,7 @@ function MoveLogin({ id, login, people, moved }: {
   const [failure, setFailure] = useState('');
   const [answer, setAnswer] = useState('');
   return <div>
-    <button type="button" aria-label="This sign-in belongs to someone else" onClick={() => setOpen(true)} disabled={busy}>This sign-in belongs to someone else</button>
+    <Act symbol="open" name="This sign-in belongs to someone else" word="Not theirs" onClick={() => setOpen(true)} disabled={busy} />
     {open ? <form aria-label="Move sign-in" onSubmit={(event) => {
       event.preventDefault();
       if (busy) return;
@@ -73,8 +74,8 @@ function MoveLogin({ id, login, people, moved }: {
       <label>Existing person<select name="person" defaultValue=""><option value="">Choose a person</option>{people.filter((person) => person.id !== id).map((person) => <option key={person.id} value={person.id}>{person.display_name}</option>)}</select></label>
       <label>Or a new person’s name<input name="display_name" autoComplete="off" /></label>
       <p>The target keeps their existing sign-ins. Grants stay with their people. Sessions begun with this sign-in will end.</p>
-      <button type="submit" disabled={busy}>Move sign-in</button>
-      <button type="button" disabled={busy} onClick={() => setOpen(false)}>Cancel</button>
+      <Act symbol="approve" name="Move sign-in" word="Move" tone="primary" type="submit" disabled={busy} />
+      <Act symbol="close" name="Cancel" word="Cancel" disabled={busy} onClick={() => setOpen(false)} />
     </form> : null}
     {failure ? <p role="alert">{failure}</p> : null}
     {answer ? <p role="status">{answer}</p> : null}
