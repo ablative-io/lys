@@ -434,6 +434,7 @@ async fn each_refusal_is_the_librarys_own_bytes() -> TestResult {
 
 const ROUTE: &str = include_str!("../src/start.rs");
 const ROUTES: &str = include_str!("../src/routes_startup.rs");
+const WIRING: &str = include_str!("../src/door_handles.rs");
 
 #[test]
 fn the_route_holds_no_start_logic_and_reads_the_door_through_the_seam() {
@@ -449,9 +450,9 @@ fn the_route_holds_no_start_logic_and_reads_the_door_through_the_seam() {
     }
     assert!(ROUTE.contains("pub handles: Box<dyn HandleRecords + Send + Sync>"));
     assert!(!ROUTE.contains("DoorHandles") && !ROUTE.contains("door_handles"));
-    assert!(ROUTES.contains("let handles = door_handles::DoorHandles::unconfigured();"));
-    assert!(ROUTES.contains("Box::new(handles),\n        door_handles::credential_id,"));
-    assert!(ROUTES.contains("let start_service = start_service(config, &state)?;"));
+    assert!(WIRING.contains("let handles = DoorHandles::unconfigured();"));
+    assert!(WIRING.contains("Box::new(handles),\n        credential_id,"));
+    assert!(ROUTES.contains("let start_service = crate::routes::door_handles::start_service(config, &state)?;"));
     assert!(ROUTES.contains("let starts = start::routes(start_service);"));
     assert!(ROUTE.contains("StartService::new_with_passes("));
 }

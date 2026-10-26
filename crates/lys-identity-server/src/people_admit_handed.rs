@@ -91,6 +91,7 @@ pub(crate) struct AdmissionView {
 
 /// The withdrawn record, named by digest without disclosing the token.
 #[derive(Serialize, utoipa::ToSchema)]
+#[schema(as = AdmissionWithdrawn)]
 pub(crate) struct Withdrawn {
     /// The person whose link was withdrawn.
     person: String,

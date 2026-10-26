@@ -223,9 +223,9 @@ fn reused_connections_have_kernel_keepalive_configured() -> TestResult {
         return Err("expected loopback stream".into());
     };
     assert!(rustix::net::sockopt::socket_keepalive(stream)?);
-    assert_eq!(rustix::net::sockopt::tcp_keepidle(stream)?.as_secs(), 60);
+    assert_eq!(rustix::net::sockopt::tcp_keepidle(stream)?.as_secs(), 30);
     assert_eq!(rustix::net::sockopt::tcp_keepintvl(stream)?.as_secs(), 10);
-    assert_eq!(rustix::net::sockopt::tcp_keepcnt(stream)?, 3);
+    assert_eq!(rustix::net::sockopt::tcp_keepcnt(stream)?, 5);
     Ok(())
 }
 

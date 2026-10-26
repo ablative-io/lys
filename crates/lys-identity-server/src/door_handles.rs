@@ -283,3 +283,27 @@ pub fn report(handles: &DoorHandles, agent: &str) -> String {
         HandleAnswer::Unreadable { reason } => format!("unreadable: {reason}"),
     }
 }
+
+/// The start route's service over the directory `state` holds. The route
+/// reads the handle record through this client, [`DoorHandles`], as its
+/// `HandleRecords`, so the route never names the door. No configuration
+/// field names the door yet, so the client is built without an address and
+/// answers that no handle record exists, naming SECRETS-002, until one does.
+/// Launch records are kept in `launch-records` beside the directory log.
+///
+/// # Errors
+/// Names an unreadable service key or a launch-record store that cannot open.
+pub(crate) fn start_service(
+    config: &crate::config::Config,
+    state: &crate::routes::Shared,
+) -> Result<std::sync::Arc<crate::routes::start::StartService>, crate::error::ServerError> {
+    let handles = DoorHandles::unconfigured();
+    let dir = config.log_dir.with_file_name("launch-records");
+    crate::routes::start::directory_service(
+        state,
+        Box::new(handles),
+        credential_id,
+        &dir,
+        lys_identity::signer::load_service_key(&config.event_key_file)?,
+    )
+}

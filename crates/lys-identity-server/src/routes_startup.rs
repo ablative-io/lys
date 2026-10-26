@@ -443,7 +443,7 @@ fn served_routes(
         .merge(crate::memory_api::routes(config))
         .merge(crate::certificates_api::routes())
         .with_state(Arc::clone(&state));
-    let start_service = start::configured_service(config, &state)?;
+    let start_service = crate::routes::door_handles::start_service(config, &state)?;
     crate::agent_pass_recovery::at_start(&state, &start_service)?;
     // The dashboard reads the launch records an agent gave (AGENTS-016 R5).
     let launches = axum::Extension(Arc::clone(&start_service));
