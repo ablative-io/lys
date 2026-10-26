@@ -71,6 +71,7 @@ impl SpiceDb {
             relations: self.relations.clone(),
             scope: self.scope.clone(),
             client: Arc::clone(&self.client),
+            post_json: self.post_json,
             tokens: Arc::clone(&self.tokens),
             confirmed: Arc::clone(&self.confirmed),
             app_kinds: Mutex::new(

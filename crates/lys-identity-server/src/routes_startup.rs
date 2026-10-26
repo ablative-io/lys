@@ -223,10 +223,7 @@ async fn make_state(
     checked: &crate::stores_receipt::Checked,
 ) -> Result<Shared, ServerError> {
     let model = auxiliary.apps.model()?;
-    let spicedb = config
-        .spicedb
-        .clone()
-        .map(crate::spicedb_outbound::engine);
+    let spicedb = config.spicedb.clone().map(crate::spicedb_outbound::engine);
     // The provider reads its kept tokens on the sessions' clock, the
     // service's own (DIRECTORY-099 R1).
     let sessions = sessions(config, clock)?;

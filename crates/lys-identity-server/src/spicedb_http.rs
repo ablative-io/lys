@@ -55,13 +55,13 @@ impl Client {
             .idle
             .lock()
             .map_err(|error| format!("{authority} connection pool is poisoned: {error}"))?;
-        let held = pooled
+        let checked_out = pooled
             .iter()
             .position(|(host, _)| host == authority)
             .map(|n| pooled.swap_remove(n).1);
         drop(pooled);
-        let reused = held.is_some();
-        let mut stream = match held {
+        let reused = checked_out.is_some();
+        let mut stream = match checked_out {
             Some(stream) => stream,
             None => connect(authority)?,
         };

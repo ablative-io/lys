@@ -213,8 +213,14 @@ fn text_of(body: &str) -> Result<String, GrantError> {
 
 impl SpiceDb {
     pub(super) fn raw(&self, path: &str, body: &Value) -> Result<(u16, String), GrantError> {
-        let answer = (self.post_json)(&self.client, &self.endpoint, path, &self.key, &body.to_string())
-            .map_err(unavailable)?;
+        let answer = (self.post_json)(
+            &self.client,
+            &self.endpoint,
+            path,
+            &self.key,
+            &body.to_string(),
+        )
+        .map_err(unavailable)?;
         let body = answer.body.replace(self.key.as_ref(), "[redacted]");
         Ok((answer.status, body))
     }
