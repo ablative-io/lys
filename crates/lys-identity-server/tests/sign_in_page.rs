@@ -251,8 +251,10 @@ async fn failed_sign_ins_from_one_address_do_not_bar_another() -> TestResult {
 #[tokio::test]
 async fn a_provider_sign_in_passes_through_the_provider_and_lys_only() -> TestResult {
     let (service, _accounts) = identity_contract::fake_rauthy::FakeRauthy::service_for(&Login {
-        subject: "google-subject".to_owned(), email: "g@example.test".to_owned(),
-    }).await?;
+        subject: "google-subject".to_owned(),
+        email: "g@example.test".to_owned(),
+    })
+    .await?;
     service.issuer.sign_in_as(Login {
         subject: "google-subject".to_owned(),
         email: "g@example.test".to_owned(),

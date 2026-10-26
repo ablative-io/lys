@@ -22,7 +22,9 @@ pub(super) fn held(state: &AppState, person: &str) -> Result<String, ServerError
             .email_for(person)
             .map(str::to_owned)
             .ok_or_else(|| {
-                super::refused("Lys has no held address for you. Ask an administrator to change your email.")
+                super::refused(
+                    "Lys has no held address for you. Ask an administrator to change your email.",
+                )
             })
     })
 }

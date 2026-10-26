@@ -287,15 +287,14 @@ impl IssuerSignIn {
             Err(error) => Err(error.into()),
         };
         match outcome {
-            Ok((code, answered)) if answered == held.state => {
-                oidc.finish_provider(code, &held.state)
-                    .await
-                    .map(|actor| ProviderLogin {
-                        actor,
-                        provider: held.provider,
-                    })
-                    .map_err(Into::into)
-            }
+            Ok((code, answered)) if answered == held.state => oidc
+                .finish_provider(code, &held.state)
+                .await
+                .map(|actor| ProviderLogin {
+                    actor,
+                    provider: held.provider,
+                })
+                .map_err(Into::into),
             Ok(_) => {
                 oidc.abandon(&held.state)?;
                 Err(ServerError::SignInStateUnknown.into())

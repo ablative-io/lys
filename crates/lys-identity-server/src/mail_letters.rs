@@ -88,8 +88,8 @@ impl Letter {
     #[must_use]
     pub fn to(&self) -> &str {
         match self {
-            Self::EmailChange { email, .. } => email,
-            Self::Added { email, .. }
+            Self::EmailChange { email, .. }
+            | Self::Added { email, .. }
             | Self::AccessGiven { email, .. }
             | Self::Founded { email, .. }
             | Self::AlreadyYours { email, .. } => email,
@@ -101,11 +101,10 @@ impl Letter {
     #[must_use]
     pub fn recipient(&self) -> &str {
         match self {
-            Self::EmailChange { .. } => "",
             Self::Added { name, .. }
             | Self::AccessGiven { name, .. }
             | Self::Founded { name, .. } => name,
-            Self::AlreadyYours { .. } => "",
+            Self::EmailChange { .. } | Self::AlreadyYours { .. } => "",
         }
     }
 
@@ -131,7 +130,9 @@ impl Letter {
                 } else {
                     "new email"
                 };
-                format!("Return this code for your {mailbox} on your Lys Account page, together with the code from the other mailbox. Code: {code}\nIf you did not ask for this, ignore this letter.")
+                format!(
+                    "Return this code for your {mailbox} on your Lys Account page, together with the code from the other mailbox. Code: {code}\nIf you did not ask for this, ignore this letter."
+                )
             }
             Self::Added {
                 name,

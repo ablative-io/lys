@@ -311,9 +311,11 @@ fn check_fit(identity: IdentityId, change: &Change) -> Result<(), IdentityError>
         ) => Err(IdentityError::ChangeMismatch {
             reason: "an agent registration names an agent",
         }),
-        (Change::BindLogin { .. } | Change::UnbindLogin { .. }, IdentityId::Agent(_)) => Err(IdentityError::ChangeMismatch {
-            reason: "a login is bound to a person, never to an agent",
-        }),
+        (Change::BindLogin { .. } | Change::UnbindLogin { .. }, IdentityId::Agent(_)) => {
+            Err(IdentityError::ChangeMismatch {
+                reason: "a login is bound to a person, never to an agent",
+            })
+        }
         (Change::AdmissionWithdrawn { .. }, IdentityId::Agent(_)) => {
             Err(IdentityError::ChangeMismatch {
                 reason: "an admission withdrawal names a person",

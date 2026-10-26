@@ -192,7 +192,17 @@ async fn table() -> Result<(Service, FakeRauthy, String), Box<dyn Error>> {
     Ok((service, api, cookie))
 }
 
-async fn table_with_mail(mail: bool) -> Result<(Service, FakeRauthy, String, identity_contract::mail_sink::MailSink), Box<dyn Error>> {
+async fn table_with_mail(
+    mail: bool,
+) -> Result<
+    (
+        Service,
+        FakeRauthy,
+        String,
+        identity_contract::mail_sink::MailSink,
+    ),
+    Box<dyn Error>,
+> {
     let sink = identity_contract::mail_sink::MailSink::start().await?;
     let port = sink.port();
     let rauthy = FakeRauthy::start().await?;
@@ -209,8 +219,12 @@ async fn table_with_mail(mail: bool) -> Result<(Service, FakeRauthy, String, ide
         move |config| {
             config.password_policy = Some(changes::fixture_password_policy());
             config.mail = mail.then(|| lys_identity_server::mail::MailSettings {
-                host: "127.0.0.1".to_owned(), port, user: None, password_file: None,
-                from: "Lys <lys@example.test>".to_owned(), tls: lys_identity_server::mail::Tls::None,
+                host: "127.0.0.1".to_owned(),
+                port,
+                user: None,
+                password_file: None,
+                from: "Lys <lys@example.test>".to_owned(),
+                tls: lys_identity_server::mail::Tls::None,
                 sent_file: config.log_dir.with_file_name("letters-sent.jsonl"),
             });
             config.requests_dir = None;

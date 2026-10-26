@@ -100,7 +100,11 @@ pub(crate) struct Withdrawn {
 
 /// Require an active person holding organisation.administer in the target's
 /// organisation. Authority over a different organisation admits nothing.
-pub(crate) fn administrator(state: &AppState, actor: &Actor, person: PersonId) -> Result<(), ServerError> {
+pub(crate) fn administrator(
+    state: &AppState,
+    actor: &Actor,
+    person: PersonId,
+) -> Result<(), ServerError> {
     use lys_identity::grants::{Action, ExerciseRequest, GrantError, Resource, Route};
     crate::grants::with_grants(state, |mut judged| {
         let (caller, organisation) =

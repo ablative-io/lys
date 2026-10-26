@@ -64,7 +64,10 @@ async fn poisoned_provider_flights_refuse_start_abandon_and_finish() -> Result<(
     assert!(poisoned.is_err());
     let start = oidc.begin_provider("192.0.2.1".parse()?).map(drop);
     let abandon = oidc.abandon("state");
-    let finish = oidc.finish_provider("code".to_owned(), "state").await.map(drop);
+    let finish = oidc
+        .finish_provider("code".to_owned(), "state")
+        .await
+        .map(drop);
     for result in [start, abandon, finish] {
         let refusal = result
             .err()

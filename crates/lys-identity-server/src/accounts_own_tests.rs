@@ -33,7 +33,14 @@ async fn table() -> Result<(Service, FakeRauthy, String)> {
     Ok((service, rauthy, cookie))
 }
 
-async fn table_with_mail(mail: bool) -> Result<(Service, FakeRauthy, String, identity_contract::mail_sink::MailSink)> {
+async fn table_with_mail(
+    mail: bool,
+) -> Result<(
+    Service,
+    FakeRauthy,
+    String,
+    identity_contract::mail_sink::MailSink,
+)> {
     let sink = identity_contract::mail_sink::MailSink::start().await?;
     let port = sink.port();
     let rauthy = FakeRauthy::start().await?;
@@ -67,12 +74,18 @@ async fn table_with_mail(mail: bool) -> Result<(Service, FakeRauthy, String, ide
         None,
         Some(settings),
         move |config| {
-            config.mail = mail.then(|| identity_contract::lys_identity_server::mail::MailSettings {
-                host: "127.0.0.1".to_owned(), port, user: None, password_file: None,
-                from: "Lys <lys@example.test>".to_owned(),
-                tls: identity_contract::lys_identity_server::mail::Tls::None,
-                sent_file: config.log_dir.with_file_name("letters-sent.jsonl"),
-            });
+            config.mail =
+                mail.then(
+                    || identity_contract::lys_identity_server::mail::MailSettings {
+                        host: "127.0.0.1".to_owned(),
+                        port,
+                        user: None,
+                        password_file: None,
+                        from: "Lys <lys@example.test>".to_owned(),
+                        tls: identity_contract::lys_identity_server::mail::Tls::None,
+                        sent_file: config.log_dir.with_file_name("letters-sent.jsonl"),
+                    },
+                );
         },
         |config| {
             identity_contract::lys_identity_server::dev_seed::seed_configured(
@@ -81,11 +94,18 @@ async fn table_with_mail(mail: bool) -> Result<(Service, FakeRauthy, String, ide
             )?;
             let directory = server::routes::open_directory(config)?;
             let binding = LoginBinding::new(&config.issuer, &subject)?;
-            let person = directory.projection()?.person_for(&binding).ok_or("Gail's person")?;
-            std::fs::write(config.log_dir.with_file_name("foundings.json"), json!({
-                "format": crate::foundings_store::FORMAT, "foundings": {},
-                "admitted_email": {(person.to_string()): "gail@example.test"},
-            }).to_string())?;
+            let person = directory
+                .projection()?
+                .person_for(&binding)
+                .ok_or("Gail's person")?;
+            std::fs::write(
+                config.log_dir.with_file_name("foundings.json"),
+                json!({
+                    "format": crate::foundings_store::FORMAT, "foundings": {},
+                    "admitted_email": {(person.to_string()): "gail@example.test"},
+                })
+                .to_string(),
+            )?;
             drop(directory);
             let sessions = crate::session::Sessions::open(
                 config.sessions_file.clone().ok_or("session file missing")?,
@@ -167,14 +187,30 @@ async fn an_unverified_address_stays_unverified_when_setting_a_first_password() 
     let mut user = rauthy.users()?[0].clone();
     let id = user["id"].as_str().ok_or("Gail's account")?.to_owned();
     user["email_verified"] = json!(false);
-    reqwest::Client::new().put(format!("{}/users/{id}", rauthy.api()))
+    reqwest::Client::new()
+        .put(format!("{}/users/{id}", rauthy.api()))
         .header(reqwest::header::AUTHORIZATION, format!("API-Key {API_KEY}"))
-        .json(&user).send().await?.error_for_status()?;
-    let (status, answer) = service.post("/me/account/email", Some(&gail), &json!({"email":"annabel@example.test"})).await?;
+        .json(&user)
+        .send()
+        .await?
+        .error_for_status()?;
+    let (status, answer) = service
+        .post(
+            "/me/account/email",
+            Some(&gail),
+            &json!({"email":"annabel@example.test"}),
+        )
+        .await?;
     assert_eq!(status, 409, "{answer}");
     assert_eq!(answer["refusal"], "EmailChangeNeedsMail");
     assert_eq!(rauthy.users()?[0], user);
-    let (status, answer) = service.post("/me/account/password", Some(&gail), &json!({"password":"Gail-First-Password-77"})).await?;
+    let (status, answer) = service
+        .post(
+            "/me/account/password",
+            Some(&gail),
+            &json!({"password":"Gail-First-Password-77"}),
+        )
+        .await?;
     assert_eq!(status, 200, "{answer}");
     assert_eq!(rauthy.users()?[0]["email_verified"], false);
     Ok(())
@@ -182,7 +218,11 @@ async fn an_unverified_address_stays_unverified_when_setting_a_first_password() 
 
 /// Codes are taken from letters, with no clock or mailbox polling.
 fn code(letter: &identity_contract::mail_sink::Captured) -> Result<&str> {
-    letter.body.split("Code: ").nth(1).and_then(|s| s.split_whitespace().next())
+    letter
+        .body
+        .split("Code: ")
+        .nth(1)
+        .and_then(|s| s.split_whitespace().next())
         .ok_or_else(|| "the mailed code".into())
 }
 
@@ -204,68 +244,143 @@ async fn both_mailed_codes_are_bound_to_the_person_replaced_and_spent() -> Resul
     assert!(first.body.contains("new email"));
     assert!(held.body.contains("email you are leaving"));
     assert_ne!(code(&first)?, code(&held)?);
-    for body in [json!({}), json!({"code":code(&first)?}),
-        json!({"held_code":code(&held)?}), json!({"code":"wrong", "held_code":code(&held)?}),
-        json!({"code":code(&first)?, "held_code":"wrong"})] {
-        let (status, refused) = service.post("/me/account/email/confirm", Some(&gail), &body).await?;
+    for body in [
+        json!({}),
+        json!({"code":code(&first)?}),
+        json!({"held_code":code(&held)?}),
+        json!({"code":"wrong", "held_code":code(&held)?}),
+        json!({"code":code(&first)?, "held_code":"wrong"}),
+    ] {
+        let (status, refused) = service
+            .post("/me/account/email/confirm", Some(&gail), &body)
+            .await?;
         assert_eq!(status, 409, "{refused}");
         assert_eq!(refused["refusal"], "EmailChangeCodeRefused");
         assert_eq!(rauthy.users()?, before);
     }
-    assert_eq!(service.post("/me/account/email", Some(&gail), &ask).await?.0, 200);
+    assert_eq!(
+        service
+            .post("/me/account/email", Some(&gail), &ask)
+            .await?
+            .0,
+        200
+    );
     let second = sink.next().await.ok_or("the replacement new code")?;
     let next_held = sink.next().await.ok_or("the replacement held code")?;
     assert_ne!(code(&first)?, code(&second)?);
     assert_ne!(code(&held)?, code(&next_held)?);
-    for body in [json!({"code":code(&first)?, "held_code":code(&held)?}),
+    for body in [
+        json!({"code":code(&first)?, "held_code":code(&held)?}),
         json!({"code":code(&second)?, "held_code":code(&held)?}),
-        json!({"code":code(&first)?, "held_code":code(&next_held)?})] {
-        assert_eq!(service.post("/me/account/email/confirm", Some(&gail), &body).await?.1["refusal"], "EmailChangeCodeRefused");
+        json!({"code":code(&first)?, "held_code":code(&next_held)?}),
+    ] {
+        assert_eq!(
+            service
+                .post("/me/account/email/confirm", Some(&gail), &body)
+                .await?
+                .1["refusal"],
+            "EmailChangeCodeRefused"
+        );
     }
     let proof = json!({"code":code(&second)?, "held_code":code(&next_held)?});
-    let bea = service.sign_in(identity_contract::fake_issuer::Login { subject:"other-subject".to_owned(), email:"bea@example.test".to_owned() }).await?;
-    let (status, wrong_person) = service.post("/me/account/email/confirm", Some(&bea), &proof).await?;
+    let bea = service
+        .sign_in(identity_contract::fake_issuer::Login {
+            subject: "other-subject".to_owned(),
+            email: "bea@example.test".to_owned(),
+        })
+        .await?;
+    let (status, wrong_person) = service
+        .post("/me/account/email/confirm", Some(&bea), &proof)
+        .await?;
     assert_eq!(status, 409, "{wrong_person}");
     assert_eq!(wrong_person["refusal"], "EmailChangeCodeRefused");
     assert_eq!(rauthy.users()?, before);
-    let (status, changed) = service.post("/me/account/email/confirm", Some(&gail), &proof).await?;
+    let (status, changed) = service
+        .post("/me/account/email/confirm", Some(&gail), &proof)
+        .await?;
     assert_eq!(status, 200, "{changed}");
     assert_eq!(changed["email"], "gail@lovelace.test");
     assert_eq!(rauthy.users()?[0]["email_verified"], true);
-    let stored: Value = serde_json::from_slice(&std::fs::read(service.dir.path().join("foundings.json"))?)?;
+    let stored: Value =
+        serde_json::from_slice(&std::fs::read(service.dir.path().join("foundings.json"))?)?;
     assert_eq!(stored["admitted_email"][person], "gail@lovelace.test");
-    assert_eq!(service.post("/me/account/email/confirm", Some(&gail), &proof).await?.1["refusal"], "EmailChangeCodeRefused");
+    assert_eq!(
+        service
+            .post("/me/account/email/confirm", Some(&gail), &proof)
+            .await?
+            .1["refusal"],
+        "EmailChangeCodeRefused"
+    );
     let subject = before[0]["id"].as_str().ok_or("the confirmed account")?;
-    let (back, binding) = service.issuer_answer_from(identity_contract::fake_issuer::Login {
-        subject:subject.to_owned(), email:"gail@lovelace.test".to_owned(),
-    }, "provider-1").await?;
+    let (back, binding) = service
+        .issuer_answer_from(
+            identity_contract::fake_issuer::Login {
+                subject: subject.to_owned(),
+                email: "gail@lovelace.test".to_owned(),
+            },
+            "provider-1",
+        )
+        .await?;
     let (_, location, cookie) = service.get_page(&back, &binding).await?;
     assert_eq!(location.as_deref(), Some("/#/me"));
     assert!(cookie, "a confirmed R2 change becomes the R3 held address");
     // The next request must mail the address just confirmed, never the former one.
-    assert_eq!(service.post("/me/account/email", Some(&gail), &json!({"email":"third@example.test"})).await?.0, 200);
+    assert_eq!(
+        service
+            .post(
+                "/me/account/email",
+                Some(&gail),
+                &json!({"email":"third@example.test"})
+            )
+            .await?
+            .0,
+        200
+    );
     let _new = sink.next().await.ok_or("third mailbox")?;
-    assert_eq!(sink.next().await.ok_or("current held mailbox")?.to, vec!["gail@lovelace.test"]);
+    assert_eq!(
+        sink.next().await.ok_or("current held mailbox")?.to,
+        vec!["gail@lovelace.test"]
+    );
     Ok(())
 }
 
 #[tokio::test]
 async fn another_persons_held_email_is_refused_before_either_letter() -> Result {
     let (service, rauthy, gail, mut sink) = table_with_mail(true).await?;
-    let ada = service.sign_in(identity_contract::fake_issuer::Login {subject:ADMINISTRATOR.to_owned(), email:"ada@example.test".to_owned()}).await?;
-    let (status, admitted) = service.post("/people/admit", Some(&ada), &json!({
-        "operation":lys_identity::OperationId::generate()?.to_string(),
-        "display_name":"Dean", "email":"dean@example.test",
-    })).await?;
+    let ada = service
+        .sign_in(identity_contract::fake_issuer::Login {
+            subject: ADMINISTRATOR.to_owned(),
+            email: "ada@example.test".to_owned(),
+        })
+        .await?;
+    let (status, admitted) = service
+        .post(
+            "/people/admit",
+            Some(&ada),
+            &json!({
+                "operation":lys_identity::OperationId::generate()?.to_string(),
+                "display_name":"Dean", "email":"dean@example.test",
+            }),
+        )
+        .await?;
     assert_eq!(status, 200, "{admitted}");
     let _added = sink.next().await.ok_or("Dean's admission letter")?;
     let before = rauthy.users()?;
     let sent = std::fs::read(service.dir.path().join("letters-sent.jsonl"))?;
-    let (status, refused) = service.post("/me/account/email", Some(&gail), &json!({"email":"dean@example.test"})).await?;
+    let (status, refused) = service
+        .post(
+            "/me/account/email",
+            Some(&gail),
+            &json!({"email":"dean@example.test"}),
+        )
+        .await?;
     assert_eq!(status, 409, "{refused}");
     assert_eq!(refused["refusal"], "EmailHeldByAnother");
     assert!(refused["reason"].as_str().ok_or("reason")?.contains("Dean"));
-    assert_eq!(std::fs::read(service.dir.path().join("letters-sent.jsonl"))?, sent);
+    assert_eq!(
+        std::fs::read(service.dir.path().join("letters-sent.jsonl"))?,
+        sent
+    );
     assert!(sink.taken().is_none());
     assert_eq!(rauthy.users()?, before);
     Ok(())
@@ -277,10 +392,20 @@ async fn the_departing_code_goes_to_lys_held_email_even_after_an_issuer_mix_up()
     let mut user = rauthy.users()?[0].clone();
     let id = user["id"].as_str().ok_or("Gail's account")?.to_owned();
     user["email"] = json!("annabel@example.test");
-    reqwest::Client::new().put(format!("{}/users/{id}", rauthy.api()))
+    reqwest::Client::new()
+        .put(format!("{}/users/{id}", rauthy.api()))
         .header(reqwest::header::AUTHORIZATION, format!("API-Key {API_KEY}"))
-        .json(&user).send().await?.error_for_status()?;
-    let (status, pending) = service.post("/me/account/email", Some(&gail), &json!({"email":"new@example.test"})).await?;
+        .json(&user)
+        .send()
+        .await?
+        .error_for_status()?;
+    let (status, pending) = service
+        .post(
+            "/me/account/email",
+            Some(&gail),
+            &json!({"email":"new@example.test"}),
+        )
+        .await?;
     assert_eq!(status, 200, "{pending}");
     let _new = sink.next().await.ok_or("the new code")?;
     let held = sink.next().await.ok_or("the departing code")?;

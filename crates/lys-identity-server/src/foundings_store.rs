@@ -276,7 +276,10 @@ impl Foundings {
         let person = founding.founder.clone();
         let remembered = !self.stored.admitted_email.contains_key(&person);
         if remembered {
-            let email = self.email_for(&person).unwrap_or(&founding.email).to_owned();
+            let email = self
+                .email_for(&person)
+                .unwrap_or(&founding.email)
+                .to_owned();
             self.stored.admitted_email.insert(person.clone(), email);
         }
         let taken = replaced.and_then(|old| self.stored.foundings.remove(old));

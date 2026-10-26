@@ -9,10 +9,15 @@ async fn a_changed_email_signs_in_and_the_old_one_does_not() -> TestResult {
     assert_eq!(shown["email"], EMAIL);
     // First provider sign-in records the setup account's missing held address.
     let me = service.get("/me", Some(&ada)).await?.1;
-    let (back, binding) = service.issuer_answer(identity_contract::fake_issuer::Login {
-        subject: me["signed_in"]["subject"].as_str().ok_or("Ada's account")?.to_owned(),
-        email: EMAIL.to_owned(),
-    }).await?;
+    let (back, binding) = service
+        .issuer_answer(identity_contract::fake_issuer::Login {
+            subject: me["signed_in"]["subject"]
+                .as_str()
+                .ok_or("Ada's account")?
+                .to_owned(),
+            email: EMAIL.to_owned(),
+        })
+        .await?;
     let (_, location, cookie) = service.get_page(&back, &binding).await?;
     assert_eq!(location.as_deref(), Some("/#/me"));
     assert!(cookie);
@@ -34,13 +39,32 @@ async fn a_changed_email_signs_in_and_the_old_one_does_not() -> TestResult {
         .await?;
     assert_eq!(status, 200, "{changed}");
     assert_eq!(changed["pending"], true);
-    assert_eq!(service.get("/me/account", Some(&ada)).await?.1["email"], EMAIL);
+    assert_eq!(
+        service.get("/me/account", Some(&ada)).await?.1["email"],
+        EMAIL
+    );
     let letter = sink.next().await.ok_or("the email proof")?;
-    let code = letter.body.split("Code: ").nth(1).and_then(|rest| rest.split_whitespace().next()).ok_or("the mailed code")?;
+    let code = letter
+        .body
+        .split("Code: ")
+        .nth(1)
+        .and_then(|rest| rest.split_whitespace().next())
+        .ok_or("the mailed code")?;
     let held = sink.next().await.ok_or("the held mailbox proof")?;
     assert_eq!(held.to, vec![EMAIL]);
-    let held_code = held.body.split("Code: ").nth(1).and_then(|rest| rest.split_whitespace().next()).ok_or("the held code")?;
-    let (status, changed) = service.post("/me/account/email/confirm", Some(&ada), &json!({"code": code, "held_code":held_code})).await?;
+    let held_code = held
+        .body
+        .split("Code: ")
+        .nth(1)
+        .and_then(|rest| rest.split_whitespace().next())
+        .ok_or("the held code")?;
+    let (status, changed) = service
+        .post(
+            "/me/account/email/confirm",
+            Some(&ada),
+            &json!({"code": code, "held_code":held_code}),
+        )
+        .await?;
     assert_eq!(status, 200, "{changed}");
     assert_eq!(changed["email"], "ada@lovelace.test");
     let signed_in = service.sign_in_with("ada@lovelace.test", PASSWORD).await?;

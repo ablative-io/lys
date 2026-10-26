@@ -43,8 +43,7 @@ fn a_token_is_thirty_two_bytes_and_only_its_digest_is_stored() -> Result<(), Ser
 }
 
 #[test]
-fn a_second_founding_for_the_address_replaces_the_first_in_one_write() -> Result<(), ServerError>
-{
+fn a_second_founding_for_the_address_replaces_the_first_in_one_write() -> Result<(), ServerError> {
     let dir = tempfile::tempdir().map_err(|e| unusable(Path::new("tmp"), &e))?;
     let file = dir.path().join("foundings.json");
     let mut foundings = Foundings::open(file.clone())?;
@@ -89,8 +88,7 @@ fn a_file_of_another_format_is_refused() {
 }
 
 #[test]
-fn withdrawing_an_admission_keeps_its_record_and_a_later_link_works() -> Result<(), ServerError>
-{
+fn withdrawing_an_admission_keeps_its_record_and_a_later_link_works() -> Result<(), ServerError> {
     let dir = tempfile::tempdir().map_err(|e| unusable(Path::new("tmp"), &e))?;
     let file = dir.path().join("foundings.json");
     let mut held = Foundings::open(file.clone())?;
@@ -149,18 +147,29 @@ fn a_refused_withdrawal_save_leaves_memory_and_disk_whole() -> Result<(), Server
 }
 
 #[test]
-fn a_retained_founding_is_read_without_rewriting_and_link_replacement_keeps_its_email() -> Result<(), ServerError> {
+fn a_retained_founding_is_read_without_rewriting_and_link_replacement_keeps_its_email()
+-> Result<(), ServerError> {
     let dir = tempfile::tempdir().map_err(|error| unusable(Path::new("tmp"), &error))?;
     let file = dir.path().join("foundings.json");
     let original = founding("dean@example.test", "op-1");
-    std::fs::write(&file, serde_json::json!({"format":FORMAT, "foundings":{"old":original}}).to_string())
-        .map_err(|error| unusable(&file, &error))?;
+    std::fs::write(
+        &file,
+        serde_json::json!({"format":FORMAT, "foundings":{"old":original}}).to_string(),
+    )
+    .map_err(|error| unusable(&file, &error))?;
     let before = std::fs::read(&file).map_err(|error| unusable(&file, &error))?;
     let mut held = Foundings::open(file.clone())?;
     assert_eq!(held.email_for("person-1"), Some("dean@example.test"));
     assert!(!held.recorded_at_sign_in("person-1"));
-    assert_eq!(std::fs::read(&file).map_err(|error| unusable(&file, &error))?, before);
-    held.record("new".to_owned(), founding("annabel@example.test", "op-2"), Some("old"))?;
+    assert_eq!(
+        std::fs::read(&file).map_err(|error| unusable(&file, &error))?,
+        before
+    );
+    held.record(
+        "new".to_owned(),
+        founding("annabel@example.test", "op-2"),
+        Some("old"),
+    )?;
     assert_eq!(held.email_for("person-1"), Some("dean@example.test"));
     let reopened = Foundings::open(file)?;
     assert_eq!(reopened.email_for("person-1"), Some("dean@example.test"));

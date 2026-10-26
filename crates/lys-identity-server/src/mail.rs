@@ -304,13 +304,18 @@ impl Mailer {
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
             Err(error) => return Err(record_unavailable(&self.sent_file, &error)),
         };
-        text.lines().filter(|line| !line.trim().is_empty()).map(|line| {
-            serde_json::from_str::<Sent>(line).map_err(|error| record_unavailable(&self.sent_file, &error))
-        }).filter_map(|sent| match sent {
-            Ok(sent) if sent.letter == "added" => Some(Ok((sent.operation, sent.to))),
-            Ok(_) => None,
-            Err(error) => Some(Err(error)),
-        }).collect()
+        text.lines()
+            .filter(|line| !line.trim().is_empty())
+            .map(|line| {
+                serde_json::from_str::<Sent>(line)
+                    .map_err(|error| record_unavailable(&self.sent_file, &error))
+            })
+            .filter_map(|sent| match sent {
+                Ok(sent) if sent.letter == "added" => Some(Ok((sent.operation, sent.to))),
+                Ok(_) => None,
+                Err(error) => Some(Err(error)),
+            })
+            .collect()
     }
 
     /// Who the record says sent `letter` for `operation`, if anyone.

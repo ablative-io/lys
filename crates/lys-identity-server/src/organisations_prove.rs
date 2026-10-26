@@ -24,8 +24,8 @@
 //! unknown proof is and nothing is recorded.
 
 use axum::Json;
-use axum::extract::{Path, State};
 use axum::extract::rejection::JsonRejection;
+use axum::extract::{Path, State};
 use axum::http::{HeaderMap, header};
 use axum::response::{IntoResponse, Response};
 use lys_identity::{

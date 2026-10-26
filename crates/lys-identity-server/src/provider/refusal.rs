@@ -27,7 +27,6 @@ macro_rules! server_refusals {
             | ServerError::ProofRefused
             | ServerError::AlreadyAdmitted
             | ServerError::EmailHeldByAnother { .. }
-
             | ServerError::SignedInAsAnother { .. }
             | ServerError::EmailChangeNeedsMail
             | ServerError::EmailChangeCodeRefused
