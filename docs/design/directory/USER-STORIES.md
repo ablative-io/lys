@@ -144,6 +144,10 @@
 
 **S479.** As an administrator, I want every person who has no access to anything to be marked so where I read the people, and said so in the admission's receipt and letter, so that I give it before they meet a door and not after.
 
+**S482.** As an administrator adding a person by their email, I want Lys to refuse by name when that email already opens someone else's record, so that I never hand one person a link that signs them in as another.
+
+**S483.** As an administrator who handed a sign-in link that should not be used, I want to withdraw it before it is opened, so that a mistake in a letter is never a way into someone's account.
+
 ## Certificate verifier — Checks an agent's certificate and its record against the certificate log without the issuer's cooperation
 
 **S31.** As a certificate verifier, I want a revoked certificate to fail verification against the log with its revocation leaf named, so that revocation rests on the log and not on the issuer's word.
@@ -207,6 +211,8 @@
 **S477.** As a Directory administrator reading identity.log, I want a lost runner to be said once and its feed to come back when the runner does, so that the log is not hundreds of copies of the same line and the service never sits on a clock.
 
 **S481.** As a directory administrator, I want this change held to every standing bar with the screens' tests red first, so that the default and the ask are proven on the real routes and nothing is assumed.
+
+**S484.** As a directory administrator, I want this change held to every standing bar with its tests red first, so that the refusal and the withdrawal are proven on the real routes and nothing is assumed.
 
 ## Release reviewer — Decides from the record whether the release proof is complete
 

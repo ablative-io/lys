@@ -2690,6 +2690,26 @@
           "done": false
         }
       ]
+    },
+    {
+      "name": "An admit never opens a record the administrator did not mean (DIRECTORY-121)",
+      "items": [
+        {
+          "id": "C847",
+          "text": "An admit whose email's account is bound to a person under another name is refused by name (EmailHeldByAnother, naming that person's id and display name) unless the act names that person; an admit that reuses a person says so in its receipt (existing line) and its screen. DIRECTORY-121/R1.",
+          "done": false
+        },
+        {
+          "id": "C848",
+          "text": "A handed admission link names the person it opens in its letter and on the admitted screen, and an administrator withdraws an unspent one through POST /people/{id}/admission/withdraw, recorded, after which the link proves nothing. DIRECTORY-121/R2.",
+          "done": false
+        },
+        {
+          "id": "C849",
+          "text": "Standing bars hold for DIRECTORY-121; no fixed wait; no test proves less than before. DIRECTORY-121/R3.",
+          "done": false
+        }
+      ]
     }
   ]
 }

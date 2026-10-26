@@ -733,3 +733,9 @@
 - [ ] **C844** — An admission giving no access, whoever asked for it, says so in its receipt (no_access line), its letter and the People row; it is never refused for it. DIRECTORY-120/R2.
 - [ ] **C845** — An approved app on its agent pass records a draft of its declared first grant for a refused person; one open draft per person and resource; administrators approve or refuse it in Drafts; the door never issues a grant. DIRECTORY-120/R3.
 - [ ] **C846** — Standing bars hold for DIRECTORY-120; no fixed wait; no test proves less than before. DIRECTORY-120/R4.
+
+## An admit never opens a record the administrator did not mean (DIRECTORY-121)
+
+- [ ] **C847** — An admit whose email's account is bound to a person under another name is refused by name (EmailHeldByAnother, naming that person's id and display name) unless the act names that person; an admit that reuses a person says so in its receipt (existing line) and its screen. DIRECTORY-121/R1.
+- [ ] **C848** — A handed admission link names the person it opens in its letter and on the admitted screen, and an administrator withdraws an unspent one through POST /people/{id}/admission/withdraw, recorded, after which the link proves nothing. DIRECTORY-121/R2.
+- [ ] **C849** — Standing bars hold for DIRECTORY-121; no fixed wait; no test proves less than before. DIRECTORY-121/R3.

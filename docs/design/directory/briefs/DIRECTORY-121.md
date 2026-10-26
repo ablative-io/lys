@@ -1,0 +1,100 @@
+---
+type: brief
+id: DIRECTORY-121
+cluster: directory
+title: An admit never opens a record the administrator did not mean: an email already another person's is refused by name, a handed link names whose record it opens, and an unspent link can be withdrawn
+---
+
+# DIRECTORY-121: An admit never opens a record the administrator did not mean: an email already another person's is refused by name, a handed link names whose record it opens, and an unspent link can be withdrawn
+
+> **Cluster:** directory
+> **Depends on:** DIRECTORY-112, DIRECTORY-116
+> **Checklist:**
+> - C847 — An admit whose email's account is bound to a person under another name is refused by name (EmailHeldByAnother, naming that person's id and display name) unless the act names that person; an admit that reuses a person says so in its receipt (existing line) and its screen. DIRECTORY-121/R1.
+> - C848 — A handed admission link names the person it opens in its letter and on the admitted screen, and an administrator withdraws an unspent one through POST /people/{id}/admission/withdraw, recorded, after which the link proves nothing. DIRECTORY-121/R2.
+> - C849 — Standing bars hold for DIRECTORY-121; no fixed wait; no test proves less than before. DIRECTORY-121/R3.
+> **Stories:**
+> - S482 (Administrator, Suspends, reinstates and retires identities, and reads why a check refused) — As an administrator adding a person by their email, I want Lys to refuse by name when that email already opens someone else's record, so that I never hand one person a link that signs them in as another.
+> - S483 (Administrator, Suspends, reinstates and retires identities, and reads why a check refused) — As an administrator who handed a sign-in link that should not be used, I want to withdraw it before it is opened, so that a mistake in a letter is never a way into someone's account.
+> - S484 (Directory administrator, Resolves a refused act) — As a directory administrator, I want this change held to every standing bar with its tests red first, so that the refusal and the withdrawal are proven on the real routes and nothing is assumed.
+
+## Purpose
+
+On 26 October 2026, about 08:50 AEDT, Waffles admitted Annabel through POST /people/admit with annabel@ablative.com.au and the name "Annabel", on Tom's word, and handed the link the act answered. The link opens person-6c865659a2fceb3bf7c350661f311d7e, "Dean Whiting", Dean's record from 24 October with his grants and his one sign-in (login subject xd6QynfzIpRSXASxr1fW5CZQ), because the sign-in service's account bound to that record answers to annabel@ablative.com.au. people_admit.rs steps() asks admitted_already (people_admit.rs:441) for the person the email's account is bound to and, finding one, marks register, account, bind and activate done and goes on to the grant and the letter (DIRECTORY-116 R3): the asked display name "Annabel" is dropped without a word, the receipt names only a person id, the letter is written to "Annabel" (people_admit.rs:526) and the screen says "Annabel is added" (AddPerson.tsx:121). Opening that link would have signed Annabel in as Dean. The link was caught before it was sent and marked withdrawn in the team's signup note, but Lys itself cannot withdraw it: foundings_store.rs holds an unspent admission until it is proved, and the only way to drop one is to hand a newer link for the same person (unspent_admission_for, DIRECTORY-112 R3), which opens the same record. The same morning's admit of dean@ablative.com.au made Dean a second record (person-92f2b39d); the directory also holds earlier pairs (Dean and Dean Whiting, David and David Basseal, an older Annabel, person-92023e13). Tom, 13 October: a wrong refusal is the failure that cannot happen; a wrong admission, one person signed in as another, is worse, and in a hospital it is one clinician's record carrying another's access.
+
+## Task
+
+Make an admission never open a record the administrator did not mean: an admit whose email already belongs to a person under another name is refused by name and goes ahead only when the act names that person; every admit that reuses a person says so; every handed link says whose record it opens; and an administrator can withdraw an unspent admission link, recorded, so a link handed in error is never a way in.
+
+## Requirements
+
+### R1: An admit whose email already opens another person's record is refused by name unless the act names that person
+
+WHEN POST /people/admit finds, through admitted_already, that the email's sign-in account is bound to a person whose display name is not the asked display_name, and the act does not name that person in a `person` member, THE SYSTEM SHALL refuse the act with 409 EmailHeldByAnother naming that person's id and display name and the email, write nothing (no grant, no letter, no link), and say on the Add a person screen "<email> already signs in as <display name>" with a link to that person. WHEN the act names that person THE SYSTEM SHALL go on as DIRECTORY-116 R3 does today. WHEN any admit reuses an existing person THE SYSTEM SHALL record an `existing` line in the receipt naming the person's id and display name, and the admitted screen SHALL say "<email> was already <display name>; <display name> now holds …", never "<asked name> is added". The comparison is of display names as stored, exact after trimming; no fuzzy match.
+
+**Acceptance:**
+- Red first (crates/lys-identity-server/tests/people_admit.rs): with a person "Dean Whiting" bound to an account whose email is a@example.test, an admit of a@example.test as "Annabel" answers 409 EmailHeldByAnother naming Dean Whiting's id, and the foundings store and grants are unchanged; the same admit naming Dean Whiting's id in `person` answers 200 with the existing line; an admit of a@example.test as "Dean Whiting" answers 200 with the existing line.
+- Red first (surface/identity/src/features/people/people-add-person.test.tsx): the 409 shows the "already signs in as" words with the link to the person; a 200 with an existing line shows the already words and never "is added" with the asked name.
+
+**Files:**
+- modify: crates/lys-identity-server/src/people_admit.rs
+- modify: crates/lys-identity-server/tests/people_admit.rs
+- modify: surface/identity/src/features/people/AddPerson.tsx
+- modify: surface/identity/src/features/people/people-add-person.test.tsx
+
+**Checklist:**
+- C847 — An admit whose email's account is bound to a person under another name is refused by name (EmailHeldByAnother, naming that person's id and display name) unless the act names that person; an admit that reuses a person says so in its receipt (existing line) and its screen. DIRECTORY-121/R1.
+
+**Stories:**
+- S482 (Administrator, Suspends, reinstates and retires identities, and reads why a check refused) — As an administrator adding a person by their email, I want Lys to refuse by name when that email already opens someone else's record, so that I never hand one person a link that signs them in as another.
+
+### R2: A handed link names whose record it opens, and an administrator withdraws an unspent one
+
+THE SYSTEM SHALL write in every handed or mailed admission letter, and on the admitted screen beside the link, the display name of the person the link signs in as. WHEN an administrator of the person's organisation calls POST /people/{id}/admission/withdraw and an unspent admission link for that person is held THE SYSTEM SHALL mark it withdrawn in the foundings store in one durable write, record the withdrawal on the person's events with the actor, and answer 200 naming the withdrawn digest's record; WHEN none is held THE SYSTEM SHALL answer 404 NoUnspentAdmission by name. A withdrawn link SHALL be refused at POST /organisations/found/prove exactly as a spent one is, and a later handed link for the same person is unaffected. The person's Account page (Account.tsx) SHALL show an unspent link as "A sign-in link is waiting" with Withdraw, for administrators only.
+
+**Acceptance:**
+- Red first (crates/lys-identity-server/src/foundings_store.rs tests): a withdrawn admission is not unspent_admission_for its person and by_digest reads it withdrawn; the write fails whole on a refused save, as record does.
+- Red first (crates/lys-identity-server/tests/organisations_handed.rs): hand a link, withdraw it as an administrator, prove it: refused as spent; withdraw again: 404 NoUnspentAdmission; a non-administrator's withdraw is refused by name; the letter text names the person's display name.
+- surface/identity/src/features/people/people-views.test.tsx: an administrator sees the waiting link and Withdraw on the person's Account page; a non-administrator does not.
+
+**Files:**
+- modify: crates/lys-identity-server/src/foundings_store.rs
+- modify: crates/lys-identity-server/src/people_admit_handed.rs
+- modify: crates/lys-identity-server/src/routes_table.rs
+- modify: crates/lys-identity-server/tests/organisations_handed.rs
+- modify: surface/identity/src/features/people/Account.tsx
+- modify: surface/identity/src/features/people/people-views.test.tsx
+
+**Checklist:**
+- C848 — A handed admission link names the person it opens in its letter and on the admitted screen, and an administrator withdraws an unspent one through POST /people/{id}/admission/withdraw, recorded, after which the link proves nothing. DIRECTORY-121/R2.
+
+**Stories:**
+- S483 (Administrator, Suspends, reinstates and retires identities, and reads why a check refused) — As an administrator who handed a sign-in link that should not be used, I want to withdraw it before it is opened, so that a mistake in a letter is never a way into someone's account.
+
+### R3: Standing bars hold for DIRECTORY-121; no fixed wait; no test proves less than before
+
+THE SYSTEM SHALL hold every standing bar on the exact final commit: cargo fmt, clippy pedantic -D warnings with all targets, cargo nextest run (never cargo test), cargo test --doc, ast-grep, the file-length gate, tsc and vitest for surface/identity, and scripts/design/gate.sh with the rendered markdown equal to its JSON. No sleep, timeout taken as readiness or poll is added. No test is deleted, weakened or marked serial.
+
+**Acceptance:**
+- Every gate leg green on the final commit, each judged by its parsed output lines, never by its exit code.
+- scripts/design/gate.sh passes for this brief, judged by its parsed output.
+
+**Checklist:**
+- C849 — Standing bars hold for DIRECTORY-121; no fixed wait; no test proves less than before. DIRECTORY-121/R3.
+
+**Stories:**
+- S484 (Directory administrator, Resolves a refused act) — As a directory administrator, I want this change held to every standing bar with its tests red first, so that the refusal and the withdrawal are proven on the real routes and nothing is assumed.
+
+## Boundaries
+
+- SHALL NOT change, merge or retire any person or account as part of this work: the records already mixed up are put right by an administrator through the existing routes, with Tom's word, not by a migration.
+- SHALL NOT refuse an admit that names the existing person, nor one whose asked name is that person's: DIRECTORY-116 R3's reuse stands for the person meant.
+- SHALL NOT delete a withdrawn link's record: it is marked, kept, and refused at proof.
+- SHALL NOT add a sleep, a timeout taken as readiness, or a poll anywhere.
+
+## Verification
+
+- cargo nextest run -p lys-identity-server -E 'binary(people_admit) | binary(organisations_handed) | test(foundings)' alone, read by its PASS and FAIL lines; vitest on surface/identity for people-add-person and people-views, read by its summary line; then the full gate.
+- Red first: every new test is run before the code and its failing lines kept in the handback.
+- Walked on the installed Lys: admit an email already bound under another name and read the refusal naming that person; admit it naming that person and read the existing line; hand a link, withdraw it on the Account page, open it and read the refusal. Each step's screen is read, not assumed.
+- Hospital line: If this code were used in a hospital, the worst credible failure is a new nurse handed a link that signs them in as a senior clinician, with that clinician's access to every patient on the ward, and it could harm about every patient whose record that clinician can reach.
