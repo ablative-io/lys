@@ -21,7 +21,7 @@ it('gives a person who is not an administrator their account and layout, and onl
 it('gives an administrator every Settings tab, the service settings apart from their own', async () => {
   await mount('#/settings/account', { ...SERVICE, '/configuration': ok(settings) });
   // Apps has its own rail entry, so it is not a Settings tab.
-  expect(tabs()).toEqual(['For you', 'Service accounts', 'This service', 'Services and sign-in providers']);
+  expect(tabs()).toEqual(['For you', 'Service accounts', 'This service', 'Services and sign-in providers', 'Health']);
   expect($('.effective-settings')).toBeNull();
 });
 

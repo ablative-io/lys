@@ -50,7 +50,7 @@ describe('Running sessions', () => {
       ['POST ' + secondBase + '/read-bytes']: ok({ session: second, answer: { kind: 'bytes', output: { session: second, from: 0, cursor: 0, oldest: 0, data: [], ended: exited } }, receipt: { index: 2 } }),
     });
     expect($$('.running-list .running-chip a[href="#/canvas/' + SCRIBE + '"]')).toHaveLength(2);
-    expect(posted.some((entry) => entry.path.endsWith('/end'))).toBe(false);
+    expect(posted.some((entry) => /\/runtime\/sessions\/[^/]+\/(end|stop|end-now)$/.test(entry.path))).toBe(false);
   });
 
   it('sends a Mac\'s Command and Option editing keys as the bytes a line editor acts on, and leaves every other key to the terminal', async () => {

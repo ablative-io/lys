@@ -1,6 +1,6 @@
 /**
  * Stop beside one live run (AGENTS-017 R2): the ordinary Stop, the same question and the same route as the agent's
- * own page (`useRunActs`, `POST /runtime/sessions/{session}/end`), never the emergency act. The agent's certificate is
+ * own page (`useRunActs`, `POST /runtime/sessions/{session}/stop`), never the emergency act. The agent's certificate is
  * untouched, so the agent starts again from the same seat file; the receipt says so. A refusal is shown as Lys
  * answered it. Used on the Dashboard's started lines and beside each live session on the agent's Sessions tab.
  */

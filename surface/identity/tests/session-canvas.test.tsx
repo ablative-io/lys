@@ -132,7 +132,7 @@ describe('Running: the list and the canvas', () => {
     await click($('.session-canvas-menu [data-act="toggle"]'));
     expect($('.terminal')).toBeNull();
     expect($('.session-canvas-menu')).toBeNull();
-    expect(posted.some((entry) => entry.path.endsWith('/end'))).toBe(false);
+    expect(posted.some((entry) => /\/runtime\/sessions\/[^/]+\/(end|stop|end-now)$/.test(entry.path))).toBe(false);
   });
 
   it('zooms the surface by its buttons and by a pinch about the pointer, and back to actual size', async () => {

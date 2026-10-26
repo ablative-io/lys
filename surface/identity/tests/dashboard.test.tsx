@@ -322,7 +322,7 @@ describe('The Dashboard is the front page', () => {
     expect($('section[aria-label="Agents"] .you-asked')?.textContent).toContain('Stop Scribe? This ends its run on Lab. What it has not saved is lost.');
     expect(rowOf('Scribe')?.nextElementSibling?.classList.contains('you-asked')).toBe(true);
     expect($$('.you-asked')).toHaveLength(1);
-    expect(posted.filter((entry) => entry.path.endsWith('/end'))).toEqual([]);
+    expect(posted.filter((entry) => /\/runtime\/sessions\/[^/]+\/(end|stop|end-now)$/.test(entry.path))).toEqual([]);
     await click($$('section[aria-label="Agents"] .you-asked button').find((el) => (el.getAttribute('aria-label') ?? el.textContent) === 'Stop Scribe') ?? null);
     expect(posted.filter((entry) => entry.path.endsWith('/stop')).map((entry) => entry.path)).toEqual(['/runtime/sessions/' + LIVE + '/stop']);
   });
@@ -357,7 +357,7 @@ describe('The Dashboard is the front page', () => {
     expect($('.dash-picture')).toBeNull();
     expect(rowOf('Courier')?.querySelector('[data-act="stop"]')).not.toBeNull();
     expect(rowOf('Courier')?.textContent).toContain('on Shed');
-    expect(posted.filter((call) => call.path.endsWith('/end'))).toEqual([]);
+    expect(posted.filter((call) => /\/runtime\/sessions\/[^/]+\/(end|stop|end-now)$/.test(call.path))).toEqual([]);
     expect(unreachable()).toEqual([]);
   });
 

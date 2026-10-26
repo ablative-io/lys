@@ -1,6 +1,6 @@
 /**
  * AGENTS-016 R5, AGENTS-017 R2: what the person's agents registered and started for them, on the Dashboard under one
- * heading, in plain words. A started line's Stop ends that run through the runtime session's end and never the
+ * heading, in plain words. A started line's Stop ends that run through the runtime session's stop and never the
  * agent's stop; Withdraw, on every line, is the emergency act behind the agent file's confirmation, headed Withdraw,
  * its receipt saying the registrar cannot certify the agent again. A registered line has no session and shows
  * Withdraw alone. AGENTS-019 R5: an act an agent took with a grant is said in its shipped sentence, '<agent>
@@ -67,7 +67,7 @@ async function drawn(lines: ActedLine[]) {
       reason: (body as { reason: string }).reason, sessions_confirmed: [], sessions_refused: [],
       final_words: FINAL,
     }),
-    [`POST /runtime/sessions/${SESSION}/end`]: () => ok({
+    [`POST /runtime/sessions/${SESSION}/stop`]: () => ok({
       session: SESSION, answer: { kind: 'ended', ended: { how: 'exited', at: AT + 90, status: 0, signal: null } },
       receipt: { act: 'end', session: SESSION },
     }),
@@ -106,9 +106,11 @@ describe('Acted for you by your agents, on the Dashboard', () => {
     await until(container, () => container.querySelector('[role="alertdialog"][aria-label="Stop Runner"]') !== null);
     expect(posted).toEqual([]);
     container.querySelector<HTMLButtonElement>('button[data-act="confirm-stop"]')?.click();
-    await until(container, () => container.querySelector('[data-session-stopped]') !== null);
-    expect(posted.map((each) => each.path)).toEqual([`/runtime/sessions/${SESSION}/end`]);
-    expect(posted.some((each) => each.path.endsWith('/stop'))).toBe(false);
+    // A refusal ends the wait too, so a route the page does not answer fails here instead of waiting for ever.
+    await until(container, () => container.querySelector('[data-session-stopped], [role="alert"]') !== null);
+    expect(container.querySelector('[role="alert"]')?.textContent ?? null).toBeNull();
+    expect(posted.map((each) => each.path)).toEqual([`/runtime/sessions/${SESSION}/stop`]);
+    expect(posted.some((each) => each.path.startsWith('/agents/'))).toBe(false);
     const receipt = container.querySelector('[data-session-stopped]')?.textContent ?? '';
     expect(receipt).toContain('ended');
     expect(receipt).toContain('Its certificate stands');
