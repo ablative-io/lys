@@ -349,22 +349,26 @@ fn sent_to_sign_in(
     email: Option<&str>,
 ) -> Response {
     let mut location = format!("{SIGN_IN_SCREEN}?refused={}", error.name());
-    if let ServerError::ProviderEmailMismatch {
-        provider,
-        account,
-        held,
-    } = error
-    {
-        for (name, value) in [
+    let fields: Vec<(&str, &String)> = match error {
+        ServerError::ProviderEmailMismatch {
+            provider,
+            account,
+            held,
+        } => vec![
             ("provider", provider),
             ("account_email", account),
             ("held_email", held),
-        ] {
-            location.push('&');
-            location.push_str(name);
-            location.push('=');
-            location.push_str(&crate::provider::encoded(value));
+        ],
+        ServerError::SignInNotTheirs { account, held } => {
+            vec![("account_email", account), ("held_email", held)]
         }
+        _ => Vec::new(),
+    };
+    for (name, value) in fields {
+        location.push('&');
+        location.push_str(name);
+        location.push('=');
+        location.push_str(&crate::provider::encoded(value));
     }
     if let Some(email) = email {
         location.push_str("&email=");

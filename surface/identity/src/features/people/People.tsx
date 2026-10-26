@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react';
 import { Navigate, useLocation, useNavigate, useParams } from 'react-router';
 import { api, useLoad } from '../../api';
 import { organisationActs } from '../grants/organisation-acts';
-import type { PeopleView } from '../../generated';
+import type { PeopleView, SignInHealth } from '../../generated';
 import { Listing } from '../../shell/Listing';
 import type { Column } from '../../shell/Listing';
 import { groupByTeam, inWhose } from '../../shell/org';
@@ -23,6 +23,20 @@ import type { Load } from '../../api';
 import { readRoles, RoleSummary } from '../roles/AssignedRoles';
 import { PageHeader } from '../../shell/PageHeader';
 import './people.css';
+
+/** What a person's sign-in needs, in words, when it is not ready (DIRECTORY-124 R1). */
+export function signInWords(health: SignInHealth, name: (id: string) => string): string {
+  switch (health.state) {
+    case 'ready': return '';
+    case 'no_address': return 'Cannot sign in: Lys holds no address for them. Set one on their Account page.';
+    case 'repairable': return 'Their sign-in account is missing; Lys makes it under their address at the next change to the directory or the next start.';
+    case 'disabled': return 'Their sign-in is disabled.';
+    case 'several_addresses': return 'Signs in as nobody: Lys holds ' + health.addresses.join(' and ') + ' for them. Set the one that is theirs on their Account page.';
+    case 'not_theirs': return 'Their sign-in carries ' + health.account_email + (health.belongs_to ? ', which is ' + name(health.belongs_to) + "'s address. Give it to them on this Account page." : ", another person's address.");
+    case 'address_taken': return 'Their address is the sign-in of ' + health.holder + '. Give that sign-in to them on ' + health.holder + "'s Account page.";
+    case 'shared_address': return 'Their address is held for ' + health.with.join(' and ') + ' too. Retire the duplicate or set another address.';
+  }
+}
 
 /** The views of People and agents, each with its own address. */
 const VIEWS: [KindFilter, string, string][] = [
@@ -130,7 +144,8 @@ function List({ view, teams, me, reach }: { view: PeopleView; teams: OrgTeam[]; 
       const signIn = person?.sign_in_email;
       const admitted = person?.admitted_email;
       const differs = signIn && admitted && signIn.trim().toLowerCase() !== admitted.trim().toLowerCase();
-      return <>{x.display_name}{signIn ? <span className="sec"> {differs ? <>Signs in as {signIn}, added as {admitted} <a href={'#/file/' + x.id + '/credentials'}>Account</a></> : signIn}{person?.email_recorded_at_sign_in ? <> (recorded at sign-in)</> : null}</span> : null}</>;
+      const health = person?.sign_in && person.sign_in.state !== 'ready' ? signInWords(person.sign_in, (id) => names.get(id) ?? 'someone outside your view') : '';
+      return <>{x.display_name}{signIn ? <span className="sec"> {differs ? <>Signs in as {signIn}, added as {admitted} <a href={'#/file/' + x.id + '/credentials'}>Account</a></> : signIn}{person?.email_recorded_at_sign_in ? <> (recorded at sign-in)</> : null}</span> : null}{health ? <span className="answers-warn"> {health} {differs ? null : <a href={'#/file/' + x.id + '/credentials'}>Account</a>}</span> : null}</>;
     } },
     { head: 'Role', cell: (x) => <span className="sec"><RoleSummary load={roles} id={x.id} /></span> },
     { head: 'State', cell: (x) => <span className="state-of" data-state={x.state}><span className={'dot s-' + x.state} />{stateWords(x.state)}</span> },

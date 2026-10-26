@@ -104,6 +104,7 @@ fn server(error: &ServerError) -> &str {
         ServerError::EmailChangeNeedsMail => "EmailChangeNeedsMail",
         ServerError::EmailChangeCodeRefused => "EmailChangeCodeRefused",
         ServerError::ProviderEmailMismatch { .. } => "ProviderEmailMismatch",
+        ServerError::SignInNotTheirs { .. } => "SignInNotTheirs",
         ServerError::LoginNotBound => "LoginNotBound",
         ServerError::SameTarget => "SameTarget",
         ServerError::NotSameOrganisation => "NotSameOrganisation",

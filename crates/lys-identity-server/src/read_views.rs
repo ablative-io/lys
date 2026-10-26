@@ -136,6 +136,9 @@ pub struct PersonEmails {
     pub admitted_email: Option<String>,
     /// This original address was first recorded at a provider sign-in.
     pub email_recorded_at_sign_in: bool,
+    /// Their sign-in judged against the issuer (DIRECTORY-124 R1).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sign_in: Option<crate::sign_in_reconcile::SignInHealth>,
 }
 
 /// The answer of `GET /people` and `GET /directory/people`.

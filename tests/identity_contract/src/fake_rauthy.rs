@@ -187,6 +187,16 @@ impl FakeRauthy {
         Ok(held(&self.inner.users)?.clone())
     }
 
+    /// Drop the account `id`, as an issuer wiped or cleaned behind Lys's
+    /// back does: reads of it answer 404 from now on.
+    ///
+    /// # Errors
+    /// Returns the named fixture fault if a state lock is poisoned.
+    pub fn forget(&self, id: &str) -> std::io::Result<()> {
+        held(&self.inner.users)?.retain(|user| user["id"] != id);
+        Ok(())
+    }
+
     /// Refuse the next POST /users once, answering 503, so a caller's
     /// failed account step can be exercised and retried.
     pub fn refuse_create_once(&self) {

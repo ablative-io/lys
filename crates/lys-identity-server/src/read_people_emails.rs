@@ -48,11 +48,24 @@ pub(super) async fn attach(
                 sign_in_email: None,
                 admitted_email,
                 email_recorded_at_sign_in: foundings.recorded_at_sign_in(&person.id),
+                sign_in: None,
             });
         }
         Ok((answer, subjects))
     })?;
     if let Some(api) = state.sign_in_providers.as_ref() {
+        let ids = answer
+            .0
+            .people
+            .iter()
+            .map(|person| PersonId::from_str(&person.id))
+            .collect::<Result<Vec<_>, _>>()?;
+        let judged = crate::sign_in_reconcile::health_of(state, api, &ids).await?;
+        for (person, health) in answer.0.people.iter_mut().zip(judged) {
+            if let Some(emails) = &mut person.emails {
+                emails.sign_in = health;
+            }
+        }
         for (person, subject) in answer.0.people.iter_mut().zip(subjects) {
             if let (Some(emails), Some(subject)) = (&mut person.emails, subject) {
                 emails.sign_in_email = match crate::accounts::email_of(api, &subject).await {

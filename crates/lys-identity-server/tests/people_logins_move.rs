@@ -96,7 +96,18 @@ async fn moving_a_historical_mix_up_records_one_batch_keeps_grants_and_ends_the_
     let (_, source) = service
         .get(&format!("/identities/{person}"), Some(&ada))
         .await?;
-    assert_eq!(source["logins"], json!([]));
+    // Dean keeps the address held for him; the repair after the move gives
+    // his record a new account under it (DIRECTORY-124 R2).
+    let renewed = source["logins"].as_array().ok_or("Dean's logins")?;
+    assert_eq!(renewed.len(), 1, "{source}");
+    assert_ne!(renewed[0]["subject"], json!(subject));
+    assert!(
+        rauthy
+            .users()?
+            .iter()
+            .any(|user| user["id"] == renewed[0]["subject"] && user["email"] == "dean@example.test"),
+        "Dean's new account is under his own address"
+    );
     let (_, target_record) = service
         .get(&format!("/identities/{target}"), Some(&ada))
         .await?;
@@ -119,10 +130,8 @@ async fn moving_a_historical_mix_up_records_one_batch_keeps_grants_and_ends_the_
         assert_eq!(signed["receipt"], *receipt);
     }
     assert!(indices.windows(2).all(|pair| pair[1] == pair[0] + 1));
-    assert_eq!(
-        source["events"].as_array().and_then(|e| e.last()),
-        indices.first().map(|i| json!(i)).as_ref()
-    );
+    let source_events = source["events"].as_array().ok_or("Dean's events")?;
+    assert!(source_events.contains(&json!(indices[0])), "{source}");
     assert_eq!(target_record["events"], json!(&indices[1..]));
     assert_eq!(service.get("/me", Some(&mixed)).await?.0, 401);
     assert_eq!(service.get("/me", Some(&second_session)).await?.0, 401);
@@ -338,6 +347,8 @@ async fn an_existing_person_in_the_same_organisation_receives_only_the_login() -
 
 #[path = "people_logins_move/incident.rs"]
 mod incident;
+#[path = "people_logins_move/reconcile.rs"]
+mod reconcile;
 
 #[tokio::test]
 async fn moving_to_a_person_in_another_organisation_is_refused_before_any_write() -> TestResult {

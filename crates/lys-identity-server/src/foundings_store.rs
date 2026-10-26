@@ -188,6 +188,26 @@ impl Foundings {
             })
     }
 
+    /// Every address held for `person`, case folded once each: the one an
+    /// administrator or a confirmed change wrote, else each founding or
+    /// admission under them that was not withdrawn. More than one is a
+    /// mix-up an administrator settles (DIRECTORY-124 R4).
+    pub(crate) fn addresses_for(&self, person: &str) -> Vec<&str> {
+        if let Some(email) = self.stored.admitted_email.get(person) {
+            return vec![email.as_str()];
+        }
+        let mut held: Vec<&str> = self
+            .stored
+            .foundings
+            .values()
+            .filter(|founding| founding.founder == person && !founding.withdrawn)
+            .map(|founding| founding.email.trim())
+            .collect();
+        held.sort_unstable_by_key(|email| email.to_ascii_lowercase());
+        held.dedup_by(|a, b| a.eq_ignore_ascii_case(b));
+        held
+    }
+
     /// Preserve the original row provenance independently of authorized changes.
     pub(crate) fn original_email_for(&self, person: &str) -> Option<&str> {
         self.stored

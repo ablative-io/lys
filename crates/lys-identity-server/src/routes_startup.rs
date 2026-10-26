@@ -38,6 +38,9 @@ pub(crate) async fn started_with_clock(
     let auxiliary = open_auxiliary(config, &primary.key, &say)?;
     let state = Box::pin(make_state(config, say, clock, primary, auxiliary, &checked)).await?;
     recover(&state)?;
+    // Every person's sign-in account is judged and repaired before anything
+    // is served (DIRECTORY-124 R2); an unreachable issuer is said, not fatal.
+    crate::sign_in_reconcile::at_start(&state).await;
     let at_stop = crate::stores_receipt::after_boot(config, &state, checked)?;
     Ok(crate::stores_receipt::Started {
         router: served_routes(config, state, catalogue)?,

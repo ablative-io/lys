@@ -91,6 +91,25 @@ describe("The administrator's account screen", () => {
   });
 });
 
+describe('A person with no sign-in account (DIRECTORY-124 R3)', () => {
+  it('is told to the administrator, who sets the email Lys makes their account under', async () => {
+    const { posted } = await mount('#/file/' + BEA + '/credentials', {
+      ...SERVICE,
+      ...BEA_LOGINS,
+      [ACCOUNT]: ok({ email: null, enabled: false, missing: true }),
+      ['POST ' + ACCOUNT + '/email']: ok({ email: 'bea@example.test', enabled: true, password: false, providers: [] }),
+    });
+    expect(text()).toContain('They have no sign-in account. Set their email and Lys makes one under it.');
+    expect($('form[aria-label="Reset this person\'s password"]')).toBeNull();
+    expect($('form[aria-label="Disable sign-in"]')).toBeNull();
+    await fill("Set this person's email", { 'account-email': ' bea@example.test ' });
+    await submit("Set this person's email");
+    expect(posted).toEqual([{ path: ACCOUNT + '/email', body: { email: 'bea@example.test' } }]);
+    expect(text()).toContain('They now sign in with bea@example.test.');
+    expect(text()).toContain('Signs in with bea@example.test. Sign-in is enabled.');
+  });
+});
+
 describe('Email proof (DIRECTORY-122)', () => {
   it('tells a password-less person to ask an administrator when mail is absent', async () => {
     await mount('#/settings/account', { ...SERVICE,

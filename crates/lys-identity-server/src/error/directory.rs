@@ -91,6 +91,15 @@ macro_rules! directory_refusals {
     /// A code is wrong, replaced, spent, or belongs to another account.
     #[error("EmailChangeCodeRefused: This email code is not waiting for you, or was replaced or used. Ask for a new code.")]
     EmailChangeCodeRefused,
+    /// A person Lys holds more than one address for signs in as nobody
+    /// until an administrator sets theirs (DIRECTORY-124 R4).
+    #[error("SignInNotTheirs: This sign-in carries {account}, but Lys holds {held} for the person it opens, so it signs in as nobody until an administrator sets which address is theirs on People.")]
+    SignInNotTheirs {
+        /// The address the account carries, masked.
+        account: String,
+        /// The address Lys holds for the person, masked.
+        held: String,
+    },
     /// The issuer account does not agree with the person's held address.
     #[error("ProviderEmailMismatch: {provider} returned the sign-in account {account}, but Lys holds {held} for this person. Ask an administrator to check your Account page.")]
     ProviderEmailMismatch {

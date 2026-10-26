@@ -20,6 +20,8 @@ import type { SymbolName } from '../../shell/symbols';
 interface AccountView {
   email: string | null;
   enabled: boolean;
+  /** The person has no live sign-in account; setting their address makes one (DIRECTORY-124 R3). */
+  missing?: boolean;
   /** Whether the account has a Lys password; absent from an older service, which always asked for it. */
   password?: boolean;
   /** The providers it signs in with, by the name the sign-in page offers: "google"; absent from an older service. */
@@ -309,19 +311,19 @@ export function PersonAccount({ id }: { id: string }) {
   return (
     <section className="card" aria-label="Lys account">
       <h2>Lys account</h2>
-      <p className="note">{account ? `Signs in with ${account.email ?? 'no email'}. Sign-in is ${account.enabled ? 'enabled' : 'disabled'}.` : 'Reading the account…'}</p>
+      <p className="note">{!account ? 'Reading the account…' : account.missing ? 'They have no sign-in account. Set their email and Lys makes one under it.' : `Signs in with ${account.email ?? 'no email'}. Sign-in is ${account.enabled ? 'enabled' : 'disabled'}.`}</p>
       <Change
-        label="Change this person's email"
-        action="Change email"
+        label={account?.missing ? "Set this person's email" : "Change this person's email"}
+        action={account?.missing ? 'Set email' : 'Change email'}
         submit={async (form) => {
           const changed = await request<AccountView>(path + '/email', { email: text(form, 'account-email').trim() });
           setAccount(changed);
-          return `They now sign in with ${changed.email ?? 'the new email'}.`;
+          return changed.missing ? 'Their email is held; Lys could not make their account yet and tries again at the next change to the directory or the next start.' : `They now sign in with ${changed.email ?? 'the new email'}.`;
         }}
       >
         <Field id="account-email" label="New email" type="email" autoComplete="off" />
       </Change>
-      <Change
+      {account?.missing ? null : <Change
         label="Reset this person's password"
         action="Reset password"
         symbol="again"
@@ -333,8 +335,8 @@ export function PersonAccount({ id }: { id: string }) {
       >
         <Field id="account-new-password" label="New password" type="password" autoComplete="new-password" />
         <Field id="account-new-password-again" label="New password again" type="password" autoComplete="new-password" />
-      </Change>
-      {account ? (
+      </Change>}
+      {account && !account.missing ? (
         <Change
           label={account.enabled ? 'Disable sign-in' : 'Enable sign-in'}
           action={account.enabled ? 'Disable sign-in' : 'Enable sign-in'}

@@ -33,6 +33,7 @@ macro_rules! server_refusals {
             | ServerError::EmailChangeNeedsMail
             | ServerError::EmailChangeCodeRefused
             | ServerError::ProviderEmailMismatch { .. }
+            | ServerError::SignInNotTheirs { .. }
             | ServerError::LoginNotBound
             | ServerError::SameTarget
             | ServerError::NotSameOrganisation

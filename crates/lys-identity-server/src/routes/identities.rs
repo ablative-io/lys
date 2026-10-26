@@ -360,7 +360,7 @@ pub(crate) async fn transition(
             });
         }
     }
-    with_directory(&state, |directory| {
+    let answer = with_directory(&state, |directory| {
         if app_pass {
             let projection = directory.projection()?;
             let person = crate::read_api::own_person(projection, &actor)?;
@@ -380,7 +380,7 @@ pub(crate) async fn transition(
                 .into());
             }
         }
-        let receipt = directory.transition(actor, op, id, moved, &body.reason, now())?;
+        let receipt = directory.transition(actor.clone(), op, id, moved, &body.reason, now())?;
         if matches!(moved, Transition::Suspend | Transition::Retire) {
             let projection = directory.projection()?;
             state.sessions.end_matching(|actor| {
@@ -395,7 +395,15 @@ pub(crate) async fn transition(
         Ok(Json(ReceiptAnswer {
             receipt: receipt_view(&receipt),
         }))
-    })
+    })?;
+    // A person retired or brought back changes whose address is whose, so
+    // sign-ins are judged and repaired again (DIRECTORY-124 R2).
+    if matches!(id, IdentityId::Person(_))
+        && matches!(moved, Transition::Retire | Transition::Reinstate)
+    {
+        crate::sign_in_reconcile::after_change(&state, &actor).await;
+    }
+    Ok(answer)
 }
 
 #[derive(Deserialize, utoipa::ToSchema)]

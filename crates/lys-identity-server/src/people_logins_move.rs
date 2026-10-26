@@ -177,8 +177,12 @@ pub(crate) async fn move_login(
         }
         _ => None,
     };
+    let actor = moving.actor.clone();
     let receipts = moving.commit(&state)?;
     drop(guard);
+    // The moved login may leave a dead one behind, or an address free for
+    // a person waiting on it (DIRECTORY-124 R2).
+    crate::sign_in_reconcile::after_change(&state, &actor).await;
     let (source_grants, target_grants) = crate::grants::with_grants(&state, |judged| {
         let ids = |person| {
             judged

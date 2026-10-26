@@ -229,6 +229,7 @@ pub mod people_admit;
 pub(crate) mod people_admit_app;
 pub(crate) mod people_admit_handed;
 mod people_logins_move;
+pub mod sign_in_reconcile;
 pub mod plugins_installed_api;
 mod product_agents;
 pub mod product_drafts;

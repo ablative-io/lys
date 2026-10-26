@@ -82,16 +82,51 @@ pub async fn begin(state: &AppState, actor: Actor) -> Result<String, ServerError
     if !enabled {
         return Err(ServerError::SignInRefused);
     }
+    let email = user
+        .get("email")
+        .and_then(serde_json::Value::as_str)
+        .unwrap_or_default()
+        .trim()
+        .to_owned();
     let answer = with_directory(state, |directory| {
         let projection = directory.projection()?;
         if account_id(projection, &actor, state.oidc.issuer()).as_deref() != Some(&account) {
             return Err(ServerError::SignInRefused);
         }
         bound_caller(projection, &actor, true)?;
+        theirs(state, projection, &actor, &email)?;
         state.sessions.begin(actor)
     });
     drop(guard);
     answer
+}
+
+/// An account opens its person unless Lys holds more than one address for
+/// them (DIRECTORY-124 R4): that is a mix-up an administrator settles on
+/// People by setting the one that is theirs, and until then every account
+/// bound to them signs in as nobody.
+fn theirs(
+    state: &AppState,
+    directory: &Projection,
+    actor: &Actor,
+    email: &str,
+) -> Result<(), ServerError> {
+    let Some(person) = directory.person_for(actor.binding()) else {
+        return Ok(());
+    };
+    let foundings = crate::organisations_found::foundings(state)?;
+    let own = foundings.addresses_for(&person.to_string());
+    if own.len() > 1 {
+        return Err(ServerError::SignInNotTheirs {
+            account: crate::people_admit_handed::masked_email(email),
+            held: own
+                .iter()
+                .map(|held| crate::people_admit_handed::masked_email(held))
+                .collect::<Vec<_>>()
+                .join(" and "),
+        });
+    }
+    Ok(())
 }
 
 fn account_id(directory: &Projection, actor: &Actor, issuer: &str) -> Option<String> {
@@ -186,16 +221,25 @@ pub(crate) async fn begin_provider(
             .to_string();
         bound_caller(projection, &login.actor, true)?;
         let mut foundings = crate::organisations_found::foundings(state)?;
-        if let Some(held) = foundings.email_for(&person) {
-            if email.trim().to_lowercase() != held.trim().to_lowercase() {
+        let held: Vec<String> = foundings
+            .addresses_for(&person)
+            .into_iter()
+            .map(str::to_owned)
+            .collect();
+        match held.as_slice() {
+            [] => foundings.hold_email(&person, email.trim(), true)?,
+            [one] if one.eq_ignore_ascii_case(email.trim()) => {}
+            held => {
                 return Err(ServerError::ProviderEmailMismatch {
                     provider,
                     account: crate::people_admit_handed::masked_email(email.trim()),
-                    held: crate::people_admit_handed::masked_email(held.trim()),
+                    held: held
+                        .iter()
+                        .map(|held| crate::people_admit_handed::masked_email(held))
+                        .collect::<Vec<_>>()
+                        .join(" and "),
                 });
             }
-        } else {
-            foundings.hold_email(&person, email.trim(), true)?;
         }
         state.sessions.begin(login.actor)
     });

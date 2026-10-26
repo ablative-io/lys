@@ -71,12 +71,24 @@ export interface ReportingAgent extends AgentSummary {
   gap: ReportingGap | null;
 }
 
+/** `SignInHealth`: a person's sign-in judged against the issuer (DIRECTORY-124 R1). */
+export type SignInHealth =
+  | { state: 'ready' }
+  | { state: 'no_address' }
+  | { state: 'repairable' }
+  | { state: 'disabled' }
+  | { state: 'several_addresses'; addresses: string[] }
+  | { state: 'not_theirs'; account_email: string; belongs_to: string | null }
+  | { state: 'address_taken'; holder: string }
+  | { state: 'shared_address'; with: string[] };
+
 /** `person_with_agents`. */
 export interface PersonWithAgents extends PersonSummary {
   /** Present only on the administrator's directory read. */
   sign_in_email?: string | null;
   admitted_email?: string | null;
   email_recorded_at_sign_in?: boolean;
+  sign_in?: SignInHealth;
   agents: ReportingAgent[];
 }
 

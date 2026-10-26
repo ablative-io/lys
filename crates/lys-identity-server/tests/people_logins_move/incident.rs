@@ -130,7 +130,18 @@ async fn october_26_link_email_and_google_each_refuse_becoming_dean() -> TestRes
         .await?
         .1;
     assert_eq!(source["display_name"], "Dean Whiting");
-    assert_eq!(source["logins"], json!([]));
+    // Dean keeps the address held for him; the repair after the move gives
+    // his record a new account under it, never the moved one (DIRECTORY-124 R2).
+    let renewed = source["logins"].as_array().ok_or("Dean's logins")?;
+    assert_eq!(renewed.len(), 1, "{source}");
+    assert_ne!(renewed[0]["subject"], dean["subject"]);
+    assert!(
+        rauthy
+            .users()?
+            .iter()
+            .any(|user| user["id"] == renewed[0]["subject"] && user["email"] == "dean@example.test"),
+        "Dean's new account is under his own address"
+    );
     assert_eq!(target["display_name"], target_before["display_name"]);
     assert_eq!(target["state"], target_before["state"]);
     let logins = target["logins"].as_array().ok_or("Annabel's two logins")?;
@@ -165,10 +176,11 @@ async fn october_26_link_email_and_google_each_refuse_becoming_dean() -> TestRes
         assert_eq!(signed["receipt"], *receipt);
     }
     assert_eq!(indices, vec![size, size + 1]);
-    assert_eq!(service.log_size().await?, size + 2);
+    // The move's two leaves, then the repair's bind of Dean's new account.
+    assert_eq!(service.log_size().await?, size + 3);
     assert_eq!(
-        source["events"].as_array().and_then(|events| events.last()),
-        Some(&json!(size))
+        source["events"].as_array().map(|events| events[events.len() - 2..].to_vec()),
+        Some(vec![json!(size), json!(size + 2)])
     );
     let mut target_events = target_before["events"]
         .as_array()

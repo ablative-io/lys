@@ -33,7 +33,7 @@ use axum::extract::{OriginalUri, Path, State};
 use axum::http::{HeaderMap, Request};
 use axum::routing::{get, post};
 use axum::{Json, Router};
-use lys_identity::{IdentityId, PersonId};
+use lys_identity::PersonId;
 use serde::Deserialize;
 use serde_json::{Value, json};
 
@@ -96,7 +96,7 @@ impl AccountName<'_> {
     }
 }
 
-fn user_id(user: &Value) -> Result<String, ServerError> {
+pub(crate) fn user_id(user: &Value) -> Result<String, ServerError> {
     user.get("id")
         .and_then(Value::as_str)
         .map(str::to_owned)
@@ -298,23 +298,12 @@ fn body_of<T>(body: Result<Json<T>, JsonRejection>) -> Result<T, ServerError> {
         })
 }
 
-/// The account of person `id`: the login the directory binds them to at
-/// this service's issuer.
-fn account_id(state: &AppState, id: &str) -> Result<String, ServerError> {
-    let person = PersonId::from_str(id)?;
-    with_directory(state, |directory| {
-        let record = directory
-            .record(IdentityId::Person(person))?
-            .ok_or_else(|| lys_identity::IdentityError::IdentityUnknown {
-                identity: person.to_string(),
-            })?;
-        record
-            .bindings()
-            .iter()
-            .find(|binding| binding.issuer() == state.oidc.issuer())
-            .map(|binding| binding.subject().to_owned())
-            .ok_or_else(|| refused("this person has no Lys account to change"))
-    })
+/// The account of person `id`: their live account at this service's issuer,
+/// never a binding whose account the issuer no longer has (DIRECTORY-124).
+async fn account_id(state: &AppState, api: &SignInProviders, id: &str) -> Result<String, ServerError> {
+    crate::sign_in_reconcile::live_account(state, api, PersonId::from_str(id)?)
+        .await?
+        .ok_or_else(|| refused("this person has no Lys account to change"))
 }
 
 async fn account_of(
@@ -325,8 +314,13 @@ async fn account_of(
     let actor = signed_in(&state, &headers)?;
     agent::exercised(&state, &actor, &person, "read")?;
     crate::routes::administrator(&state, &actor)?;
-    let id = account_id(&state, &person)?;
-    shown(api(&state)?, &id).await
+    let api = api(&state)?;
+    // A person with no live account is read as missing, so People can set
+    // the address Lys makes their account under (DIRECTORY-124 R3).
+    let Some(id) = crate::sign_in_reconcile::live_account(&state, api, PersonId::from_str(&person)?).await? else {
+        return Ok(Json(json!({ "email": null, "enabled": false, "missing": true })));
+    };
+    shown(api, &id).await
 }
 
 /// A person's new email, set by the administrator.
@@ -345,13 +339,25 @@ async fn set_email(
     let actor = signed_in(&state, &headers)?;
     agent::exercised(&state, &actor, &person, "person.email.set")?;
     crate::routes::administrator(&state, &actor)?;
-    let id = account_id(&state, &person)?;
     let email = check_email(&body_of(body)?.email)?.to_owned();
     let api = api(&state)?;
+    // A person with no live account has the address held, and the repair
+    // finds or makes their account under it (DIRECTORY-124 R3).
+    let held = PersonId::from_str(&person)?;
+    let Some(id) = crate::sign_in_reconcile::live_account(&state, api, held).await? else {
+        crate::sign_in_reconcile::hold_address(&state, api, held, &email).await?;
+        crate::sign_in_reconcile::after_change(&state, &actor).await;
+        return match crate::sign_in_reconcile::live_account(&state, api, held).await? {
+            Some(made) => shown(api, &made).await,
+            None => Ok(Json(json!({ "email": null, "enabled": false, "missing": true }))),
+        };
+    };
     let guard = api.lock_account(&id).await?;
     email_changes::write_email(&state, api, &id, &person, &email).await?;
     drop(guard);
-    shown(api, &id).await
+    let answer = shown(api, &id).await?;
+    crate::sign_in_reconcile::after_change(&state, &actor).await;
+    Ok(answer)
 }
 
 /// A person's new password, set by the administrator. Never printed.
@@ -369,8 +375,8 @@ async fn reset_password(
 ) -> Result<Json<Value>, ServerError> {
     let actor = signed_in(&state, &headers)?;
     crate::routes::administrator(&state, &actor)?;
-    let id = account_id(&state, &person)?;
     let api = api(&state)?;
+    let id = account_id(&state, api, &person).await?;
     let policy = state.password_policy.as_ref();
     set_password(api, policy, &id, &body_of(body)?.password).await?;
     shown(api, &id).await
@@ -416,14 +422,14 @@ async fn set_enabled(
     if actor.provenance().agent().is_some() {
         return giving::enabled(&state, &actor, PersonId::from_str(&person)?, body.enabled).await;
     }
-    let id = account_id(&state, &person)?;
+    let api = api(&state)?;
+    let id = account_id(&state, api, &person).await?;
     if actor.binding().subject() == id {
         return Err(refused(
             "the administrator does not disable their own sign-in",
         ));
     }
     let enabled = body.enabled;
-    let api = api(&state)?;
     let guard = api.lock_account(&id).await?;
     let mut update = update_of(&read(api, &id).await?)?;
     update["enabled"] = Value::Bool(enabled);

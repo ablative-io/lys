@@ -56,6 +56,11 @@ export function refusedInAddress(who = 'your administrator'): string {
     const held = params.get('held_email') ?? 'an unknown address';
     return `${provider} returned the sign-in account ${accountEmail}, but Lys holds ${held} for this person. Ask ${who} to check your Account page.`;
   }
+  if (name === 'SignInNotTheirs') {
+    const accountEmail = params.get('account_email') ?? 'an unknown address';
+    const held = params.get('held_email') ?? 'more than one address';
+    return `This sign-in carries ${accountEmail}, but Lys holds ${held} for the person it opens, so it signs in as nobody. Ask ${who} to set which address is yours.`;
+  }
   // The browser-binding cookie is kept only at the address the sign-in began on. The service sends a refused
   // return to this page, at Lys's own address, so trying again here is the act that works.
   if (name === 'SignInStateUnknown') {

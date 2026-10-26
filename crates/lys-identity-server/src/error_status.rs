@@ -265,6 +265,7 @@ impl ServerError {
             | Self::AgentHasNoPolicy { .. }
             | Self::NotAdmitted { .. }
             | Self::ProviderEmailMismatch { .. }
+            | Self::SignInNotTheirs { .. }
             | Self::ProofRefused
             | Self::AlreadyAdmitted
             | Self::OrganisationNotOwn { .. }

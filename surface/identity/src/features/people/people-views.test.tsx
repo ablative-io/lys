@@ -82,6 +82,24 @@ describe('An admission waiting on the Account page (DIRECTORY-121)', () => {
   });
 });
 
+describe('Sign-in health (DIRECTORY-124)', () => {
+  it('says what a person not ready to sign in needs, with their Account link, and nothing for a ready one', async () => {
+    await mount('#/people', { ...SERVICE, '/directory/people': ok({ scope: 'directory', people: [
+      { id: ADA, display_name: 'Dean Whiting', state: 'active', agents: [], sign_in_email: 'dean@example.test', admitted_email: 'dean@example.test', sign_in: { state: 'ready' } },
+      { id: BEA, display_name: 'Annabel', state: 'active', agents: [], sign_in: { state: 'address_taken', holder: 'Dean Whiting' } },
+    ] }) });
+    expect(text()).toContain("Their address is the sign-in of Dean Whiting. Give that sign-in to them on Dean Whiting's Account page.");
+    expect($('a[href="#/file/' + BEA + '/credentials"]')).not.toBeNull();
+    expect($('a[href="#/file/' + ADA + '/credentials"]')).toBeNull();
+  });
+  it('names every address held for a person who signs in as nobody', async () => {
+    await mount('#/people', { ...SERVICE, '/directory/people': ok({ scope: 'directory', people: [
+      { id: ADA, display_name: 'Dean Whiting', state: 'active', agents: [], sign_in: { state: 'several_addresses', addresses: ['annabel@example.test', 'dean@example.test'] } },
+    ] }) });
+    expect(text()).toContain('Signs in as nobody: Lys holds annabel@example.test and dean@example.test for them.');
+  });
+});
+
 describe('Sign-in mix-ups (DIRECTORY-122)', () => {
   it('shows both addresses and the Account link only for the differing person', async () => {
     await mount('#/people', { ...SERVICE, '/directory/people': ok({ scope: 'directory', people: [
