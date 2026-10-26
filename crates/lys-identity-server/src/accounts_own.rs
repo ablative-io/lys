@@ -18,6 +18,9 @@ use crate::routes::{AppState, signed_in};
 use crate::sign_in::{Attempt, person_address};
 use crate::sign_in_providers::{SignInProviders, api};
 
+#[path = "accounts_pending.rs"]
+mod pending;
+
 /// The account `actor` signed in with, when it is one at this service's issuer.
 fn own_id(state: &AppState, actor: &Actor) -> Result<String, ServerError> {
     if actor.binding().issuer() == state.oidc.issuer() {
@@ -151,7 +154,7 @@ pub(super) async fn own_email(
         .as_ref()
         .ok_or(ServerError::EmailChangeNeedsMail)?;
     let api = api(&state)?;
-    let mut changes = api.email_changes.lock().await;
+    let turn = api.email_turns.take(&id).await?;
     let guard = api.lock_account(&id).await?;
     let owner = super::email_changes::owner(&state, &actor)?;
     let held = super::email_changes::held(&state, &owner)?;
@@ -159,7 +162,11 @@ pub(super) async fn own_email(
     let code = crate::foundings_store::new_token()?;
     let held_code = crate::foundings_store::new_token()?;
     // A newer ask invalidates both predecessors even if either send fails.
-    changes.remove(&id);
+    let sending = pending::Sending::new(api, &id, PendingEmail {
+        email:email.clone(), held:held.clone(), digest:crate::foundings_store::digest(&code),
+        held_digest:crate::foundings_store::digest(&held_code), owner, sent:false,
+    })?;
+    drop(guard);
     for (address, code, leaving) in [(&email, &code, false), (&held, &held_code, true)] {
         let letter = crate::mail_letters::Letter::EmailChange {
             email: address.clone(),
@@ -170,17 +177,8 @@ pub(super) async fn own_email(
             .send_once(&lys_identity::OperationId::generate()?.to_string(), &letter)
             .await?;
     }
-    changes.insert(
-        id,
-        PendingEmail {
-            email,
-            held,
-            digest: crate::foundings_store::digest(&code),
-            held_digest: crate::foundings_store::digest(&held_code),
-            owner,
-        },
-    );
-    drop(guard);
+    sending.complete()?;
+    drop(turn);
     Ok(Json(json!({"pending": true})))
 }
 
@@ -222,6 +220,7 @@ pub(crate) struct PendingEmail {
     held_digest: String,
     held: String,
     owner: String,
+    sent: bool,
 }
 
 /// Both mailbox codes, never printed or stored in clear. Missing codes
@@ -244,16 +243,18 @@ pub(super) async fn confirm_email(
     let id = own_id(&state, &actor)?;
     let body = body_of(body)?;
     let api = api(&state)?;
-    let mut changes = api.email_changes.lock().await;
+    let turn = api.email_turns.take(&id).await?;
     let guard = api.lock_account(&id).await?;
     let owner = super::email_changes::owner(&state, &actor)?;
     let (Some(code), Some(held_code)) = (body.code, body.held_code) else {
         return Err(ServerError::EmailChangeCodeRefused);
     };
+    let email = {
+    let changes = pending::changes(api)?;
     let pending = changes
         .get(&id)
         .filter(|pending| {
-            pending.owner == owner
+            pending.sent && pending.owner == owner
                 && pending.digest == crate::foundings_store::digest(&code)
                 && pending.held_digest == crate::foundings_store::digest(&held_code)
         })
@@ -261,13 +262,14 @@ pub(super) async fn confirm_email(
     if super::email_changes::held(&state, &owner)? != pending.held {
         return Err(ServerError::EmailChangeCodeRefused);
     }
-    let email = pending.email.clone();
+    pending.email.clone()
+    };
     super::email_changes::available(&state, api, &owner, &email).await?;
     // Spend both before the issuer write, including uncertain transport outcomes.
-    changes.remove(&id);
+    pending::changes(api)?.remove(&id);
     super::email_changes::write_email(&state, api, &id, &owner, &email).await?;
     drop(guard);
-    drop(changes);
+    drop(turn);
     shown(api, &id).await
 }
 

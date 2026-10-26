@@ -79,6 +79,9 @@ const PAIRING: &str = "a pairing is a person's to decide: the agent is registere
 /// the deployment keeps (`kept-responsibilities.json`), never both: first-run
 /// setup and setting a sign-in provider are kept, so they are not here.
 pub const HUMAN_ONLY: &[(Method, &str, &str)] = &[
+    (POST, "/runtime/sessions/{id}/end-now", "End now is a person's explicit escalation"),
+    (GET, "/waits", "only a person administering this service inspects outbound calls"),
+    (POST, "/waits/{id}/cancel", "only a person administering this service cancels outbound calls"),
     (GET, "/me/account", CREDENTIALS),
     (POST, "/me/account/email", CREDENTIALS),
     (POST, "/me/account/email/confirm", CREDENTIALS),

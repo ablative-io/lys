@@ -1,0 +1,31 @@
+id: no-clock-on-a-peer
+language: rust
+severity: error
+message: "A peer wait ends on bytes, a close or a transport error. Only the schedules/goals due instant may wake on a clock (HOME-040)."
+files:
+  - "crates/lys-identity-server/src/**/*.rs"
+rule:
+  any:
+    - pattern: tokio::time::timeout($$$)
+    - pattern: tokio::time::timeout_at($$$)
+    - all:
+        - pattern: tokio::time::sleep($$$)
+        - not:
+            all:
+              - pattern: tokio::time::sleep(wait)
+              - inside:
+                  kind: function_item
+                  stopBy: end
+                  has:
+                    field: name
+                    regex: '^(fire_from|remind_from)$'
+              - inside:
+                  kind: block
+                  stopBy: end
+                  has:
+                    pattern: let wait = std::time::Duration::from_secs(due.saturating_sub(now()));
+                    stopBy: end
+    - pattern: $CLIENT.timeout($$$)
+    - pattern: $CLIENT.connect_timeout($$$)
+    - pattern: $SOCKET.set_read_timeout(Some($$$))
+    - pattern: $SOCKET.set_write_timeout(Some($$$))

@@ -25,7 +25,6 @@
 
 use std::collections::BTreeMap;
 use std::env::VarError;
-use std::time::Duration;
 
 use reqwest::header::{HeaderName, HeaderValue};
 use serde_json::{Value, json};
@@ -53,7 +52,6 @@ pub const BOUND_EXCEEDED: &str = "import_bound_exceeded";
 /// The largest answer read from one monitor API, in bytes.
 pub const ANSWER_BOUND: usize = 4 * 1024 * 1024;
 
-const ASKED_FOR: Duration = Duration::from_secs(10);
 const NANOS: i128 = 1_000_000_000;
 pub(crate) const BUDGETS: &str = "/api/budgets";
 pub(crate) const PROMPTS: &str = "/api/prompt-settings";
@@ -302,8 +300,7 @@ fn asking(source: &MonitorSource) -> Result<Asking, Refusal> {
             Some((header_name, header))
         }
     };
-    let client = reqwest::Client::builder()
-        .timeout(ASKED_FOR)
+    let client = crate::outbound::http()
         .build()
         .map_err(|error| {
             let detail = format!("the client that asks the monitor could not be built: {error}");
@@ -319,6 +316,13 @@ fn asking(source: &MonitorSource) -> Result<Asking, Refusal> {
 /// Ask the monitor `path`, posting `body` when there is one, and read its JSON
 /// answer within [`ANSWER_BOUND`].
 async fn ask(asking: &Asking, path: &str, body: Option<&Value>) -> Result<Value, Refusal> {
+    let mut call = crate::waits::Call::begin("app", &asking.base, path, "seat import")
+        .map_err(|error| refusal(SOURCE_UNAVAILABLE, path, error.to_string()))?;
+    call.until(ask_untracked(asking, path, body)).await
+        .map_err(|reason| refusal(SOURCE_UNAVAILABLE, path, reason))?
+}
+
+async fn ask_untracked(asking: &Asking, path: &str, body: Option<&Value>) -> Result<Value, Refusal> {
     let address = format!("{}{path}", asking.base);
     let method = if body.is_some() { "POST" } else { "GET" };
     let member = format!("{method} {address}");

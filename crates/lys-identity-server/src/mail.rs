@@ -17,13 +17,16 @@ use std::path::PathBuf;
 use lettre::message::Mailbox;
 use lettre::message::header::ContentType;
 use lettre::transport::smtp::authentication::Credentials;
-use lettre::{AsyncSmtpTransport, AsyncTransport, Message, Tokio1Executor};
+use lettre::Message;
 use serde::{Deserialize, Serialize};
-use tokio::sync::Mutex;
+use std::sync::{Mutex, MutexGuard};
 use zeroize::Zeroizing;
 
 use crate::error::ServerError;
 use crate::mail_letters::Letter;
+
+#[path = "mail_transport.rs"]
+mod transport;
 
 /// The `mail` section of the service configuration, as the install writes
 /// it from deployment.toml's `[mail]`: the server, the sender, how the
@@ -153,11 +156,12 @@ struct Sent {
 
 /// The sender.
 pub struct Mailer {
-    transport: AsyncSmtpTransport<Tokio1Executor>,
+    transport: transport::Transport,
     from: Mailbox,
     sent_file: PathBuf,
     /// One record read and append at a time, so two acts never interleave.
     record: Mutex<()>,
+    claims: crate::wait_turns::Turns,
 }
 
 impl std::fmt::Debug for Mailer {
@@ -187,21 +191,7 @@ impl Mailer {
             .from
             .parse()
             .map_err(|error| invalid(format!("mail.from is not an address: {error}")))?;
-        let builder = match settings.tls {
-            Tls::Implicit => AsyncSmtpTransport::<Tokio1Executor>::relay(&settings.host),
-            Tls::Starttls => AsyncSmtpTransport::<Tokio1Executor>::starttls_relay(&settings.host),
-            Tls::None => Ok(AsyncSmtpTransport::<Tokio1Executor>::builder_dangerous(
-                &settings.host,
-            )),
-        }
-        .map_err(|error| {
-            invalid(format!(
-                "the mail server {} cannot be dialled: {error}",
-                settings.host
-            ))
-        })?;
-        let mut builder = builder.port(settings.port);
-        if let Some(user) = &settings.user {
+        let credentials = if let Some(user) = &settings.user {
             let file = settings
                 .password_file
                 .as_ref()
@@ -212,16 +202,17 @@ impl Mailer {
                     file.display()
                 ))
             })?);
-            builder = builder.credentials(Credentials::new(
+            Some(Credentials::new(
                 user.clone(),
                 password.trim_end().to_owned(),
-            ));
-        }
+            ))
+        } else { None };
         Ok(Self {
-            transport: builder.build(),
+            transport: transport::Transport::new(settings, credentials),
             from,
             sent_file: settings.sent_file.clone(),
             record: Mutex::new(()),
+            claims: crate::wait_turns::Turns::default(),
         })
     }
 
@@ -236,8 +227,14 @@ impl Mailer {
         operation: &str,
         letter: &Letter,
     ) -> Result<LetterView, ServerError> {
-        let _one = self.record.lock().await;
-        if let Some(by) = self.recorded(operation, letter.name())? {
+        let claim = self.claims.take(&format!("{operation}/{}", letter.name())).await?;
+        let recorded = {
+            let record = self.record()?;
+            let recorded = self.recorded(operation, letter.name());
+            drop(record);
+            recorded?
+        };
+        if let Some(by) = recorded {
             return Ok(LetterView::sent(letter, by));
         }
         let not_sent = |reply: String| ServerError::MailNotSent {
@@ -253,11 +250,12 @@ impl Mailer {
             .header(ContentType::TEXT_PLAIN)
             .body(letter.body())
             .map_err(|error| not_sent(format!("the letter could not be built: {error}")))?;
-        self.transport
-            .send(message)
-            .await
-            .map_err(|error| not_sent(error.to_string()))?;
+        let call = crate::waits::Call::begin("mail", &self.transport.peer(), letter.name(), operation)?;
+        call.run(self.transport.send(&message)).await.map_err(not_sent)?;
+        let record = self.record()?;
         self.append(operation, letter, Sender::Lys)?;
+        drop(record);
+        drop(claim);
         Ok(LetterView::sent(letter, Sender::Lys))
     }
 
@@ -272,11 +270,14 @@ impl Mailer {
         operation: &str,
         letter: &Letter,
     ) -> Result<LetterView, ServerError> {
-        let _one = self.record.lock().await;
+        let claim = self.claims.take(&format!("{operation}/{}", letter.name())).await?;
+        let record = self.record()?;
         if let Some(by) = self.recorded(operation, letter.name())? {
             return Ok(LetterView::sent(letter, by));
         }
         self.append(operation, letter, Sender::Issuer)?;
+        drop(record);
+        drop(claim);
         Ok(LetterView::sent(letter, Sender::Issuer))
     }
 
@@ -287,24 +288,31 @@ impl Mailer {
     /// # Errors
     /// A record that cannot be read is named as the directory being
     /// unavailable.
-    pub async fn recorded_by(
+    pub fn recorded_by(
         &self,
         operation: &str,
         letter: &str,
-    ) -> Result<Option<Sender>, ServerError> {
-        let _one = self.record.lock().await;
-        self.recorded(operation, letter)
+    ) -> std::future::Ready<Result<Option<Sender>, ServerError>> {
+        std::future::ready(self.record().and_then(|record| {
+            let answer = self.recorded(operation, letter);
+            drop(record);
+            answer
+        }))
     }
 
     /// Admission addresses already recorded by Lys; a read never repairs data.
-    pub(crate) async fn added_addresses(&self) -> Result<Vec<(String, String)>, ServerError> {
-        let _one = self.record.lock().await;
+    pub(crate) fn added_addresses(&self) -> std::future::Ready<Result<Vec<(String, String)>, ServerError>> {
+        std::future::ready(self.read_added_addresses())
+    }
+
+    fn read_added_addresses(&self) -> Result<Vec<(String, String)>, ServerError> {
+        let record = self.record()?;
         let text = match std::fs::read_to_string(&self.sent_file) {
             Ok(text) => text,
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
             Err(error) => return Err(record_unavailable(&self.sent_file, &error)),
         };
-        text.lines()
+        let addresses = text.lines()
             .filter(|line| !line.trim().is_empty())
             .map(|line| {
                 serde_json::from_str::<Sent>(line)
@@ -315,7 +323,13 @@ impl Mailer {
                 Ok(_) => None,
                 Err(error) => Some(Err(error)),
             })
-            .collect()
+            .collect();
+        drop(record);
+        addresses
+    }
+
+    fn record(&self) -> Result<MutexGuard<'_, ()>, ServerError> {
+        self.record.lock().map_err(|error| record_unavailable(&self.sent_file, &error))
     }
 
     /// Who the record says sent `letter` for `operation`, if anyone.

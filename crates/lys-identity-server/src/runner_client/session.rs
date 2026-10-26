@@ -1,4 +1,4 @@
-use super::{DialHub, Hook, Leave, LeaveOnDrop, Replied, RunnerRecord};
+use super::{DialHub, Hook, LeaveOnDrop, Replied, RunnerRecord};
 use crate::error::ServerError;
 use lys_runner::{Act, Answer};
 use std::sync::Arc;
@@ -236,30 +236,38 @@ pub(super) async fn ask_exactly(
     act: Act,
     standing: bool,
 ) -> Result<Answer, ServerError> {
-    let leave = Arc::new(Leave::default());
+    let encoded = serde_json::to_value(&act).map_err(|error| ServerError::Runner {
+        refusal:"runner_request_malformed".to_owned(), words:error.to_string(),
+    })?;
+    let peer = match &record {
+        RunnerRecord::Socket { path } => path.as_str(),
+        RunnerRecord::Lys => "local runner socket",
+        RunnerRecord::Dialled { .. } => machine,
+    };
+    let mut call = crate::waits::Call::begin("runner", peer,
+        encoded["act"].as_str().unwrap_or("request"), act.session().unwrap_or(machine))?;
+    let leave = call.closer();
     let guard = LeaveOnDrop(Arc::clone(&leave));
     let (shared, asked_machine, asked_record) =
         (Arc::clone(state), machine.to_owned(), record.clone());
-    let bounded = matches!(&act, Act::Status { .. } | Act::Liveness { .. } | Act::Owned);
-    let waiting = tokio::task::spawn_blocking(move || {
+    let mut waiting = tokio::task::spawn_blocking(move || {
         shared
             .runners
             .ask(&asked_machine, &asked_record, &act, &leave)
     });
-    let joined = if bounded {
-        if let Ok(joined) = tokio::time::timeout(std::time::Duration::from_secs(5), waiting).await {
-            joined
-        } else {
+    let joined = match call.until(&mut waiting).await {
+        Ok(joined) => joined,
+        Err(words) => {
             guard.0.leave()?;
+            let outcome = waiting.await.map_err(|error| ServerError::Runner {
+                refusal:"runner_unreachable".to_owned(), words:error.to_string(),
+            })?;
+            if let Err(error) = outcome { tracing::debug!("cancelled_runner_returned: {error}"); }
             return Err(ServerError::Runner {
                 refusal: "runner_unreachable".to_owned(),
-                words:
-                    "this computer's runner did not answer within 5 seconds; check its connection"
-                        .to_owned(),
+                words,
             });
         }
-    } else {
-        waiting.await
     };
     let asked = joined.map_err(|failed| ServerError::Runner {
         refusal: "runner_unreachable".to_owned(),

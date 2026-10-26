@@ -317,14 +317,14 @@ describe('The Dashboard is the front page', () => {
   });
 
   it('stops a running agent from its row, after asking, in a row under it, opened once', async () => {
-    const { posted } = await mount('#/', { ...routes, ['POST /runtime/sessions/' + LIVE + '/end']: ok({ session: LIVE, answer: { kind: 'ended' }, receipt: { index: 1 } }) });
+    const { posted } = await mount('#/', { ...routes, ['POST /runtime/sessions/' + LIVE + '/stop']: ok({ session: LIVE, answer: { kind: 'ended' }, receipt: { index: 1 } }) });
     await click(rowOf('Scribe')?.querySelector('button[data-act="stop"]') ?? null);
     expect($('section[aria-label="Agents"] .you-asked')?.textContent).toContain('Stop Scribe? This ends its run on Lab. What it has not saved is lost.');
     expect(rowOf('Scribe')?.nextElementSibling?.classList.contains('you-asked')).toBe(true);
     expect($$('.you-asked')).toHaveLength(1);
     expect(posted.filter((entry) => entry.path.endsWith('/end'))).toEqual([]);
     await click($$('section[aria-label="Agents"] .you-asked button').find((el) => (el.getAttribute('aria-label') ?? el.textContent) === 'Stop Scribe') ?? null);
-    expect(posted.filter((entry) => entry.path.endsWith('/end')).map((entry) => entry.path)).toEqual(['/runtime/sessions/' + LIVE + '/end']);
+    expect(posted.filter((entry) => entry.path.endsWith('/stop')).map((entry) => entry.path)).toEqual(['/runtime/sessions/' + LIVE + '/stop']);
   });
 
   it('opens one picture of a running agent\'s terminal on Watch, switches it on a second Watch, keeps it while the page reads again, and closes it leaving the agent running', async () => {
@@ -386,7 +386,7 @@ describe('What the Dashboard reads, as the service answers it', () => {
   it('shows each live session of an agent with its own Watch and Stop, in its one row', async () => {
     const { posted } = await mount('#/', { ...routes, ...terminalOf(OTHER),
       '/dashboard': ok(dashboard({ [SCRIBE]: { sessions: [running, session(OTHER, SCRIBE, 'Shed')] } })),
-      ['POST /runtime/sessions/' + OTHER + '/end']: ok({ session: OTHER, answer: { kind: 'ended' }, receipt: { index: 1 } }) });
+      ['POST /runtime/sessions/' + OTHER + '/stop']: ok({ session: OTHER, answer: { kind: 'ended' }, receipt: { index: 1 } }) });
     expect([...(rowOf('Scribe')?.querySelectorAll('td')[1].querySelectorAll('.dash-line') ?? [])].map((line) => line.textContent)).toEqual(['on Lab', 'on Shed']);
     expect([...(rowOf('Scribe')?.querySelectorAll('.dash-acts') ?? [])].map((acts) => acts.getAttribute('data-session'))).toEqual([LIVE, OTHER]);
     expect($$('.dash-acts[data-session]').map((acts) => [acts.getAttribute('data-session'), acts.closest('tr') === rowOf('Scribe')])).toEqual([[LIVE, true], [OTHER, true]]);
@@ -394,7 +394,7 @@ describe('What the Dashboard reads, as the service answers it', () => {
     expect($('.dash-picture')?.textContent).toContain('on Shed');
     await click(rowOf('Scribe')?.querySelector(`.dash-acts[data-session="${OTHER}"] [data-act="stop"]`) ?? null);
     await click($$('section[aria-label="Agents"] .you-asked button').find((el) => (el.getAttribute('aria-label') ?? el.textContent) === 'Stop Scribe') ?? null);
-    expect(posted.filter((entry) => entry.path.endsWith('/end')).map((entry) => entry.path)).toEqual(['/runtime/sessions/' + OTHER + '/end']);
+    expect(posted.filter((entry) => entry.path.endsWith('/stop')).map((entry) => entry.path)).toEqual(['/runtime/sessions/' + OTHER + '/stop']);
   });
 
   it('opens Stop under the one listing it was pressed in when an agent is under two teams', async () => {

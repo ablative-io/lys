@@ -61,6 +61,7 @@ export function NetworkTreePane({ seat, name, reason, change }: { seat: SeatView
       {running && !ended ? <Act symbol="stop" name={RUN_WORDS.stop + ' ' + seat.name} word={RUN_WORDS.stop} className="small" disabled={action.busy} onClick={() => setAsking(true)} /> : null}
     </header>
     {asking && running && !ended ? <RunConfirm className="terminal-stop" small doing="stop" name={name} where={null} busy={action.busy} refused={null}
+      waitingSince={action.waitingSince} endingNow={action.endingNow} endNow={() => { void action.endNow(); }}
       confirm={() => { void action.run('stop').then(() => setAsking(false)); }} cancel={() => setAsking(false)} /> : null}
     {reason ? <p className="network-reason" role="status" title={reason}>{problemWords(reason)}</p> : null}
     {running ? <form className="seat-send" aria-label={'Send to ' + seat.name} onSubmit={(event) => {

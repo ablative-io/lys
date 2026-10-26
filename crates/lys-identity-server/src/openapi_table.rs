@@ -135,6 +135,8 @@ mod tests;
 pub(crate) const TABLE: &[E] = entries! {
     GET "/authority" "The authority this service speaks for" P [];
     GET "/health" "That this service is serving, with its name and build" P [];
+    GET "/waits" "Outbound calls in flight, oldest first; after waits for a change event" S [ADMIN, &["waits_unavailable"]];
+    POST "/waits/{id}/cancel" "An administrator cancels one outbound call" S [ADMIN, &["wait_unknown", "waits_unavailable"]];
     GET "/clients" "The client platforms and commits held by this install" P [&["clients_unreadable"]];
     GET "/clients/{platform}/{name}" "Download a held client executable with its commit and SHA-256" P [&["client_platform_unknown", "client_file_unknown", "client_digest_mismatch", "clients_unreadable"]];
     GET "/login" "Redirect to the sign-in screen" P [];
@@ -272,6 +274,8 @@ pub(crate) const TABLE: &[E] = entries! {
     POST "/runtime/sessions/{id}/resize" "Resize a session" G [SIGNED_BODY, &["RuntimeSessionUnknown", "AgentNotVisible", "not_permitted"]] scope("runtime-session", "runtime-session.resize", ["id"]);
     POST "/runtime/sessions/{id}/compact" "Compact a session" G [SIGNED_BODY, &["RuntimeSessionUnknown", "AgentNotVisible", "not_permitted"]] scope("runtime-session", "runtime-session.compact", ["id"]);
     POST "/runtime/sessions/{id}/end" "End a session" G [SIGNED_BODY, &["RuntimeSessionUnknown", "AgentNotVisible", "not_permitted"]] scope("runtime-session", "runtime-session.end", ["id"]);
+    POST "/runtime/sessions/{id}/stop" "Ask a session to stop and wait for the runner's reap" G [SIGNED_BODY, &["RuntimeSessionUnknown", "AgentNotVisible", "not_permitted", "runner_unreachable", "runner_reply_malformed", "operation_refused", "RuntimeUnavailable"]] scope("runtime-session", "runtime-session.end", ["id"]);
+    POST "/runtime/sessions/{id}/end-now" "A person asks the runner to end a waiting process now" S [SIGNED_BODY, &["RuntimeSessionUnknown", "AgentNotVisible", "not_permitted", "runner_unreachable", "RuntimeUnavailable"]];
     POST "/agents/{id}/wake" "Wake an agent's live session" G [SIGNED_BODY, &["AgentNotVisible", "not_permitted", "no_live_session"]] scope("agent", "agent.wake", ["id"]);
     GET "/runtime/live" "The sessions still running" G [SIGNED, &["RequestMalformed", "TeamUnknown", "TeamsUnavailable", "AgentNotVisible", "IdentifierMalformed", "RuntimeSessionUnknown"]] scope("runtime-session", "read", []);
     GET "/network/machines/{id}/runner" "A machine's runner" G [SIGNED, &["NoPerson", "not_your_computer", "MachineUnknown", "MachineRetired", "NetworkUnavailable"]] scope("machine", "read", ["id"]);

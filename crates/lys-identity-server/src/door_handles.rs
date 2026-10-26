@@ -85,8 +85,16 @@ impl DoorHandles {
 
 /// The door's answer for `agent`: its status and its body.
 fn get(host: &str, port: u16, agent: &str) -> Result<(u16, Vec<u8>), String> {
+    let call = crate::waits::Call::begin("app", &format!("{host}:{port}"), "credential handles", agent).map_err(|error| error.to_string())?;
     let mut stream = TcpStream::connect((host, port))
         .map_err(|error| format!("the door at {host}:{port} could not be reached: {error}"))?;
+    crate::outbound::keepalive(&stream).map_err(|error| error.to_string())?;
+    let closer = stream.try_clone().map_err(|error| error.to_string())?;
+    call.closer().hold(Box::new(move || {
+        if let Err(error) = closer.shutdown(std::net::Shutdown::Both) {
+            if error.kind() != std::io::ErrorKind::NotConnected { tracing::error!("door_close_failed: {error}"); }
+        }
+    })).map_err(|error| error.to_string())?;
     let request = format!(
         "GET {HANDLES_PATH}?holder={} HTTP/1.1\r\nHost: {host}:{port}\r\nAccept: application/json\r\nConnection: close\r\n\r\n",
         query_value(agent)
@@ -94,12 +102,12 @@ fn get(host: &str, port: u16, agent: &str) -> Result<(u16, Vec<u8>), String> {
     stream
         .write_all(request.as_bytes())
         .and_then(|()| stream.flush())
-        .map_err(|error| format!("the request to the door was not sent: {error}"))?;
+        .map_err(|error| call.reason().unwrap_or_else(|| format!("the request to the door was not sent: {error}")))?;
     let mut raw = Vec::new();
     stream
         .read_to_end(&mut raw)
-        .map_err(|error| format!("the door's answer was not read: {error}"))?;
-    response(&raw)
+        .map_err(|error| call.reason().unwrap_or_else(|| format!("the door's answer was not read: {error}")))?;
+    response(&raw).map_err(|error| call.reason().unwrap_or(error))
 }
 
 impl HandleRecords for DoorHandles {

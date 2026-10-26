@@ -224,6 +224,12 @@ fn settings(state: &AppState) -> Result<&SetupSettings, ServerError> {
         .ok_or_else(|| unavailable("the configuration names no setup"))
 }
 
+async fn turn(state: &AppState) -> Result<crate::wait_turns::Claim<'static>, ServerError> {
+    static TURNS: std::sync::OnceLock<crate::wait_turns::Turns> = std::sync::OnceLock::new();
+    let subject = settings(state)?.code_file.to_string_lossy().into_owned();
+    TURNS.get_or_init(crate::wait_turns::Turns::default).take(&subject).await
+}
+
 fn pending(settings: &SetupSettings) -> Result<Option<PendingCode>, ServerError> {
     let path = &settings.code_file;
     let text = match std::fs::read_to_string(path) {
@@ -366,7 +372,7 @@ async fn make_administrator(
         .setup_attempts
         .admit(state.sign_in.address(&extensions, &headers)?, 5)?;
     let Json(body) = body.map_err(|refused| malformed(&refused))?;
-    let turn = state.setup_lock.lock().await;
+    let turn = turn(&state).await?;
     admit(&state, &body.code, Purpose::FirstRun)?;
     let settings = settings(&state)?;
     let email = accounts::check_email(&body.email)?;

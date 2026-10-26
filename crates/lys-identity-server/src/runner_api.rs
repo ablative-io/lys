@@ -164,6 +164,7 @@ pub(crate) async fn perform(
     carried: Carried,
     act: Act,
 ) -> Result<Json<Value>, ServerError> {
+    let require_reap = matches!(act, Act::End { .. });
     let act = if matches!(
         act,
         Act::Input { .. } | Act::InputBytes { .. } | Act::Keys { .. } | Act::Operate { .. }
@@ -175,8 +176,19 @@ pub(crate) async fn perform(
     } else {
         act
     };
-    let answered =
-        crate::runner_client::ask(state, &driven.machine, driven.runner.clone(), act).await;
+    let answered = crate::runner_client::ask(state, &driven.machine, driven.runner.clone(), act).await
+        .and_then(|answer| {
+            if require_reap {
+                let lys_runner::Answer::Ended { session, ended } = &answer else {
+                    return Err(ServerError::Runner { refusal:"runner_reply_malformed".to_owned(), words:"the end was not answered with a reap".to_owned() });
+                };
+                if session != &driven.session {
+                    return Err(ServerError::Runner { refusal:"runner_reply_malformed".to_owned(), words:"the end's reap names another session".to_owned() });
+                }
+                ended.require_reaped(session)?;
+            }
+            Ok(answer)
+        });
     if let Some(ended) = answered.as_ref().ok().and_then(ended_in) {
         record_end(state, driven, ended)?;
     }

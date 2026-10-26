@@ -36,7 +36,7 @@ pub(super) async fn new_password(
         .setup_attempts
         .admit(state.sign_in.address(&extensions, &headers)?, 5)?;
     let Json(body) = body.map_err(|refused| super::malformed(&refused))?;
-    let turn = state.setup_lock.lock().await;
+    let turn = super::turn(&state).await?;
     admit(&state, &body.code, Purpose::Password)?;
     let login = state
         .admission

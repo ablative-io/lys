@@ -67,7 +67,7 @@ impl SecretsBroker {
             base: settings.broker.trim_end_matches('/').to_owned(),
             service: settings.service.clone(),
             key,
-            client: reqwest::Client::new(),
+            client: crate::outbound::http().build().map_err(|error| ServerError::ConfigInvalid { reason:error.to_string() })?,
         })
     }
 }
@@ -142,6 +142,8 @@ pub(crate) async fn ask_as(
         },
         &broker.key,
     )?;
+    let mut call = crate::waits::Call::begin("app", &broker.base, path, person)?;
+    let asking = async {
     let answer = broker
         .client
         .request(method, format!("{}{path}", broker.base))
@@ -176,6 +178,8 @@ pub(crate) async fn ask_as(
     serde_json::from_str(&text).map_err(|error| ServerError::SecretsUnavailable {
         reason: format!("the secrets broker's answer is not JSON: {error}"),
     })
+    };
+    call.until(asking).await.map_err(|reason| ServerError::SecretsUnavailable { reason })?
 }
 
 async fn secrets(
@@ -349,7 +353,8 @@ pub(crate) async fn bind_proxy(
     let unavailable = |reason: &str| ServerError::SecretsUnavailable {
         reason: reason.to_owned(),
     };
-    let key = broker
+    let mut call = crate::waits::Call::begin("model upstream", proxy, "account key", run)?;
+    let key = call.until(async { broker
         .client
         .get(format!("{proxy}/_lys/account/key"))
         .send()
@@ -359,7 +364,8 @@ pub(crate) async fn bind_proxy(
         .map_err(|error| unavailable(&format!("account proxy key refused: {error}")))?
         .text()
         .await
-        .map_err(|error| unavailable(&format!("account proxy key unreadable: {error}")))?;
+        .map_err(|error| unavailable(&format!("account proxy key unreadable: {error}"))) }).await.map_err(|reason| unavailable(&reason))??;
+    drop(call);
     let path = "/_lys/account/bind";
     let body=serde_json::to_vec(&serde_json::json!({"broker":broker.base,"run":run,"agent":agent,"provider":provider,"accounts":rotation.accounts,"proxy_key":key.trim()})).map_err(|error|unavailable(&format!("account binding encoding failed: {error}")))?;
     let [service, on_behalf_of, operation, signed_at, signature] = crate::secrets_sign::headers(
@@ -373,6 +379,8 @@ pub(crate) async fn bind_proxy(
         },
         &broker.key,
     )?;
+    let mut call = crate::waits::Call::begin("model upstream", proxy, "bind account", run)?;
+    let binding = async {
     let response = broker
         .client
         .post(format!("{proxy}{path}"))
@@ -402,6 +410,8 @@ pub(crate) async fn bind_proxy(
         });
     }
     Ok(())
+    };
+    call.until(binding).await.map_err(|reason| unavailable(&reason))?
 }
 
 async fn hold_account(

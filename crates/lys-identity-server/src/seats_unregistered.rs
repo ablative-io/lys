@@ -3,7 +3,6 @@
 use std::collections::BTreeSet;
 use std::future::Future;
 use std::sync::Arc;
-use std::time::Duration;
 
 use axum::Json;
 use axum::extract::State;
@@ -16,7 +15,6 @@ use crate::routes::{AppState, signed_in};
 use crate::seats_acts::{Live, liveness};
 use crate::seats_views::{SeatRunnerUnread, SeatUnregistered, UnregisteredSession};
 
-const RUNNER_DEADLINE: Duration = Duration::from_secs(2);
 type Answered = (String, String, Result<Vec<Live>, ServerError>);
 
 async fn answers<F, A>(
@@ -31,14 +29,7 @@ where
     for (machine, name) in machines {
         let reading = read(machine.clone());
         asked.spawn(async move {
-            let answer = tokio::time::timeout(RUNNER_DEADLINE, reading)
-                .await
-                .unwrap_or_else(|_| {
-                    Err(ServerError::Runner {
-                        refusal: "runner_deadline".to_owned(),
-                        words: format!("the runner of {name} did not answer within two seconds"),
-                    })
-                });
+            let answer = reading.await;
             (machine, name, answer)
         });
     }

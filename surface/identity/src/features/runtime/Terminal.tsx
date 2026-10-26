@@ -65,6 +65,7 @@ export function Terminal({ session, agent, machine, bare = false }: { session: s
       {!ended ? <Act symbol="stop" name={RUN_WORDS.stop} hint={RUN_WORDS.stop + ' ' + name} word={RUN_WORDS.stop} className="small" data-act="stop" disabled={held} onClick={() => setConfirming('stop')} /> : null}
     </div>}
     {confirming ? <RunConfirm className="terminal-stop" small doing={confirming} name={name} where={machine ?? null} busy={held} refused={acts.refused}
+      waitingSince={acts.waitingSince} endingNow={acts.endingNow} endNow={() => { void acts.endNow(); }}
       confirm={() => { void acts.act(confirming); }} cancel={() => { acts.clear(); setConfirming(null); }} /> : null}
     {bare && agent ? <Act symbol="retry" name={RUN_WORDS.restart} word={RUN_WORDS.restart} data-act="restart" disabled={held} onClick={() => setConfirming('restart')} /> : null}
     <div className="terminal-keys" role="group" aria-label="Terminal keys">

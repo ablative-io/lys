@@ -68,12 +68,13 @@ impl Oidc {
     /// that differs from configuration, invalid endpoint origins, an unreadable
     /// client secret or an invalid client redirect address.
     pub async fn discover(config: &Config) -> Result<Self, ServerError> {
-        let http = reqwest::ClientBuilder::new()
+        let http = crate::outbound::http()
             .redirect(reqwest::redirect::Policy::none())
             .build()
             .map_err(|error| failed(&error))?;
         let api = config.sign_in_api();
-        let text = http
+        let mut discovery = crate::waits::Call::begin("issuer", &api, "OIDC discovery", &config.issuer)?;
+        let text = discovery.until(async { http
             .get(format!("{api}/.well-known/openid-configuration"))
             .header(reqwest::header::ACCEPT, "application/json")
             .send()
@@ -81,7 +82,8 @@ impl Oidc {
             .map_err(|error| failed(&error))?
             .text()
             .await
-            .map_err(|error| failed(&error))?;
+            .map_err(|error| failed(&error)) }).await.map_err(|reason| failed(&reason))??;
+        drop(discovery);
         let mut document: serde_json::Value =
             serde_json::from_str(&text).map_err(|error| failed(&error))?;
         let named = document.get("issuer").and_then(serde_json::Value::as_str);
@@ -106,9 +108,11 @@ impl Oidc {
         }
         let metadata: CoreProviderMetadata =
             serde_json::from_value(document).map_err(|error| failed(&error))?;
-        let keys = CoreJsonWebKeySet::fetch_async(metadata.jwks_uri(), &http)
-            .await
+        let mut fetching = crate::waits::Call::begin("issuer", metadata.jwks_uri().as_str(), "OIDC keys", &config.issuer)?;
+        let keys = fetching.until(CoreJsonWebKeySet::fetch_async(metadata.jwks_uri(), &http))
+            .await.map_err(|reason| failed(&reason))?
             .map_err(|error| failed(&error))?;
+        drop(fetching);
         let metadata = metadata.set_jwks(keys);
         Ok(Self {
             metadata,
@@ -247,12 +251,13 @@ impl Oidc {
             Some(self.secret.clone()),
         )
         .set_redirect_uri(self.redirect.clone());
-        let answer = client
+        let mut exchanging = crate::waits::Call::begin("issuer", self.metadata.issuer().as_str(), "OIDC code exchange", self.client_id.as_str())?;
+        let exchange = client
             .exchange_code(AuthorizationCode::new(code))
             .map_err(|error| failed(&error))?
             .set_pkce_verifier(verifier)
-            .request_async(&self.http)
-            .await
+            .request_async(&self.http);
+        let answer = exchanging.until(exchange).await.map_err(|reason| failed(&reason))?
             .map_err(|error| match error {
                 // The issuer's own refusal is said; a transport failure is
                 // said without the issuer's address, which a browser reads.
@@ -261,6 +266,7 @@ impl Oidc {
                 }
                 _ => failed(&"the sign-in service did not answer the code exchange"),
             })?;
+        drop(exchanging);
         let token = answer
             .id_token()
             .ok_or_else(|| failed(&"the issuer answered no ID token"))?;

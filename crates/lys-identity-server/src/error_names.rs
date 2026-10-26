@@ -94,6 +94,8 @@ fn server(error: &ServerError) -> &str {
         ServerError::Canvas(error) => error.name(),
         ServerError::ProductDraft(error) => error.name(),
         ServerError::HarnessCatalogueUnreadable { .. } => "harness_catalogue_unreadable",
+        ServerError::WaitsUnavailable { .. } => "waits_unavailable",
+        ServerError::WaitUnknown => "wait_unknown",
         ServerError::Identity(error) => identity(error),
         ServerError::Grant(error) => grant(error),
         ServerError::App(error) => app(error),

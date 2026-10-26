@@ -2,6 +2,7 @@ import { EstateApproval } from './features/import/EstateApproval';
 import { Roles } from './features/roles/Roles';
 import { Network } from './features/network/Network';
 import { Connections } from './features/connections/Connections';
+import { Health } from './features/health/Health';
 import { SecretsPage } from './features/secrets/SecretsPage';
 import { Reviews } from './features/reviews/Reviews';
 import { Requests } from './features/requests/Requests';
@@ -35,6 +36,7 @@ export function AppRoutes() {
       <Route path="/network" element={<Network />} />
       <Route path="/service-accounts" element={<Navigate replace to="/settings/service-accounts" />} />
       <Route path="/connections" element={<Connections />} />
+      <Route path="/health" element={<Health />} />
       <Route path="/model" element={<Model />} />
       <Route path="/apps" element={<Apps />} />
       <Route path="/apps/connect" element={<ConnectApp />} />

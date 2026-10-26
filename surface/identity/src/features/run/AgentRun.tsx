@@ -16,6 +16,7 @@ import type { RunDoing } from './RunConfirm';
 function RunAsk({ doing, entry, session, changed, done }: { doing: RunDoing; entry: Entry; session: RuntimeSession; changed: () => void; done: () => void }) {
   const acts = useRunActs(entry.id, session.session, () => { done(); changed(); });
   return <RunConfirm className="run-stop" doing={doing} name={entry.display_name} where={session.machine_name ?? session.machine} busy={acts.busy} refused={acts.refused}
+    waitingSince={acts.waitingSince} endingNow={acts.endingNow} endNow={() => { void acts.endNow(); }}
     confirm={() => { void acts.act(doing); }} cancel={done} />;
 }
 

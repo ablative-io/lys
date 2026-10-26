@@ -8,6 +8,11 @@
 //! crate holds sign-in, sessions, admission and the HTTP routes over it.
 
 pub mod accounts;
+mod outbound;
+mod wait_request;
+pub mod wait_turns;
+pub mod waits;
+pub mod waits_api;
 pub mod admission;
 mod agent_acts;
 mod agent_grants_api;
@@ -303,7 +308,7 @@ mod signed_first;
 pub mod skills_api;
 pub mod spicedb;
 mod spicedb_apps;
-mod spicedb_http;
+pub mod spicedb_http;
 mod start_budget;
 pub mod start_checks;
 pub mod stop_api;

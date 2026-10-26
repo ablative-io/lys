@@ -1,15 +1,14 @@
-//! Bounded replay memory and short handoff leases for dialled machines.
+//! Bounded replay memory and connection-owned presence for dialled machines.
 
 use super::{Act, Replied, RunnerError, ServerError};
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::{Arc, Mutex, mpsc};
-use std::time::{Duration, Instant};
+use std::time::Instant;
 use tokio::sync::Notify;
 
 #[path = "hub/connection_control.rs"]
 mod connection_control;
 
-const HANDOFF: Duration = Duration::from_secs(2);
 const NONCES: usize = 65_536;
 const FINISHED: usize = 4096;
 const EPOCH_SECONDS: u64 = 300;
@@ -77,7 +76,6 @@ pub(super) struct Machine {
     completions: HashMap<String, String>,
     control: connection_control::Control,
     nonce_epoch: String,
-    last_contact: Option<Instant>,
     /// How many of the machine's bridges are dialled in now, each waiting
     /// for its next request.
     pub(super) bridges: usize,
@@ -266,7 +264,7 @@ impl DialHub {
     pub async fn next(&self, machine: &str) -> Result<(String, Act), ServerError> {
         self.with(machine, |held| {
             held.bridges += 1;
-            held.last_contact = Some(Instant::now());
+            held.notify.notify_waiters();
         })?;
         let _waiting = Bridged { hub: self, machine };
         let notify = self.with(machine, |held| Arc::clone(&held.notify))?;
@@ -277,7 +275,6 @@ impl DialHub {
             notified.as_mut().enable();
             let taken = self.with(machine, |held| {
                 while let Some(pending) = held.queue.pop_front() {
-                    held.last_contact = Some(Instant::now());
                     if pending.taken.send(()).is_err() {
                         held.finish(&pending.ticket, "runner_reply_expired");
                         continue;
@@ -334,7 +331,6 @@ impl DialHub {
     /// Refuses unavailable hub state, an unknown ticket or a departed caller.
     pub fn reply(&self, machine: &str, ticket: &str, reply: Replied) -> Result<(), ServerError> {
         self.with(machine, |held| {
-            held.last_contact = Some(Instant::now());
             if held.finished.get(ticket) == Some(&"runner_reply_duplicate") && !held.completions.contains_key(ticket) {
                 return Err(finished("runner_reply_duplicate"));
             }
@@ -383,7 +379,7 @@ fn finished(refusal: &str) -> ServerError {
 }
 
 fn present(held: &Machine) -> bool {
-    held.bridges > 0 || held.last_contact.is_some_and(|at| at.elapsed() <= HANDOFF)
+    held.bridges > 0 || held.control.connected()
 }
 
 #[cfg(test)]

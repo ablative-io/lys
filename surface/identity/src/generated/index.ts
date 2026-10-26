@@ -5,6 +5,19 @@
 import type { Draft, ProductDraft } from '../features/drafts/contract';
 import type { AccessRequest } from '../features/requests/contract';
 
+/** `waits::Wait`: one outbound call; time never judges it. */
+export interface OutboundWait {
+  id: string;
+  service: string;
+  peer: string;
+  act: string;
+  subject: string;
+  started_at: number;
+}
+
+/** `waits_api::Waits`; the generation is an event for the next list. */
+export interface WaitsView { waits: OutboundWait[]; generation: number }
+
 /** `IdentityId` text form: `person-` or `agent-` and 32 lowercase hex digits. */
 export type IdentityId = string;
 

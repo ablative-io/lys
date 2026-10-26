@@ -4,7 +4,6 @@ use std::net::{IpAddr, SocketAddr};
 use std::sync::Arc;
 
 use axum::Router;
-use axum::body::Body;
 use axum::extract::{ConnectInfo, Request, State};
 use axum::http::{HeaderMap, HeaderName, HeaderValue, Uri, header};
 use axum::response::Response;
@@ -212,7 +211,7 @@ pub(super) fn routes(config: &Config) -> Result<Router, ServerError> {
             "the native issuer address must name its auth API without credentials or query",
         ));
     }
-    let http = reqwest::Client::builder()
+    let http = crate::outbound::http()
         .redirect(reqwest::redirect::Policy::none())
         .no_proxy()
         .no_gzip()
@@ -259,7 +258,8 @@ async fn carry(State(proxy): State<Arc<Proxy>>, request: Request) -> Result<Resp
     let address = crate::sign_in_address::resolve(peer, request.headers(), &proxy.trusted)?;
     let headers = request_headers(request.headers())?;
     let (parts, body) = request.into_parts();
-    let answer = proxy
+    let mut call = crate::waits::Call::begin("issuer", &target.origin().ascii_serialization(), parts.method.as_str(), target.path())?;
+    let answer = call.until(proxy
         .http
         .request(parts.method, target)
         .headers(headers)
@@ -268,8 +268,8 @@ async fn carry(State(proxy): State<Arc<Proxy>>, request: Request) -> Result<Resp
         .header("x-forwarded-proto", proxy.public.scheme())
         .header("x-forwarded-for", address.to_string())
         .body(reqwest::Body::wrap_stream(body.into_data_stream()))
-        .send()
-        .await
+        .send())
+        .await.map_err(|reason| refused(&reason))?
         .map_err(|error| {
             refused(&format!(
                 "the native issuer could not answer the request: {}",
@@ -278,7 +278,7 @@ async fn carry(State(proxy): State<Arc<Proxy>>, request: Request) -> Result<Resp
         })?;
     let status = answer.status();
     let headers = response_headers(answer.headers(), &proxy.upstream, &proxy.public)?;
-    let mut response = Response::new(Body::new(reqwest::Body::from(answer)));
+    let mut response = Response::new(crate::outbound::body(answer, call));
     *response.status_mut() = status;
     *response.headers_mut() = headers;
     Ok(response)

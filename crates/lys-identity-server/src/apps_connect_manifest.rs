@@ -132,7 +132,9 @@ pub(super) async fn read(
         }
     };
     let origin = url.origin().ascii_serialization();
-    let client = reqwest::Client::builder()
+    let mut call = crate::waits::Call::begin("app", &origin, "manifest", &query.address)?;
+    let reading = async {
+    let client = crate::outbound::http()
         .redirect(reqwest::redirect::Policy::none())
         .build()
         .map_err(|error| unavailable(&format!("the manifest reader could not start: {error}")))?;
@@ -209,6 +211,11 @@ pub(super) async fn read(
         &format!("the app at {origin} answered with {found}, not a manifest"),
         json!({"found": found}),
     ))
+    };
+    match call.until(reading).await {
+        Ok(answer) => answer,
+        Err(reason) => Ok(unread(StatusCode::SERVICE_UNAVAILABLE, "manifest_not_answering", &reason, json!({}))),
+    }
 }
 
 #[cfg(test)]

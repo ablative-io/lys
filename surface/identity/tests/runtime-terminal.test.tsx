@@ -253,14 +253,14 @@ describe('Running sessions', () => {
     const { posted } = await mount('#/canvas/' + SCRIBE, {
       ...SERVICE, ['POST ' + base + '/resize']: ok({ receipt: { index: 0 } }), '/runtime/live': ok({ sessions: [running], unanswered: [] }),
       ['POST ' + base + '/read-bytes']: readOnce('$ '),
-      ['POST ' + base + '/end']: ok({ session: ID, answer: { kind: 'ended', session: ID, ended: { ...exited, status: null, signal: 'Killed: 9' } }, receipt: { index: 4 } }),
+      ['POST ' + base + '/stop']: ok({ session: ID, answer: { kind: 'ended', session: ID, ended: { ...exited, status: null, signal: 'Killed: 9' } }, receipt: { index: 4 } }),
     });
     await click($('button[data-act="stop"]'));
-    expect(posted.filter((entry) => entry.path === base + '/end')).toEqual([]);
+    expect(posted.filter((entry) => entry.path === base + '/stop')).toEqual([]);
     const dialog = $('[role="alertdialog"]');
     expect(dialog?.textContent).toContain('Stop Scribe?');
     await click($('button[data-act="confirm-stop"]'));
-    expect(posted).toContainEqual({ path: base + '/end', body: {} });
+    expect(posted).toContainEqual({ path: base + '/stop', body: {} });
     expect(text()).toContain('The process exited, Killed: 9');
   });
 

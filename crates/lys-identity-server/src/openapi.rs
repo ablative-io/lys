@@ -158,6 +158,11 @@ pub fn document() -> Result<Value, ServerError> {
         "description": "The generation last received; wait until it changes.",
         "schema": {"type": "string"}
     }]);
+    document["paths"]["/waits"]["get"]["parameters"] = serde_json::json!([{
+        "name":"after", "in":"query", "required":false,
+        "description":"The last waits generation; the next list ends on a change event.",
+        "schema":{"type":"integer", "format":"uint64", "minimum":0}
+    }]);
     Ok(document)
 }
 

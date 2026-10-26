@@ -13,11 +13,24 @@ pub(super) struct Control {
     changed: Arc<Notify>,
 }
 
+impl Control {
+    pub(super) fn connected(&self) -> bool { self.waiting > 0 }
+}
+
 struct Waiting<'a>(&'a DialHub, &'a str);
 impl Drop for Waiting<'_> {
     fn drop(&mut self) {
         if let Err(error) = self.0.with(self.1, |held| {
             held.control.waiting = held.control.waiting.saturating_sub(1);
+            held.notify.notify_waiters();
+            if held.control.waiting == 0 && held.bridges == 0 {
+                for (_, reply) in held.delivered.drain() {
+                    if let Err(error) = reply.send(Err(lys_runner::RunnerError::Unreachable {
+                        reason:"the runner's connection closed".to_owned(),
+                    })) { tracing::debug!("runner_close_receiver_left: {error}"); }
+                }
+                held.queue.clear();
+            }
         }) {
             tracing::error!("runner_control_release_failed: {error}");
         }
@@ -25,6 +38,20 @@ impl Drop for Waiting<'_> {
 }
 
 impl DialHub {
+    /// Registration, rather than a time window, precedes a controlled runner's reply.
+    pub(crate) async fn replacement_bridge(&self, machine: &str) -> Result<(), ServerError> {
+        let notify = self.with(machine, |held| Arc::clone(&held.notify))?;
+        loop {
+            let changed = notify.notified();
+            tokio::pin!(changed);
+            changed.as_mut().enable();
+            if self.with(machine, |held| held.bridges > 0 || !held.control.connected())? {
+                return Ok(());
+            }
+            changed.await;
+        }
+    }
+
     /// Retain a signed report of the runner's connection state.
     ///
     /// # Errors

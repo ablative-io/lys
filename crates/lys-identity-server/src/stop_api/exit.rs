@@ -1,7 +1,6 @@
-//! A stop waits for the runner's reap answer within the named end budget.
+//! A stop waits for the runner's reap. No elapsed interval decides its outcome.
 
 use std::sync::Arc;
-use std::time::Duration;
 
 use lys_runner::{Act, Answer};
 
@@ -9,26 +8,18 @@ use crate::error::ServerError;
 use crate::routes::AppState;
 use crate::runner_sessions::Driven;
 
-const END_BUDGET: Duration = Duration::from_secs(10);
-
 pub(super) async fn end_within(
     state: &Arc<AppState>,
     driven: &Driven,
 ) -> Result<Answer, ServerError> {
-    let deadline = tokio::time::Instant::now() + END_BUDGET;
-    let liveness = tokio::time::timeout_at(
-        deadline,
-        crate::runner_client::ask(
+    let liveness = crate::runner_client::ask(
             state,
             &driven.machine,
             driven.runner.clone(),
             Act::Liveness {
                 session: Some(driven.session.clone()),
             },
-        ),
-    )
-    .await
-    .map_err(|error| lingering(&driven.session, None, &error))??;
+        ).await?;
     let Answer::Liveness { sessions } = liveness else {
         return Err(ServerError::Runner {
             refusal: "runner_reply_malformed".to_owned(),
@@ -47,10 +38,7 @@ pub(super) async fn end_within(
             words: "an end's liveness answer names another session".to_owned(),
         });
     }
-    bounded(
-        &driven.session,
-        live.pid,
-        deadline,
+    wait_for_reap(
         crate::runner_client::ask(
             state,
             &driven.machine,
@@ -63,27 +51,18 @@ pub(super) async fn end_within(
     .await
 }
 
-async fn bounded(
-    session: &str,
-    pid: Option<u32>,
-    deadline: tokio::time::Instant,
+async fn wait_for_reap(
     end: impl std::future::Future<Output = Result<Answer, ServerError>>,
 ) -> Result<Answer, ServerError> {
-    tokio::time::timeout_at(deadline, end)
-        .await
-        .map_err(|error| lingering(session, pid, &error))?
-}
-
-fn lingering(session: &str, pid: Option<u32>, error: &tokio::time::error::Elapsed) -> ServerError {
-    let process = pid.map_or_else(
-        || "an unreported pid".to_owned(),
-        |pid| format!("pid {pid}"),
-    );
-    ServerError::Runner {
-        refusal: "process_lingering".to_owned(),
-        words: format!(
-            "session {session}: harness process {process} was not reaped within 10 s: {error}"
-        ),
+    let answer = end.await?;
+    if let Answer::Ended { session, ended } = &answer {
+        ended.require_reaped(session)?;
+        Ok(answer)
+    } else {
+        Err(ServerError::Runner {
+            refusal:"runner_reply_malformed".to_owned(),
+            words:"an end was not answered with the runner's reap".to_owned(),
+        })
     }
 }
 
@@ -145,50 +124,5 @@ pub(super) fn keep_refusal(
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[tokio::test]
-    async fn stop_end_budget_names_the_lingering_pid() -> Result<(), Box<dyn std::error::Error>> {
-        let error = bounded(
-            "held",
-            Some(41),
-            tokio::time::Instant::now(),
-            std::future::pending(),
-        )
-        .await
-        .err()
-        .ok_or("a pending reap was accepted")?;
-        assert_eq!(error.name(), "process_lingering");
-        assert!(error.to_string().contains("pid 41"));
-        assert!(error.to_string().contains("deadline has elapsed"));
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn stop_end_budget_accepts_a_reaped_answer() -> Result<(), Box<dyn std::error::Error>> {
-        let ended = lys_runner::Ended {
-            how: lys_runner::EndedHow::Exited,
-            at: 1,
-            status: Some(0),
-            signal: None,
-            reason: None,
-            stopped: None,
-        };
-        let answer = bounded(
-            "reaped",
-            Some(42),
-            tokio::time::Instant::now() + END_BUDGET,
-            std::future::ready(Ok(Answer::Ended {
-                session: "reaped".to_owned(),
-                ended,
-            })),
-        )
-        .await?;
-        let Answer::Ended { session, ended } = answer else {
-            return Err("end answer changed".into());
-        };
-        ended.require_reaped(&session)?;
-        Ok(())
-    }
-}
+#[path = "exit_tests.rs"]
+mod exit_tests;

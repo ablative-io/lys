@@ -11,6 +11,7 @@ use crate::error::ServerError;
 macro_rules! unavailable_refusals {
     () => {
         ServerError::IssuerChallengeExpired
+            | ServerError::WaitsUnavailable { .. }
             | ServerError::ConfigInvalid { .. }
             | ServerError::HarnessCatalogueUnreadable { .. }
             | ServerError::DirectoryUnavailable { .. }
@@ -277,6 +278,7 @@ impl ServerError {
             | Self::ReviewerOnly
             | Self::McpBeyondRemit { .. } => StatusCode::FORBIDDEN,
             Self::NoUnspentAdmission
+            | Self::WaitUnknown
             | Self::AgentNotVisible
             | Self::McpServerUnknown { .. }
             | Self::GrantNotVisible

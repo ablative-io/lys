@@ -6,7 +6,7 @@ use std::sync::{Arc, Mutex, Weak};
 use crate::error::ServerError;
 
 type Key = (String, String);
-type Lock = tokio::sync::Mutex<()>;
+type Lock = crate::wait_turns::Turns;
 
 #[derive(Default)]
 pub(super) struct Starts(Mutex<BTreeMap<Key, Weak<Lock>>>);
@@ -25,7 +25,7 @@ impl Starts {
         if let Some(lock) = held.get(&key).and_then(Weak::upgrade) {
             return Ok(lock);
         }
-        let lock = Arc::new(Lock::new(()));
+        let lock = Arc::new(Lock::default());
         held.insert(key, Arc::downgrade(&lock));
         Ok(lock)
     }

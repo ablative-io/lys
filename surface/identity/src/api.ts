@@ -404,17 +404,17 @@ export const seats = {
     }
     return answer;
   },
-  start: async (name: string, operation: string) =>
-    seatAnswer(await request<{ seat: SeatView; session: string; harness_session?: string | null }>(seatPath(name, 'start'), { operation }), name),
-  stop: async (name: string, operation: string, force: boolean) => {
-    const answer = seatAnswer(await request<{ seat: SeatView; session: string; ended: boolean }>(seatPath(name, 'stop'), { operation, force }), name);
+  start: async (name: string, operation: string, signal?: AbortSignal) =>
+    seatAnswer(await request<{ seat: SeatView; session: string; harness_session?: string | null }>(seatPath(name, 'start'), { operation }, 'POST', signal), name),
+  stop: async (name: string, operation: string, force: boolean, signal?: AbortSignal) => {
+    const answer = seatAnswer(await request<{ seat: SeatView; session: string; ended: boolean }>(seatPath(name, 'stop'), { operation, force }, 'POST', signal), name);
     if (typeof answer.ended !== 'boolean') seatsUnreadable('The stop answer did not say whether the session ended.');
     return answer;
   },
-  restart: async (name: string, operation: string, force: boolean) =>
-    seatAnswer(await request<{ seat: SeatView; session: string }>(seatPath(name, 'restart'), { operation, force }), name),
-  send: async (name: string, operation: string, text: string) => {
-    const answer = seatAnswer(await request<{ seat: SeatView; session: string; delivered: true }>(seatPath(name, 'send'), { operation, text }), name);
+  restart: async (name: string, operation: string, force: boolean, signal?: AbortSignal) =>
+    seatAnswer(await request<{ seat: SeatView; session: string }>(seatPath(name, 'restart'), { operation, force }, 'POST', signal), name),
+  send: async (name: string, operation: string, text: string, signal?: AbortSignal) => {
+    const answer = seatAnswer(await request<{ seat: SeatView; session: string; delivered: true }>(seatPath(name, 'send'), { operation, text }, 'POST', signal), name);
     if (answer.delivered !== true) seatsUnreadable('The send answer did not confirm delivery; the message is not assumed delivered.');
     return answer;
   },

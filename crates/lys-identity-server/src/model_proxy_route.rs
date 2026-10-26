@@ -11,13 +11,12 @@
 //! reaches the proxy from outside except a call under a key a start minted;
 //! a key the proxy never bound draws no account.
 
-use std::sync::OnceLock;
-
 use axum::body::Body;
 use axum::extract::{Request, State};
 use axum::http::{HeaderName, StatusCode, header};
 use axum::middleware::Next;
 use axum::response::Response;
+use sha2::{Digest, Sha256};
 
 use crate::config::Config;
 use crate::error::ServerError;
@@ -65,6 +64,10 @@ pub fn keyed_call(path: &str) -> bool {
 /// Carries a keyed model call to the proxy beside this server; every other
 /// request goes on to Lys's own routes.
 pub async fn carry(State(state): State<Shared>, request: Request, next: Next) -> Response {
+    crate::wait_request::scope(carry_in(state, request, next)).await
+}
+
+async fn carry_in(state: Shared, request: Request, next: Next) -> Response {
     if !keyed_call(request.uri().path()) {
         return next.run(request).await;
     }
@@ -89,7 +92,17 @@ pub async fn forward(local: &str, request: Request) -> Response {
             .map_or_else(|| request.uri().path(), |path| path.as_str())
     );
     let (parts, body) = request.into_parts();
-    let mut outgoing = client()
+    let client = match client() {
+        Ok(client) => client,
+        Err(error) => return refused(StatusCode::SERVICE_UNAVAILABLE, &error.to_string()),
+    };
+    let (run, path) = lys_home::proxy::forward::run_key(parts.uri.path());
+    let subject = run.map_or_else(|| path.to_owned(), |key| format!("run {}", crate::routes::hex(&Sha256::digest(key.as_bytes()))));
+    let mut call = match crate::waits::Call::begin("model upstream", origin_of(local), parts.method.as_str(), &subject) {
+        Ok(call) => call,
+        Err(error) => return refused(StatusCode::SERVICE_UNAVAILABLE, &error.to_string()),
+    };
+    let mut outgoing = client
         .request(parts.method, &target)
         .body(reqwest::Body::wrap_stream(body.into_data_stream()));
     for (name, value) in &parts.headers {
@@ -97,8 +110,9 @@ pub async fn forward(local: &str, request: Request) -> Response {
             outgoing = outgoing.header(name, value);
         }
     }
-    match outgoing.send().await {
-        Ok(answer) => {
+    let sent = call.until(outgoing.send()).await;
+    match sent {
+        Ok(Ok(answer)) => {
             let mut response = Response::builder().status(answer.status());
             for (name, value) in answer.headers() {
                 if !hop(name) {
@@ -106,23 +120,23 @@ pub async fn forward(local: &str, request: Request) -> Response {
                 }
             }
             response
-                .body(Body::from_stream(answer.bytes_stream()))
+                .body(crate::outbound::body(answer, call))
                 .unwrap_or_else(|error| {
                     refused(StatusCode::SERVICE_UNAVAILABLE, &error.to_string())
                 })
         }
-        Err(error) => refused(
+        Ok(Err(error)) => refused(
             StatusCode::SERVICE_UNAVAILABLE,
             &format!("Lys could not reach its model proxy at {local}: {error}"),
         ),
+        Err(reason) => refused(StatusCode::SERVICE_UNAVAILABLE, &reason),
     }
 }
 
-/// One client for every carried call. No timeout: a model call's stream
+/// Each carried call owns its client. A model call's stream
 /// ends when the provider ends it or a side closes, never on a clock.
-fn client() -> &'static reqwest::Client {
-    static CLIENT: OnceLock<reqwest::Client> = OnceLock::new();
-    CLIENT.get_or_init(reqwest::Client::new)
+fn client() -> Result<reqwest::Client, reqwest::Error> {
+    crate::outbound::http().build()
 }
 
 /// Headers that belong to one connection, not to the call: never carried.
@@ -160,8 +174,11 @@ fn path_of(address: &str) -> &str {
 }
 
 fn refused(status: StatusCode, reason: &str) -> Response {
-    let mut response = Response::new(Body::from(format!("lys refused the model call: {reason}")));
+    let mut response = Response::new(Body::from(serde_json::json!({
+        "refusal":"model_upstream_unreachable", "reason":format!("lys refused the model call: {reason}"),
+    }).to_string()));
     *response.status_mut() = status;
+    response.headers_mut().insert(header::CONTENT_TYPE, axum::http::HeaderValue::from_static("application/json"));
     response
 }
 

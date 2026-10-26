@@ -1,0 +1,15 @@
+id: no-clock-on-a-peer
+valid:
+  - 'async fn wait() { peer.read().await; }'
+  - 'fn fire_from() { let wait = std::time::Duration::from_secs(due.saturating_sub(now())); tokio::time::sleep(wait); }'
+  - 'fn remind_from() { let wait = std::time::Duration::from_secs(due.saturating_sub(now())); tokio::time::sleep(wait); }'
+  - 'fn client() { client.tcp_keepalive(std::time::Duration::from_secs(30)); }'
+invalid:
+  - 'async fn wait() { tokio::time::timeout(budget, peer.read()).await; }'
+  - 'async fn wait() { tokio::time::timeout_at(deadline, peer.read()).await; }'
+  - 'async fn wait() { tokio::time::sleep(wait).await; }'
+  - 'fn fire_from() { tokio::time::sleep(wait); }'
+  - 'fn remind_from() { tokio::time::sleep(wait); }'
+  - 'fn client() { client.timeout(budget); }'
+  - 'fn client() { client.connect_timeout(budget); }'
+  - 'fn client() { socket.set_read_timeout(Some(budget)); }'

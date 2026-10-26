@@ -76,7 +76,7 @@ describe('An agent’s run', () => {
   const LIVE = 'op-' + '5'.repeat(32);
   const running = { session: LIVE, agent: SCRIBE, machine: 'op-' + 'b'.repeat(32), machine_name: 'Lab', runtime: 'lys-runner', shown: 'running', last_reported: 'running', first_report_at: 1790000000, last_report_at: 1790000001, what: 'started', stopped: null, reported_by: 'the runner' };
   it('says a refused stop in words, with its name only under Error details', async () => {
-    await mount('#/file/' + SCRIBE, { ...SERVICE, '/runtime/live': ok({ sessions: [running], unanswered: [] }), ['POST /runtime/sessions/' + LIVE + '/end']: refused(503, 'RuntimeUnavailable', 'no reports store') });
+    await mount('#/file/' + SCRIBE, { ...SERVICE, '/runtime/live': ok({ sessions: [running], unanswered: [] }), ['POST /runtime/sessions/' + LIVE + '/stop']: refused(503, 'RuntimeUnavailable', 'no reports store') });
     await click($('section[aria-label="Run"] [data-act="stop"]'));
     await click(button('Stop Scribe'));
     const asking = $('[role="alertdialog"][aria-label="Stop Scribe"]');

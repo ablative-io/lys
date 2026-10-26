@@ -1,6 +1,15 @@
 //! Named service refusals preserve the public enum and its derived conversions.
 mod directory;
 directory::directory_refusals! {
+    /// In-flight work records could not be read or changed.
+    #[error("waits_unavailable: {reason}")]
+    WaitsUnavailable {
+        /// What failed.
+        reason: String,
+    },
+    /// The call already answered or the identity was never held.
+    #[error("wait_unknown: no outbound call is waiting by that id")]
+    WaitUnknown,
     /// A product's own-agent view requires a person's access pass.
     #[error("ProductPassPersonRequired: this route requires a person's access pass")]
     ProductPassPersonRequired,

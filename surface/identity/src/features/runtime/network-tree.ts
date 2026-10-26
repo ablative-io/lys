@@ -153,21 +153,27 @@ export function useSeatAction(seat: SeatView, change: (seat: SeatView) => void) 
   const [problem, setProblem] = useState<unknown>(null);
   const [done, setDone] = useState<string | null>(null);
   const [stopEnded, setStopEnded] = useState(false);
+  const [waitingSince, setWaitingSince] = useState<number | null>(null);
+  const [endingNow, setEndingNow] = useState(false);
+  const callers = useRef(new Set<AbortController>());
+  useEffect(() => () => { for (const caller of callers.current) caller.abort(); }, []);
   const run = async (act: 'start' | 'restart' | 'stop' | 'send', text?: string): Promise<boolean> => {
     if (working.current) return false;
     if (!held.current || held.current.act !== act || held.current.text !== text) held.current = { act, text, operation: operationId() };
     working.current = true; setBusy(true); setFailure(null); setStartAgain(false); setProblem(null); setDone(null);
+    const caller = new AbortController(); callers.current.add(caller);
     try {
       const operation = held.current.operation;
       if (act === 'start' || act === 'restart') {
-        const answer = act === 'restart' ? await seats.restart(seat.name, operation, false) : await seats.start(seat.name, operation);
+        const answer = act === 'restart' ? await seats.restart(seat.name, operation, false, caller.signal) : await seats.start(seat.name, operation, caller.signal);
         change(answer.seat); setDone(act === 'restart' ? 'Restarted.' : 'Started.');
       } else if (act === 'stop') {
-        const answer = await seats.stop(seat.name, operation, false);
+        setWaitingSince(Date.now());
+        const answer = await seats.stop(seat.name, operation, false, caller.signal);
         setStopEnded(answer.ended);
         change(answer.seat); setDone(answer.ended ? 'Stopped.' : 'Asked to stop. Its computer has not yet confirmed it stopped.');
       } else {
-        await seats.send(seat.name, operation, text ?? '');
+        await seats.send(seat.name, operation, text ?? '', caller.signal);
         setDone('Sent.');
       }
       held.current = null;
@@ -178,7 +184,15 @@ export function useSeatAction(seat: SeatView, change: (seat: SeatView) => void) 
       setProblem(error);
       setStartAgain(error instanceof Refused && error.refusal.reason.includes('Start again'));
       return false;
-    } finally { working.current = false; setBusy(false); }
+    } finally { callers.current.delete(caller); working.current = false; setBusy(false); setWaitingSince(null); }
   };
-  return { busy, failure, problem, startAgain, done, stopEnded, run };
+  const endNow = async () => {
+    if (!seat.session || endingNow) return;
+    setEndingNow(true);
+    const caller = new AbortController(); callers.current.add(caller);
+    try { await request('/runtime/sessions/' + encodeURIComponent(seat.session) + '/end-now', {}, 'POST', caller.signal); }
+    catch (error) { if (!caller.signal.aborted) { setFailure(said(error)); setProblem(error); } }
+    finally { callers.current.delete(caller); setEndingNow(false); }
+  };
+  return { busy, failure, problem, startAgain, done, stopEnded, run, waitingSince, endingNow, endNow };
 }

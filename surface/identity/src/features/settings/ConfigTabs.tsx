@@ -7,6 +7,7 @@ import { request, useLoad } from '../../api';
 export const CONFIG_TABS: [string, string, string][] = [
   ['account', 'For you', '#/settings/account'], ['accounts', 'Service accounts', '#/settings/service-accounts'],
   ['settings', 'This service', '#/settings'], ['connections', 'Services and sign-in providers', '#/connections'],
+  ['health', 'Health', '#/health'],
 ];
 
 /** Everyone's tabs: a person keeps their own service accounts, read by that page alone. */

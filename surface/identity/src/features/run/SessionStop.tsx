@@ -22,6 +22,7 @@ export function SessionStop({ agent, session, name, where }: { agent: string; se
     <Act symbol="stop" name={`${RUN_WORDS.stop} ${name}`} word={RUN_WORDS.stop} data-act="stop" disabled={asking || acts.busy}
       onClick={() => { acts.clear(); setAsking(true); }} />
     {asking ? <RunConfirm className="run-ask" small doing="stop" name={name} where={where} busy={acts.busy} refused={acts.refused}
+      waitingSince={acts.waitingSince} endingNow={acts.endingNow} endNow={() => { void acts.endNow(); }}
       confirm={() => { void acts.act('stop'); }} cancel={() => { acts.clear(); setAsking(false); }} /> : null}
   </>;
 }

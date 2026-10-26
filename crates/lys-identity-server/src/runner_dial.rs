@@ -226,6 +226,7 @@ async fn reply(
     )?;
     let line = String::from_utf8(body.to_vec())
         .map_err(|error| refused(format!("the reply is not text: {error}")))?;
+    state.runners.hub().replacement_bridge(&machine).await?;
     state.runners.hub().reply(&machine, &ticket, Ok(line))?;
     Ok(Json(json!({ "delivered": ticket })))
 }

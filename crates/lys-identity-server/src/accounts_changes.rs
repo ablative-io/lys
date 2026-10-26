@@ -1,9 +1,10 @@
-//! Only active account changes occupy indexed async lock slots.
+//! Only active account claims occupy indexed slots. A claim holds no lock
+//! across issuer I/O; its outcome wakes only waiters for that account.
 
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
-use tokio::sync::{Mutex as AsyncMutex, OwnedMutexGuard};
+use tokio::sync::Notify;
 
 use crate::error::ServerError;
 
@@ -19,14 +20,15 @@ struct Table {
 }
 
 struct Entry {
-    lock: Arc<AsyncMutex<()>>,
+    outcome: Arc<Notify>,
+    busy: bool,
     users: usize,
 }
 
 pub(crate) struct Guard<'a> {
     owner: &'a Changes,
     id: String,
-    held: Option<OwnedMutexGuard<()>>,
+    held: bool,
 }
 
 fn unavailable(reason: impl Into<String>) -> ServerError {
@@ -37,7 +39,7 @@ fn unavailable(reason: impl Into<String>) -> ServerError {
 
 impl Changes {
     pub(super) async fn lock(&self, id: &str) -> Result<Guard<'_>, ServerError> {
-        let lock = {
+        let outcome = {
             let mut table = self.table.lock().map_err(|error| {
                 unavailable(format!(
                     "the account-change index lock is poisoned: {error}"
@@ -47,37 +49,48 @@ impl Changes {
                 .accounts
                 .entry(id.to_owned())
                 .or_insert_with(|| Entry {
-                    lock: Arc::new(AsyncMutex::new(())),
+                    outcome: Arc::new(Notify::new()),
+                    busy: false,
                     users: 0,
                 });
             entry.users += 1;
-            let lock = Arc::clone(&entry.lock);
+            let outcome = Arc::clone(&entry.outcome);
             table.active += 1;
-            lock
+            outcome
         };
         let mut guard = Guard {
             owner: self,
             id: id.to_owned(),
-            held: None,
+            held: false,
         };
-        guard.held = Some(if let Ok(held) = Arc::clone(&lock).try_lock_owned() {
+        loop {
+            let changed = outcome.notified();
+            tokio::pin!(changed);
+            changed.as_mut().enable();
+            let claimed = {
+                let mut table = self.table.lock().map_err(|error| unavailable(error.to_string()))?;
+                let entry = table.accounts.get_mut(id).ok_or_else(|| unavailable("the account claim is missing"))?;
+                if entry.busy { false } else { entry.busy = true; true }
+            };
             #[cfg(test)]
-            crate::accounts::changes_tests::started(false);
-            held
-        } else {
-            #[cfg(test)]
-            crate::accounts::changes_tests::started(true);
-            lock.lock_owned().await
-        });
-        Ok(guard)
+            crate::accounts::changes_tests::started(!claimed);
+            if claimed {
+                guard.held = true;
+                return Ok(guard);
+            }
+            changed.await;
+        }
     }
 }
 
 impl Drop for Guard<'_> {
     fn drop(&mut self) {
-        drop(self.held.take());
         match self.owner.table.lock() {
             Ok(mut table) => {
+                if self.held && let Some(entry) = table.accounts.get_mut(&self.id) {
+                    entry.busy = false;
+                    entry.outcome.notify_waiters();
+                }
                 match table.accounts.get_mut(&self.id) {
                     Some(entry) if entry.users > 1 => entry.users -= 1,
                     Some(_) => {

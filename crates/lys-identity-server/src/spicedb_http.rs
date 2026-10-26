@@ -1,12 +1,9 @@
 //! One JSON request to the `SpiceDB` gateway and its answer, over a plain
-//! kept HTTP/1.1 client with bounded network waits.
+//! kept HTTP/1.1 client. Bytes, a close, a kernel error or a caller's cancel
+//! end each wait; a checked-out connection holds no pool lock over I/O.
 
 use std::io::{Read, Write};
 use std::net::{TcpStream, ToSocketAddrs};
-use std::time::Duration;
-
-/// How long one connect, write or read may take.
-const WAIT: Duration = Duration::from_secs(5);
 
 /// An answer: its status and its body.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -25,6 +22,9 @@ pub struct Client {
 
 impl Client {
     /// Post one request, reusing a connection and reconnecting a closed read connection once.
+    ///
+    /// # Errors
+    /// Names an unavailable peer, malformed answer, unavailable pool or explicit cancel.
     pub fn post_json(
         &self,
         authority: &str,
@@ -32,6 +32,7 @@ impl Client {
         bearer: &str,
         body: &str,
     ) -> Result<Answer, String> {
+        let call = crate::waits::Call::begin("SpiceDB", authority, "POST", path).map_err(|error| error.to_string())?;
         if path
             .bytes()
             .chain(bearer.bytes())
@@ -55,16 +56,20 @@ impl Client {
             Some(stream) => stream,
             None => connect(authority)?,
         };
+        hold(&call, stream.get_ref())?;
         let mut result = exchange(&mut stream, authority, path, bearer, body);
         if reused
+            && !call.closer().left()
             && result.as_ref().is_err_and(|error| error.reconnect)
             && !path.ends_with("/write")
             && !path.ends_with("/delete")
         {
             stream = connect(authority)?;
+            hold(&call, stream.get_ref())?;
             result = exchange(&mut stream, authority, path, bearer, body);
         }
-        let (answer, keep) = result.map_err(|error| error.words)?;
+        let (answer, keep) = result.map_err(|error| call.reason().unwrap_or(error.words))?;
+        call.closer().done().map_err(|error| error.to_string())?;
         if keep {
             self.idle
                 .lock()
@@ -82,11 +87,23 @@ fn connect(authority: &str) -> Result<std::io::BufReader<TcpStream>, String> {
         .map_err(unreachable)?
         .next()
         .ok_or_else(|| format!("{authority} names no address"))?;
-    let stream = TcpStream::connect_timeout(&address, WAIT).map_err(unreachable)?;
+    let stream = TcpStream::connect(address).map_err(unreachable)?;
     stream.set_nodelay(true).map_err(unreachable)?;
-    stream.set_read_timeout(Some(WAIT)).map_err(unreachable)?;
-    stream.set_write_timeout(Some(WAIT)).map_err(unreachable)?;
+    crate::outbound::keepalive(&stream).map_err(unreachable)?;
     Ok(std::io::BufReader::new(stream))
+}
+
+fn hold(call: &crate::waits::Call, stream: &TcpStream) -> Result<(), String> {
+    let close = stream.try_clone().map_err(|error| error.to_string())?;
+    call.closer().hold(Box::new(move || {
+        match close.shutdown(std::net::Shutdown::Both) {
+            Ok(()) => {},
+            Err(error) if error.kind() == std::io::ErrorKind::NotConnected => {
+                tracing::debug!("spicedb_already_closed: {error}");
+            },
+            Err(error) => tracing::error!("spicedb_close_failed: {error}"),
+        }
+    })).map_err(|error| error.to_string())
 }
 
 struct Failure {

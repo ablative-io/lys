@@ -133,21 +133,18 @@ fn a_non_http_answer_names_the_authority_without_the_bearer() -> Result<(), Box<
 }
 
 #[test]
-fn an_unresponsive_authority_times_out_by_name_without_the_bearer() -> Result<(), Box<dyn Error>> {
+fn an_unresponsive_authority_closes_by_name_without_the_bearer() -> Result<(), Box<dyn Error>> {
     let listener = TcpListener::bind("127.0.0.1:0")?;
     let endpoint = listener.local_addr()?.to_string();
-    let (release, released) = std::sync::mpsc::channel();
     let worker = std::thread::spawn(move || -> Result<(), Box<dyn Error + Send + Sync>> {
         let (socket, _) = listener.accept()?;
         let mut reader = BufReader::new(socket);
         request(&mut reader)?;
-        released.recv()?;
         Ok(())
     });
     let error = Client::default()
         .post_json(&endpoint, "/read", "fixture-bearer", "{}")
         .expect_err("the authority did not answer");
-    release.send(())?;
     worker
         .join()
         .map_err(|p| format!("fixture panicked: {p:?}"))?

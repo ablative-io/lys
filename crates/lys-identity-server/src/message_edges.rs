@@ -133,7 +133,7 @@ fn bridge(settings: &Settings) -> Result<Bridge, ServerError> {
         reason: format!("message_service: {reason}"),
     };
     let checked = settings.check().map_err(invalid)?;
-    let client = reqwest::Client::builder()
+    let client = crate::outbound::http()
         .redirect(reqwest::redirect::Policy::none())
         .build()
         .map_err(|error| invalid(error.to_string()))?;
@@ -212,6 +212,8 @@ async fn read(
         .url
         .join("conversation/message-edges")
         .map_err(|error| unavailable(error.to_string()))?;
+    let mut call = crate::waits::Call::begin("app", &url.origin().ascii_serialization(), "message edges", &caller)?;
+    let reading = async {
     let response = bridge
         .client
         .get(url)
@@ -241,6 +243,8 @@ async fn read(
         .await
         .map_err(|error| unavailable(format!("the message service page is unreadable: {error}")))?;
     map_page(page, bridge, &caller, &visible).map(Json)
+    };
+    call.until(reading).await.map_err(unavailable)?
 }
 
 /// The body of `response`, read whole, as `T`.

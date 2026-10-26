@@ -89,12 +89,12 @@ describe('An agent\'s run on People and agents', () => {
   });
 
   it('stops a running agent from its row on the front page, after asking', async () => {
-    const { posted } = await mount('#/', { ...routes, ['POST /runtime/sessions/' + LIVE + '/end']: receipt({ kind: 'ended' }) });
+    const { posted } = await mount('#/', { ...routes, ['POST /runtime/sessions/' + LIVE + '/stop']: receipt({ kind: 'ended' }) });
     await click($('button[data-act="stop"]'));
     expect(text()).toContain('Stop Scribe? This ends its run on Lab. What it has not saved is lost. You can start it again afterwards.');
-    expect(posted.filter((entry) => entry.path.endsWith('/end'))).toEqual([]);
+    expect(posted.filter((entry) => entry.path.endsWith('/stop'))).toEqual([]);
     await click(button('Stop Scribe'));
-    expect(posted.filter((entry) => entry.path.endsWith('/end')).map((entry) => entry.path)).toEqual(['/runtime/sessions/' + LIVE + '/end']);
+    expect(posted.filter((entry) => entry.path.endsWith('/stop')).map((entry) => entry.path)).toEqual(['/runtime/sessions/' + LIVE + '/stop']);
   });
 
   it('keeps suspension in the named menu action and gives Stop only to the live run', async () => {
@@ -162,12 +162,12 @@ describe('An agent\'s run on People and agents', () => {
   });
 
   it('stops a running agent by ending its run, after asking, and never by the emergency stop', async () => {
-    const { posted } = await mount('#/file/' + SCRIBE, { ...routes, ['POST /runtime/sessions/' + LIVE + '/end']: receipt({ kind: 'ended' }) });
+    const { posted } = await mount('#/file/' + SCRIBE, { ...routes, ['POST /runtime/sessions/' + LIVE + '/stop']: receipt({ kind: 'ended' }) });
     await click($('section[aria-label="Run"] [data-act="stop"]'));
     expect(text()).toContain('Stop Scribe? This ends its run on Lab. What it has not saved is lost. You can start it again afterwards.');
-    expect(posted.filter((entry) => entry.path.endsWith('/end'))).toEqual([]);
+    expect(posted.filter((entry) => entry.path.endsWith('/stop'))).toEqual([]);
     await click(button('Stop Scribe'));
-    expect(posted.filter((entry) => entry.path.endsWith('/end')).map((entry) => entry.path)).toEqual(['/runtime/sessions/' + LIVE + '/end']);
+    expect(posted.filter((entry) => entry.path.endsWith('/stop')).map((entry) => entry.path)).toEqual(['/runtime/sessions/' + LIVE + '/stop']);
     expect(posted.some((entry) => entry.path === '/agents/' + SCRIBE + '/stop')).toBe(false);
   });
 

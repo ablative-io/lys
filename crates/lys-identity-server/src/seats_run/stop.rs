@@ -145,8 +145,9 @@ pub(super) async fn request_end(
                 };
                 let (answer, _) = act(state, (driven, caller, "seat_stop"), None, stop).await?;
                 if let Answer::Operation { outcome } = &answer
-                    && outcome.ended.is_some()
+                    && let Some(reaped) = &outcome.ended
                 {
+                    reaped.require_reaped(session)?;
                     ended = true;
                     notes.push("the harness's own end request ended the session".to_owned());
                 } else {
@@ -154,6 +155,7 @@ pub(super) async fn request_end(
                         "the harness was asked to end the session ({})",
                         kind(&answer)
                     ));
+                    ended = crate::seats_monitor::exited(state, driven).await?;
                 }
             } else {
                 let (exited, receipt) =

@@ -363,10 +363,12 @@ impl Channel {
 }
 
 fn keepalive(stream: &TcpStream) -> Result<(), RunnerError> {
-    rustix::net::sockopt::set_socket_keepalive(stream, true)
-        .and_then(|()| rustix::net::sockopt::set_tcp_keepidle(stream, Duration::from_secs(60)))
-        .and_then(|()| rustix::net::sockopt::set_tcp_keepintvl(stream, Duration::from_secs(10)))
-        .and_then(|()| rustix::net::sockopt::set_tcp_keepcnt(stream, 3))
+    let socket = socket2::SockRef::from(stream);
+    socket.set_keepalive(true)
+        .and_then(|()| socket.set_tcp_keepalive(&socket2::TcpKeepalive::new()
+            .with_time(Duration::from_secs(30))
+            .with_interval(Duration::from_secs(10))
+            .with_retries(5)))
         .map_err(|error| RunnerError::refused("runner_dial_keepalive_failed", error.to_string()))
 }
 

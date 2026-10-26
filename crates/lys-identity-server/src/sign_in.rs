@@ -106,7 +106,7 @@ pub(crate) fn unreached(error: reqwest::Error) -> String {
 /// written onto one it has just closed fails as "connection closed before
 /// message completed". Every call opens its own loopback connection.
 pub(crate) fn issuer_client() -> reqwest::ClientBuilder {
-    reqwest::ClientBuilder::new().pool_max_idle_per_host(0)
+    crate::outbound::http()
 }
 
 /// The issuer's sign-in API, over its loopback address, and the sign-ins
@@ -214,6 +214,7 @@ fn solve_counter(challenge: &str) -> Result<u64, ServerError> {
     let mut digits = [0u8; 20];
     let mut counter: u64 = 0;
     loop {
+        if crate::wait_request::left() { return Err(failed("the caller closed the sign-in")); }
         let mut value = counter;
         let mut first = digits.len();
         loop {
@@ -473,6 +474,8 @@ impl IssuerSignIn {
         let mut start = reqwest::Url::parse(&format!("{}/oidc/authorize", self.api))
             .map_err(|error| failed(format!("the sign-in address is not one: {error}")))?;
         start.set_query(begun.query());
+        let mut opening = crate::waits::Call::begin("issuer", &self.api, "open sign-in", "sign-in")?;
+        let opening_work = async {
         let page = self
             .http
             .get(start)
@@ -485,6 +488,10 @@ impl IssuerSignIn {
         jar.keep(page.headers());
         let status = page.status();
         let body = page.text().await.map_err(unreachable_issuer)?;
+        Ok::<_, ServerError>((jar, status, body))
+        };
+        let (jar, status, body) = opening.until(opening_work).await.map_err(failed)??;
+        drop(opening);
         if !status.is_success() {
             return Err(failed(format!(
                 "the sign-in service answered {status} to the start of a sign-in"
@@ -494,7 +501,8 @@ impl IssuerSignIn {
             .filter(|token| !token.is_empty())
             .ok_or_else(|| failed("the sign-in service's start named no request token"))?
             .to_owned();
-        let challenge = self
+        let mut proving = crate::waits::Call::begin("issuer", &self.api, "proof challenge", "sign-in")?;
+        let challenge = proving.until(async { self
             .http
             .post(format!("{}/pow", self.api))
             .header(FORWARDED_FOR, address)
@@ -503,10 +511,11 @@ impl IssuerSignIn {
             .map_err(unreachable_issuer)?
             .text()
             .await
-            .map_err(unreachable_issuer)?;
+            .map_err(unreachable_issuer) }).await.map_err(failed)??;
+        drop(proving);
         let challenge = challenge.trim().to_owned();
         let expires = challenge_expiry(&challenge)?;
-        let pow = tokio::task::spawn_blocking(move || solve(&challenge))
+        let pow = crate::wait_request::blocking(move || solve(&challenge))
             .await
             .map_err(|error| failed(format!("the challenge could not be answered: {error}")))??;
         check_challenge(expires)?;
@@ -525,20 +534,20 @@ impl IssuerSignIn {
         opened: &Opened,
         address: &str,
         body: &Value,
-    ) -> Result<reqwest::Response, ServerError> {
+    ) -> Result<(reqwest::Response, crate::waits::Call), ServerError> {
         if body.get("pow").is_some() {
             check_challenge(opened.expires)?;
         }
-        self.http
+        let mut call = crate::waits::Call::begin("issuer", &self.api, path, "sign-in")?;
+        let response = call.until(self.http
             .post(format!("{}{path}", self.api))
             .header(reqwest::header::CONTENT_TYPE, "application/json")
             .header(reqwest::header::COOKIE, opened.jar.header())
             .header(REQUEST_TOKEN, &opened.token)
             .header(FORWARDED_FOR, address)
             .body(body.to_string())
-            .send()
-            .await
-            .map_err(unreachable_issuer)
+            .send()).await.map_err(failed)?.map_err(unreachable_issuer)?;
+        Ok((response, call))
     }
 
     /// Carry the authorization `begun` names through the issuer's three
@@ -554,7 +563,7 @@ impl IssuerSignIn {
         credentials.insert("email".to_owned(), json!(attempt.email));
         credentials.insert("password".to_owned(), json!(attempt.password));
         credentials.insert("pow".to_owned(), json!(opened.pow));
-        let answer = self
+        let (answer, mut call) = self
             .post_in(
                 "/oidc/authorize",
                 &opened,
@@ -562,7 +571,7 @@ impl IssuerSignIn {
                 &Value::Object(credentials),
             )
             .await?;
-        accepted(answer, Some(opened.expires), unix_second()?).await
+        call.until(accepted(answer, Some(opened.expires), unix_second()?)).await.map_err(failed)?
     }
 }
 

@@ -3,7 +3,11 @@
 //! route and the door's handle records it reads are declared here, in
 //! [`start`] and [`door_handles`].
 
-pub use crate::routes_table::router;
+/// The directory routes with work bound to the lifetime of their request.
+pub fn router(state: Shared) -> axum::Router {
+    crate::routes_table::router(state)
+        .layer(axum::middleware::from_fn(crate::wait_request::observe))
+}
 
 use std::path::PathBuf;
 use std::str::FromStr;

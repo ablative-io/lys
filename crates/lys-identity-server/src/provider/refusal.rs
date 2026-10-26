@@ -14,6 +14,8 @@ use crate::error_provider::ProviderError;
 macro_rules! server_refusals {
     () => {
         ServerError::Team(..)
+            | ServerError::WaitsUnavailable { .. }
+            | ServerError::WaitUnknown
             | ServerError::HarnessCatalogueUnreadable { .. }
             | ServerError::Identity(..)
             | ServerError::Grant(..)

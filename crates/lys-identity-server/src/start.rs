@@ -308,7 +308,7 @@ where
             named_body("not_signed_in", "sign in to start an agent"),
         ));
     };
-    let task = tokio::task::spawn_blocking(move || {
+    let task = crate::wait_request::blocking(move || {
         let mut launches = service.launches()?;
         act(&service, &mut launches, &caller)
     });

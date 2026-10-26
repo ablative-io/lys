@@ -30,7 +30,10 @@ pub(super) async fn start(
         Ok(lock) => lock,
         Err(error) => return error.into_response(),
     };
-    let starting = lock.lock().await;
+    let starting = match lock.take("start").await {
+        Ok(claim) => claim,
+        Err(error) => return error.into_response(),
+    };
     let response = start_locked(Arc::clone(&service), headers, agent, body).await;
     drop(starting);
     response
@@ -148,7 +151,10 @@ pub(super) async fn start_again(
         Ok(lock) => lock,
         Err(error) => return error.into_response(),
     };
-    let starting = lock.lock().await;
+    let starting = match lock.take("start").await {
+        Ok(claim) => claim,
+        Err(error) => return error.into_response(),
+    };
     let response = start_again_locked(Arc::clone(&service), headers, source).await;
     drop(starting);
     response

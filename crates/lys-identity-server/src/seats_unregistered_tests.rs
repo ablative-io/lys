@@ -1,13 +1,14 @@
 #![cfg(test)]
-//! A stalled runner consumes one shared survey interval, with every other runner asked already.
+//! Every runner is asked independently, and a held read ends on its close.
 
-use super::{RUNNER_DEADLINE, answers};
+use super::answers;
 use std::error::Error;
 
-#[tokio::test(start_paused = true)]
-async fn every_runner_is_asked_before_unreachable_runners_reach_their_deadline()
+#[tokio::test]
+async fn every_runner_is_asked_before_unreachable_runners_close()
 -> Result<(), Box<dyn Error>> {
     let (sent, mut received) = tokio::sync::mpsc::unbounded_channel();
+    let (closed, closing) = tokio::sync::watch::channel(false);
     let asking = tokio::spawn(answers(
         vec![
             ("absent-one".to_owned(), "Dean laptop".to_owned()),
@@ -16,6 +17,7 @@ async fn every_runner_is_asked_before_unreachable_runners_reach_their_deadline()
         ],
         move |machine| {
             let sent = sent.clone();
+            let mut closing = closing.clone();
             async move {
                 sent.send(machine.clone())
                     .map_err(|error| crate::error::ServerError::Runner {
@@ -25,19 +27,21 @@ async fn every_runner_is_asked_before_unreachable_runners_reach_their_deadline()
                 if machine == "ready" {
                     Ok(Vec::new())
                 } else {
-                    std::future::pending().await
+                    closing.changed().await.map_err(|error| crate::error::ServerError::Runner {
+                        refusal:"fixture_closed".to_owned(), words:error.to_string(),
+                    })?;
+                    Err(crate::error::ServerError::Runner {
+                        refusal:"runner_unreachable".to_owned(), words:format!("{machine}: its connection closed"),
+                    })
                 }
             }
         },
     ));
-    let started = tokio::time::Instant::now();
     for _ in 0..3 {
         received.recv().await.ok_or("a runner was not asked")?;
     }
-    assert_eq!(tokio::time::Instant::now(), started);
-    tokio::time::advance(RUNNER_DEADLINE).await;
+    closed.send(true)?;
     let answered = asking.await??;
-    assert_eq!(tokio::time::Instant::now() - started, RUNNER_DEADLINE);
     assert_eq!(answered.len(), 3);
     assert!(answered[2].2.is_ok());
     for reading in &answered[..2] {
@@ -46,18 +50,18 @@ async fn every_runner_is_asked_before_unreachable_runners_reach_their_deadline()
                 .2
                 .as_ref()
                 .err()
-                .ok_or("no deadline refusal")?
+                .ok_or("no close refusal")?
                 .name(),
-            "runner_deadline"
+            "runner_unreachable"
         );
         assert!(
             reading
                 .2
                 .as_ref()
                 .err()
-                .ok_or("no deadline words")?
+                .ok_or("no close words")?
                 .to_string()
-                .contains(&reading.1)
+                .contains("connection closed")
         );
     }
     Ok(())
