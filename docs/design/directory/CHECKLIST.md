@@ -748,3 +748,12 @@
 - [ ] **C853** — People shows each person's sign-in email and flags, by name, a person whose sign-in email is not the email they were admitted under. DIRECTORY-122/R4.
 - [ ] **C854** — An administrator moves a sign-in from one person to another person, or to a new person made in the same act, in one signed directory batch with both persons' events naming the actor; refusals by name. DIRECTORY-122/R5.
 - [ ] **C855** — Standing bars hold for DIRECTORY-122; the incident is a red end to end; no fixed wait; no test proves less than before. DIRECTORY-122/R6.
+
+## Waiting on you is what needs the person, decided on Home; a check is due only after its period (DIRECTORY-123)
+
+- [ ] **C856** — A grant is due a check only when a review period has passed since its last check (its giving, or its last keep); keeping a grant takes it off Waiting on you until the next period. DIRECTORY-123/R1.
+- [ ] **C857** — A reviewer keeps every due grant an agent holds in one recorded act, naming the grants they saw; refusals by name. DIRECTORY-123/R2.
+- [ ] **C858** — Waiting on you draws one row per agent with grants due a check and decides app actions where they stand, so every line is decided on Home and the count is the rows. DIRECTORY-123/R3.
+- [ ] **C859** — Home leads with Waiting on you, full width, with no table that scrolls inside the page and no sideways scroll; alarms take one line each when firing and one line when none. DIRECTORY-123/R4.
+- [ ] **C860** — The rail's Waiting on you opens Home's Waiting on you, whose count is the rail's count; the Requests and Checks pages stay one press from the section. DIRECTORY-123/R5.
+- [ ] **C861** — Standing bars hold for DIRECTORY-123, with Tom's 26 October reading replayed: hundreds of grants, one keep per agent, the count falls to what is left. DIRECTORY-123/R6.

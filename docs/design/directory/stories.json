@@ -96,6 +96,14 @@
         {
           "id": "S443",
           "text": "As a responsible person, I approve or decline a request or a draft in the canvas window I placed for them, the same way I do on the dashboard, without being sent to another page."
+        },
+        {
+          "id": "S493",
+          "text": "As the person things wait on, I want every line of Waiting on you to be decided where it stands, so that a number never sends me to a page with nothing on it."
+        },
+        {
+          "id": "S495",
+          "text": "As a person who sees a count beside Waiting on you, I want pressing it to show exactly those things, so that the count and what I see can never disagree."
         }
       ]
     },
@@ -114,6 +122,14 @@
         {
           "id": "S105",
           "text": "As a reviewer, I want a test that fails if any start path spawns a process, so that lys stays a product that checks, gives and records and never runs an agent."
+        },
+        {
+          "id": "S491",
+          "text": "As a reviewer, I want a grant to come back for a check only when its period has passed since I last kept it, so that what waits on me is what needs me, not every grant I ever gave."
+        },
+        {
+          "id": "S492",
+          "text": "As a reviewer of an agent holding many grants, I want to keep all of its access in one act after reading the list, so that a hundred checks are not a hundred presses."
         }
       ]
     },
@@ -468,6 +484,10 @@
         {
           "id": "S490",
           "text": "As a directory administrator, I want the 26 October incident replayed as a failing test that passes only with this change, so that it is proven it cannot happen again."
+        },
+        {
+          "id": "S496",
+          "text": "As a directory administrator, I want Tom's 26 October reading replayed as a test, so that it is proven that hundreds of standing grants never again read as hundreds of things to do."
         }
       ]
     },
@@ -644,6 +664,10 @@
         {
           "id": "S134",
           "text": "As a newcomer, I want the help overlay to number what is on screen and put me back where I was when I leave it, so that asking for help never costs me my place."
+        },
+        {
+          "id": "S494",
+          "text": "As a person opening Lys, I want Home to lead with what waits on me and fit my window, so that I never scroll a table inside the page or sideways to find it."
         }
       ]
     },

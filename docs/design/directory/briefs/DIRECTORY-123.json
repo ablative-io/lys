@@ -1,0 +1,198 @@
+{
+  "id": "DIRECTORY-123",
+  "cluster": "directory",
+  "title": "Waiting on you is what needs the person, decided where it stands, at the top of Home: a check is due only after its period, an agent's checks are kept in one act, and Home fits the window",
+  "depends_on": [
+    "DIRECTORY-101",
+    "DIRECTORY-104"
+  ],
+  "blocked_by": [],
+  "checklist": [
+    "C856",
+    "C857",
+    "C858",
+    "C859",
+    "C860",
+    "C861"
+  ],
+  "stories": [
+    "S491",
+    "S492",
+    "S493",
+    "S494",
+    "S495",
+    "S496"
+  ],
+  "design_anchor": [],
+  "purpose": "Tom, 26 October 2026 about 17:50, at Lys: \"it's saying that there's like 500 and something things that are waiting on me, but then there's nothing there. Like I can't actually do anything, and the dashboard is really fucking stupid... the dashboard should have... the waiting on me section... there's this table up the top that scrolls, and then there's like alarms that take up the entire width, and then there's this long thing of stuff that goes after it.\" Read in the code at 9f432e2a: GET /waiting counts four kinds (requests, agent drafts, app actions, checks due), and the rail's count opens #/requests, which lists requests alone. A check is due for every standing grant an agent answering to the person holds (reviews_api.rs review_view: stands() and nothing else), keeping one records a decision and never takes it off the list, and there is no review period anywhere in Lys. So every live grant Tom's agents hold is a permanent line, Keep cannot lower the count, the rail sends him to a page that shows none of it, and an app action or a check only offers Open to another page. On 15 October he said the dashboard needed a rethink; this is that rethink, in his words: Home is where Waiting on you lives.",
+  "task": "Make a check due only after a review period since its last check, keep an agent's due grants in one act, decide every Waiting on you line where it stands, lead Home with it at full width with no inner or sideways scroll and alarms as lines, and make the rail open it.",
+  "requirements": [
+    {
+      "id": "R1",
+      "title": "A grant is due a check only when its review period has passed since its last check",
+      "spec": "THE SYSTEM SHALL count a grant due for its reviewer when it stands (unrevoked, within its window) and at least the review period has passed since its last check, where its last check is its last keep or, never kept, the start of its window: giving a grant is its first check. The review period is the written configuration key [reviews] period_days, a whole number of days of at least 1; the installer and the upgrade write it as 30 where it is absent, and the service refuses to start with it missing or malformed, by name. Reason for 30: one calendar month is the cadence a person can hold in mind for access they gave, and a grant given for one task is checked before a second month runs on unseen. GET /reviews and GET /waiting read the same rule from one function, so they never disagree. A kept grant leaves both at once and returns when its period passes.",
+      "acceptance": [
+        "Red first (crates/lys-identity-server/src/waiting_api_tests.rs and tests/reviews.rs): a grant given now is not due; a grant whose window began 31 days ago and was never kept is due; keeping it removes it from GET /reviews and GET /waiting in the same answer; it is due again only once 30 days have passed since the keep; the clock is the service's test clock, never a sleep.",
+        "A configuration without [reviews] period_days refuses to start, naming the key; the installer test reads 30 written into a fresh configuration and an upgraded one."
+      ],
+      "files": {
+        "create": [],
+        "modify": [
+          "crates/lys-identity-server/src/reviews_api.rs",
+          "crates/lys-identity-server/src/reviews_state.rs",
+          "crates/lys-identity-server/src/waiting_api.rs",
+          "crates/lys-identity-server/src/waiting_api_tests.rs",
+          "crates/lys-identity-server/src/config.rs",
+          "crates/lys-identity-server/tests/reviews.rs"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C856"
+      ],
+      "stories": [
+        "S491"
+      ]
+    },
+    {
+      "id": "R2",
+      "title": "A reviewer keeps every due grant an agent holds in one recorded act",
+      "spec": "WHEN a reviewer calls POST /reviews/agents/{agent}/keep with an operation and the ids of the due grants they were shown THE SYSTEM SHALL keep exactly those grants for that reviewer as one durable write, one decision per grant naming the reviewer, and answer the kept grants with their decisions; asked again with the same operation it answers the same without writing. It SHALL refuse the whole act, keeping none, with GrantNotDue naming any grant that is not due for this reviewer, GrantNotVisible for a grant they may not see, AgentMismatch for a grant the agent does not hold, ReviewerOnly for a caller who is not the reviewer, and ReviewReused for an operation already used for a different list. A grant due after the list was read is not kept: the act keeps what was seen, never more. The single-grant keep stands as it is.",
+      "acceptance": [
+        "Red first (crates/lys-identity-server/tests/reviews.rs): an agent with 120 due grants is kept in one call; its review store gains 120 decisions in one write (the store's write count read before and after); each refusal by name keeps nothing; a repeated operation writes nothing; a grant given between the read and the keep stays due."
+      ],
+      "files": {
+        "create": [],
+        "modify": [
+          "crates/lys-identity-server/src/reviews_api.rs",
+          "crates/lys-identity-server/src/reviews_store.rs",
+          "crates/lys-identity-server/src/openapi_table.rs",
+          "crates/lys-identity-server/src/error.rs",
+          "crates/lys-identity-server/tests/reviews.rs",
+          "surface/identity/src/generated/index.ts"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C857"
+      ],
+      "stories": [
+        "S492"
+      ]
+    },
+    {
+      "id": "R3",
+      "title": "Every Waiting on you line is decided where it stands, with one row per agent for its checks",
+      "spec": "GET /waiting SHALL answer one review entry per agent with grants due for the caller, carrying the agent, the due grants (id, relation, resource in words, last check) and their count, in place of one entry per grant, and every app action entry SHALL carry its draft as GET /product-drafts answers it. Waiting on you (WaitingOnYou.tsx) SHALL draw a review row as \"Check the access <agent> holds: <n> grants\" with the grants listed beneath on request, a Keep all act (R2, sending the ids shown) and an Open act to the agent's access page where any grant is withdrawn; and SHALL draw an app action row with its approve and refuse acts in the row, through the existing /product-drafts/{id}/approve and /refuse. Every act is an Act. The count in the heading is the number of rows, the rail's count is the same number, and a part that could not be read stays its own line, as today.",
+      "acceptance": [
+        "Red first (crates/lys-identity-server/src/waiting_api_tests.rs): an agent with three due grants is one entry with three grants; two agents are two entries; an app action entry carries its draft.",
+        "Red first (surface/identity/src/features/dashboard/dashboard-waiting.test.tsx): a review row shows the agent and count, Keep all posts the ids shown and the row leaves on success; an app action row approves and refuses in place; no row's only act is Open."
+      ],
+      "files": {
+        "create": [],
+        "modify": [
+          "crates/lys-identity-server/src/waiting_api.rs",
+          "crates/lys-identity-server/src/waiting_api_tests.rs",
+          "surface/identity/src/features/dashboard/WaitingOnYou.tsx",
+          "surface/identity/src/features/dashboard/waiting.ts",
+          "surface/identity/src/features/dashboard/dashboard-waiting.test.tsx",
+          "surface/identity/src/features/drafts/ProductDrafts.tsx",
+          "surface/identity/src/features/reviews/KeepGrant.tsx",
+          "surface/identity/src/generated/index.ts"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C858"
+      ],
+      "stories": [
+        "S493"
+      ]
+    },
+    {
+      "id": "R4",
+      "title": "Home leads with Waiting on you, fits the window, and draws alarms as lines",
+      "spec": "Home (Dashboard.tsx, dashboard.css) SHALL draw, in order: the stop line as today; Waiting on you, the full width of the page; alarms, one line each while firing and a single \"No alarms\" line when none fire, never a full-width panel of tiles; then Exceptions and Spend side by side where the window is wide enough, one above the other where it is not. Home SHALL NOT draw the agents table: the tree beside the terminal lists agents, and Stop everything stays on the stop line. No section scrolls inside the page; the page scrolls as one. At any window from 360 pixels wide up, nothing on Home scrolls sideways. Getting started stays above Waiting on you while it shows.",
+      "acceptance": [
+        "Red first (surface/identity/tests/dashboard-layout.test.tsx): the sections come in the order above; no element on Home carries overflow scrolling of its own; the agents table is absent and Stop everything is on the stop line; alarms render as lines, with the none line when none fire.",
+        "Red first (surface/identity/tests/dashboard-alarms.test.tsx): a firing alarm is one line with its act; none firing is one line."
+      ],
+      "files": {
+        "create": [],
+        "modify": [
+          "surface/identity/src/features/dashboard/Dashboard.tsx",
+          "surface/identity/src/features/dashboard/dashboard.css",
+          "surface/identity/src/features/dashboard/Alarms.tsx",
+          "surface/identity/tests/dashboard-layout.test.tsx",
+          "surface/identity/tests/dashboard-alarms.test.tsx",
+          "surface/identity/tests/dashboard.test.tsx"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C859"
+      ],
+      "stories": [
+        "S494"
+      ]
+    },
+    {
+      "id": "R5",
+      "title": "The rail's Waiting on you opens Home's Waiting on you, and the pages it gathers stay one press away",
+      "spec": "The rail's Waiting on you (railItems.ts, Rail.tsx) SHALL open Home with its Waiting on you section in view and focused, and its count SHALL be the section's count from the one GET /waiting read. The section's foot SHALL carry links to Requests (#/requests), Checks (#/reviews) and Drafts (#/access/drafts), so every list it gathers is one press away; those pages are unchanged.",
+      "acceptance": [
+        "Red first (surface/identity/tests/rail.test.tsx): pressing Waiting on you goes to Home with the section focused; the rail count equals the section's heading count for the same answer; the section's foot links reach the three pages."
+      ],
+      "files": {
+        "create": [],
+        "modify": [
+          "surface/identity/src/shell/railItems.ts",
+          "surface/identity/src/shell/Rail.tsx",
+          "surface/identity/tests/rail.test.tsx",
+          "surface/identity/src/features/dashboard/WaitingOnYou.tsx"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C860"
+      ],
+      "stories": [
+        "S495"
+      ]
+    },
+    {
+      "id": "R6",
+      "title": "Standing bars hold for DIRECTORY-123, with Tom's reading replayed",
+      "spec": "THE SYSTEM SHALL hold every standing bar on the exact final commit: cargo fmt, clippy pedantic -D warnings with all targets, cargo nextest run (never cargo test), cargo test --doc, ast-grep, the file-length gate, tsc and vitest for surface/identity, and scripts/design/gate.sh with the rendered markdown equal to its JSON. One test replays Tom's reading through the public routes: a person with six agents holding 540 standing grants, all older than the period, reads 6 review rows and a count of 6, never 540; Keep all on each leaves a count of 0; a request and an app action added after are 2 rows, each decided in its row. No sleep, timeout taken as readiness or poll is added. No test is deleted, weakened or marked serial.",
+      "acceptance": [
+        "The replay test (crates/lys-identity-server/tests/reviews.rs, a module named tom_26_october) fails on 9f432e2a and passes on the final commit, both runs' lines kept in the handback.",
+        "Every gate leg green on the final commit, each judged by its parsed output lines, never by its exit code."
+      ],
+      "files": {
+        "create": [],
+        "modify": [],
+        "delete": []
+      },
+      "checklist": [
+        "C861"
+      ],
+      "stories": [
+        "S496"
+      ]
+    }
+  ],
+  "boundaries": [
+    "SHALL NOT keep or withdraw any live grant by hand, script or raw route: Tom's checks are kept by Tom through R2's act after install.",
+    "SHALL NOT change what a grant permits, its window, or its revocation: only when it is due a check.",
+    "SHALL NOT remove the Requests, Checks or Drafts pages, or the single-grant keep.",
+    "SHALL NOT add a sleep, a timeout taken as readiness, or a poll anywhere; the review clock is the service's clock, read when asked.",
+    "SHALL NOT draw a bare button for an act: every act is an Act."
+  ],
+  "verification": [
+    "cargo nextest run -p lys-identity-server -E 'binary(reviews) | test(waiting_api)' alone, read by its PASS and FAIL lines; vitest on surface/identity for dashboard-waiting, dashboard-layout, dashboard-alarms, dashboard and rail, read by its summary line; then the full gate.",
+    "Red first: every new test, the replay included, is run before the code and its failing lines kept in the handback.",
+    "Walked on the installed Lys as a test person with agents and old grants: the count on the rail and on Home agree; Keep all lowers it by one row; an app action is approved in its row; Home is read at 1440 and at 390 pixels wide with nothing scrolling sideways and no inner scroll. Each step's screen is read, not assumed.",
+    "Hospital line: If this code were used in a hospital, the worst credible failure is a charge nurse whose queue shows five hundred items that cannot be opened, who stops looking at it, and misses the one real request to grant an agent access to a ward's records, and it could harm about every patient on that ward while the access stands unchecked."
+  ],
+  "amendments": []
+}

@@ -48,6 +48,10 @@
 
 **S443.** As a responsible person, I approve or decline a request or a draft in the canvas window I placed for them, the same way I do on the dashboard, without being sent to another page.
 
+**S493.** As the person things wait on, I want every line of Waiting on you to be decided where it stands, so that a number never sends me to a page with nothing on it.
+
+**S495.** As a person who sees a count beside Waiting on you, I want pressing it to show exactly those things, so that the count and what I see can never disagree.
+
 ## Reviewer — Reviews a brief before any of its rows is dispatched
 
 **S2.** As the reviewer, I want each open identity row as a design-system brief with numbered requirements and criteria, so that rows can be dispatched to the loop one at a time and reviewed against their criteria.
@@ -55,6 +59,10 @@
 **S104.** As a reviewer, I want a test that reads the command line and the clipboard and finds no credential value, so that giving a command never discloses a secret.
 
 **S105.** As a reviewer, I want a test that fails if any start path spawns a process, so that lys stays a product that checks, gives and records and never runs an agent.
+
+**S491.** As a reviewer, I want a grant to come back for a check only when its period has passed since I last kept it, so that what waits on me is what needs me, not every grant I ever gave.
+
+**S492.** As a reviewer of an agent holding many grants, I want to keep all of its access in one act after reading the list, so that a hundred checks are not a hundred presses.
 
 ## Operator — Installs and runs the standalone identity product
 
@@ -226,6 +234,8 @@
 
 **S490.** As a directory administrator, I want the 26 October incident replayed as a failing test that passes only with this change, so that it is proven it cannot happen again.
 
+**S496.** As a directory administrator, I want Tom's 26 October reading replayed as a test, so that it is proven that hundreds of standing grants never again read as hundreds of things to do.
+
 ## Release reviewer — Decides from the record whether the release proof is complete
 
 **S110.** As the release reviewer, I want every command, result, ref and hash recorded with every unmet requirement named, so that completion rests on recorded evidence and never on a health check.
@@ -299,6 +309,8 @@
 ## Newcomer to the screens — Learning what a screen shows
 
 **S134.** As a newcomer, I want the help overlay to number what is on screen and put me back where I was when I leave it, so that asking for help never costs me my place.
+
+**S494.** As a person opening Lys, I want Home to lead with what waits on me and fit my window, so that I never scroll a table inside the page or sideways to find it.
 
 ## Identity line lead — Keeping the mock-up and the build in step
 
