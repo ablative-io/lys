@@ -106,6 +106,77 @@ async fn a_suspended_person_is_given_no_account_until_they_are_reinstated() -> T
 }
 
 #[tokio::test]
+async fn an_account_a_retired_person_still_holds_is_never_taken_by_the_repair() -> TestResult {
+    let (mut service, rauthy, ada) = table_with_mail(false).await?;
+    let bea = add(&service, &ada, "Bea", "bea@example.test").await?;
+    let cal = add(&service, &ada, "Cal", "cal@example.test").await?;
+    let bea_logins = logins(&service, &ada, &bea).await?;
+    let cal_logins = logins(&service, &ada, &cal).await?;
+    transition(&service, &ada, &bea, "retire").await?;
+    // Cal's account is gone, and the address Lys holds for Cal is the one
+    // whose account the retired Bea still holds.
+    rauthy.forget(cal["subject"].as_str().ok_or("Cal's account")?)?;
+    let foundings = service.dir.path().join("foundings.json");
+    let cal_id = cal["person"].as_str().ok_or("Cal")?.to_owned();
+    service
+        .restart_between(None, move |_config| {
+            let mut held: Value = serde_json::from_slice(&std::fs::read(&foundings)?)?;
+            for row in held["foundings"].as_object_mut().ok_or("the foundings")?.values_mut() {
+                if row["founder"] == cal_id.as_str() {
+                    row["email"] = json!("bea@example.test");
+                }
+            }
+            std::fs::write(&foundings, serde_json::to_vec(&held)?)?;
+            Ok(())
+        })
+        .await?;
+
+    assert_eq!(logins(&service, &ada, &bea).await?, bea_logins, "the retired Bea keeps her login");
+    assert_eq!(logins(&service, &ada, &cal).await?, cal_logins, "Cal waits for an administrator");
+    Ok(())
+}
+
+#[tokio::test]
+async fn the_administrator_with_two_addresses_held_still_signs_in() -> TestResult {
+    let (mut service, _rauthy, ada) = table_with_mail(false).await?;
+    let (status, me) = service.get("/me", Some(&ada)).await?;
+    assert_eq!(status, 200, "{me}");
+    let administrator = me["person"]["id"].as_str().ok_or("the administrator")?.to_owned();
+    let (_, record) = service.get(&format!("/identities/{administrator}"), Some(&ada)).await?;
+    let subject = record["logins"][0]["subject"].as_str().ok_or("their login")?.to_owned();
+    let foundings = service.dir.path().join("foundings.json");
+    let founder = administrator.clone();
+    service
+        .restart_between(None, move |_config| {
+            let mut held: Value = serde_json::from_slice(&std::fs::read(&foundings)?)?;
+            let rows = held["foundings"].as_object_mut().ok_or("the foundings")?;
+            let template = rows.values().next().cloned().ok_or("a founding row")?;
+            for (key, email) in [("first", "ada@example.test"), ("second", "ada.other@example.test")] {
+                let mut row = template.clone();
+                row["founder"] = json!(founder);
+                row["email"] = json!(email);
+                row["withdrawn"] = json!(false);
+                rows.insert(format!("administrator-{key}"), row);
+            }
+            std::fs::write(&foundings, serde_json::to_vec(&held)?)?;
+            Ok(())
+        })
+        .await?;
+
+    let name = me["person"]["display_name"].as_str().ok_or("their name")?;
+    assert_eq!(
+        state_of(&health(&service, &ada).await?, name)["state"],
+        "several_addresses",
+        "the administrator's record holds two addresses"
+    );
+    let session = service
+        .sign_in(Login { subject, email: "ada@example.test".to_owned() })
+        .await?;
+    assert_eq!(service.get("/me", Some(&session)).await?.1["person"]["id"], json!(administrator));
+    Ok(())
+}
+
+#[tokio::test]
 async fn october_26_annabel_inside_dean_is_refused_then_one_move_and_one_address_put_everyone_right() -> TestResult {
     let (mut service, rauthy, ada) = table_with_mail(false).await?;
     let dean = add(&service, &ada, "Dean Whiting", "dean@example.test").await?;
