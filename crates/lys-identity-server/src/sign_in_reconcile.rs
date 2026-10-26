@@ -227,12 +227,13 @@ pub(crate) struct Repaired {
     adopted: Vec<String>,
     pruned: usize,
     waiting: Vec<String>,
+    refused: Vec<String>,
 }
 
 impl Repaired {
     fn line(&self) -> String {
         format!(
-            "sign-in accounts reconciled: {} made ({}), {} found under their address ({}), {} dead logins unbound, {} waiting for an administrator ({})",
+            "sign-in accounts reconciled: {} made ({}), {} found under their address ({}), {} dead logins unbound, {} waiting for an administrator ({}), {} refused ({})",
             self.made.len(),
             self.made.join(", "),
             self.adopted.len(),
@@ -240,15 +241,18 @@ impl Repaired {
             self.pruned,
             self.waiting.len(),
             self.waiting.join(", "),
+            self.refused.len(),
+            self.refused.join("; "),
         )
     }
 }
 
-/// Repair every person's sign-in that is safe to repair, as `actor`.
+/// Repair every person's sign-in that is safe to repair, as `actor`. Each
+/// person is repaired on their own: one refused never stops the others,
+/// and is named on the repair's line.
 ///
 /// # Errors
-/// Names an issuer, directory or session failure; persons already repaired
-/// keep their repair and the next run finds nothing to do for them.
+/// Names a directory or foundings failure met before any person is read.
 pub(crate) async fn repair(state: &AppState, actor: &Actor) -> Result<Repaired, ServerError> {
     let Some(api) = state.sign_in_providers.as_ref() else {
         return Ok(Repaired::default());
@@ -266,48 +270,71 @@ pub(crate) async fn repair(state: &AppState, actor: &Actor) -> Result<Repaired, 
     let administrator = state.admission.administrator_login()?;
     let mut done = Repaired::default();
     for person in &everyone {
-        let read = read(api, person).await?;
-        let health = judge(person, &read, &everyone, &name);
         let theirs = administrator.as_ref().is_some_and(|login| {
             login.issuer() == state.oidc.issuer()
                 && person.subjects.iter().any(|subject| subject == login.subject())
         });
-        let new = match (&health, &read.under_address) {
-            (SignInHealth::Ready | SignInHealth::Disabled, _) => None,
-            // A suspended person is never given an account: theirs waits
-            // until they are reinstated, which repairs again.
-            (SignInHealth::Repairable, _) if theirs || !person.active => {
-                done.waiting.push(name(person.person));
-                None
+        let who = name(person.person);
+        match repair_one(state, api, actor, person, &everyone, &name, theirs).await {
+            Ok(Outcome::Nothing) => {}
+            Ok(Outcome::Waiting) => done.waiting.push(who),
+            Ok(Outcome::Made(pruned)) => {
+                done.made.push(who);
+                done.pruned += pruned;
             }
-            (SignInHealth::Repairable, Some(user)) => {
-                done.adopted.push(name(person.person));
-                Some(crate::accounts::user_id(user)?)
+            Ok(Outcome::Adopted(pruned)) => {
+                done.adopted.push(who);
+                done.pruned += pruned;
             }
-            (SignInHealth::Repairable, None) => {
-                let display = name(person.person);
-                let held = person.held.as_deref().unwrap_or_default();
-                let account = crate::accounts::AccountName {
-                    display: &display,
-                    given: None,
-                    family: None,
-                };
-                let (subject, _) = crate::accounts::make(api, held, account).await?;
-                done.made.push(display);
-                Some(subject)
-            }
-            _ => {
-                done.waiting.push(name(person.person));
-                None
-            }
-        };
-        // Dead logins go only with the live one that replaces them.
-        if let Some(new) = new {
-            done.pruned += read.dead.len();
-            commit(state, actor, person, &read.dead, new)?;
+            Err(error) => done.refused.push(format!("{who}: {error}")),
         }
     }
     Ok(done)
+}
+
+/// What one person's repair did.
+enum Outcome {
+    Nothing,
+    Waiting,
+    Made(usize),
+    Adopted(usize),
+}
+
+async fn repair_one(
+    state: &AppState,
+    api: &SignInProviders,
+    actor: &Actor,
+    person: &Seen,
+    everyone: &[Seen],
+    name: &dyn Fn(PersonId) -> String,
+    theirs: bool,
+) -> Result<Outcome, ServerError> {
+    let read = read(api, person).await?;
+    let health = judge(person, &read, everyone, name);
+    let (new, made) = match (&health, &read.under_address) {
+        (SignInHealth::Ready | SignInHealth::Disabled, _) => return Ok(Outcome::Nothing),
+        // A suspended person is never given an account: theirs waits
+        // until they are reinstated, which repairs again.
+        (SignInHealth::Repairable, _) if theirs || !person.active => return Ok(Outcome::Waiting),
+        (SignInHealth::Repairable, Some(user)) => (crate::accounts::user_id(user)?, false),
+        (SignInHealth::Repairable, None) => {
+            let display = name(person.person);
+            let held = person.held.as_deref().unwrap_or_default();
+            let account = crate::accounts::AccountName {
+                display: &display,
+                given: None,
+                family: None,
+            };
+            (crate::accounts::make(api, held, account).await?.0, true)
+        }
+        _ => return Ok(Outcome::Waiting),
+    };
+    // Dead logins go only with the live one that replaces them.
+    if !commit(state, actor, person, &read.dead, new)? {
+        return Ok(Outcome::Waiting);
+    }
+    let pruned = read.dead.len();
+    Ok(if made { Outcome::Made(pruned) } else { Outcome::Adopted(pruned) })
 }
 
 fn names(state: &AppState) -> Result<Vec<(PersonId, String)>, ServerError> {
@@ -419,14 +446,15 @@ pub(crate) async fn hold_address(
 }
 
 /// Unbind `dead` and bind `new` for one person, in one signed batch, after
-/// checking their logins are still the ones read; ends the dead sessions.
+/// checking their logins are still the ones read and that no record, in any
+/// state, holds `new`; ends the dead sessions. Answers whether it wrote.
 fn commit(
     state: &AppState,
     actor: &Actor,
     seen: &Seen,
     dead: &[String],
     new: String,
-) -> Result<(), ServerError> {
+) -> Result<bool, ServerError> {
     let issuer = state.oidc.issuer().to_owned();
     with_directory(state, |directory| {
         let projection = directory.projection()?;
@@ -440,7 +468,12 @@ fn commit(
         if now != seen.subjects.iter().map(String::as_str).collect::<Vec<_>>() {
             // Someone changed this person's logins since the read; the next
             // repair judges them afresh.
-            return Ok(());
+            return Ok(false);
+        }
+        // An account another record holds, a retired one included, is
+        // never taken: an administrator moves it on People.
+        if projection.person_for(&LoginBinding::new(&issuer, &new)?).is_some() {
+            return Ok(false);
         }
         let operation = OperationId::generate()?;
         let at = crate::session::now();
@@ -474,7 +507,7 @@ fn commit(
                 && dead.iter().any(|subject| held.binding().subject() == subject)
         })?;
         directory.commit_batch(&events)?;
-        Ok(())
+        Ok(true)
     })
 }
 

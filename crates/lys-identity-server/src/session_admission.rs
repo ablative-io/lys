@@ -104,7 +104,8 @@ pub async fn begin(state: &AppState, actor: Actor) -> Result<String, ServerError
 /// An account opens its person unless Lys holds more than one address for
 /// them (DIRECTORY-124 R4): that is a mix-up an administrator settles on
 /// People by setting the one that is theirs, and until then every account
-/// bound to them signs in as nobody.
+/// bound to them signs in as nobody. The administrator's own login is never
+/// refused for it: they are the one who settles it.
 fn theirs(
     state: &AppState,
     directory: &Projection,
@@ -114,6 +115,12 @@ fn theirs(
     let Some(person) = directory.person_for(actor.binding()) else {
         return Ok(());
     };
+    let administrator = state.admission.administrator_login()?;
+    if administrator.is_some_and(|login| {
+        login.issuer() == actor.binding().issuer() && login.subject() == actor.binding().subject()
+    }) {
+        return Ok(());
+    }
     let foundings = crate::organisations_found::foundings(state)?;
     let own = foundings.addresses_for(&person.to_string());
     if own.len() > 1 {
