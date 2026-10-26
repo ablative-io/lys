@@ -68,9 +68,20 @@ impl Changes {
             tokio::pin!(changed);
             changed.as_mut().enable();
             let claimed = {
-                let mut table = self.table.lock().map_err(|error| unavailable(error.to_string()))?;
-                let entry = table.accounts.get_mut(id).ok_or_else(|| unavailable("the account claim is missing"))?;
-                if entry.busy { false } else { entry.busy = true; true }
+                let mut table = self
+                    .table
+                    .lock()
+                    .map_err(|error| unavailable(error.to_string()))?;
+                let entry = table
+                    .accounts
+                    .get_mut(id)
+                    .ok_or_else(|| unavailable("the account claim is missing"))?;
+                if entry.busy {
+                    false
+                } else {
+                    entry.busy = true;
+                    true
+                }
             };
             #[cfg(test)]
             crate::accounts::changes_tests::started(!claimed);
@@ -87,7 +98,9 @@ impl Drop for Guard<'_> {
     fn drop(&mut self) {
         match self.owner.table.lock() {
             Ok(mut table) => {
-                if self.held && let Some(entry) = table.accounts.get_mut(&self.id) {
+                if self.held
+                    && let Some(entry) = table.accounts.get_mut(&self.id)
+                {
                     entry.busy = false;
                     entry.outcome.notify_waiters();
                 }

@@ -214,7 +214,9 @@ fn solve_counter(challenge: &str) -> Result<u64, ServerError> {
     let mut digits = [0u8; 20];
     let mut counter: u64 = 0;
     loop {
-        if crate::wait_request::left() { return Err(failed("the caller closed the sign-in")); }
+        if crate::wait_request::left() {
+            return Err(failed("the caller closed the sign-in"));
+        }
         let mut value = counter;
         let mut first = digits.len();
         loop {
@@ -474,21 +476,22 @@ impl IssuerSignIn {
         let mut start = reqwest::Url::parse(&format!("{}/oidc/authorize", self.api))
             .map_err(|error| failed(format!("the sign-in address is not one: {error}")))?;
         start.set_query(begun.query());
-        let mut opening = crate::waits::Call::begin("issuer", &self.api, "open sign-in", "sign-in")?;
+        let mut opening =
+            crate::waits::Call::begin("issuer", &self.api, "open sign-in", "sign-in")?;
         let opening_work = async {
-        let page = self
-            .http
-            .get(start)
-            .header(reqwest::header::ACCEPT, "text/html")
-            .header(FORWARDED_FOR, address)
-            .send()
-            .await
-            .map_err(unreachable_issuer)?;
-        let mut jar = Jar::default();
-        jar.keep(page.headers());
-        let status = page.status();
-        let body = page.text().await.map_err(unreachable_issuer)?;
-        Ok::<_, ServerError>((jar, status, body))
+            let page = self
+                .http
+                .get(start)
+                .header(reqwest::header::ACCEPT, "text/html")
+                .header(FORWARDED_FOR, address)
+                .send()
+                .await
+                .map_err(unreachable_issuer)?;
+            let mut jar = Jar::default();
+            jar.keep(page.headers());
+            let status = page.status();
+            let body = page.text().await.map_err(unreachable_issuer)?;
+            Ok::<_, ServerError>((jar, status, body))
         };
         let (jar, status, body) = opening.until(opening_work).await.map_err(failed)??;
         drop(opening);
@@ -501,17 +504,22 @@ impl IssuerSignIn {
             .filter(|token| !token.is_empty())
             .ok_or_else(|| failed("the sign-in service's start named no request token"))?
             .to_owned();
-        let mut proving = crate::waits::Call::begin("issuer", &self.api, "proof challenge", "sign-in")?;
-        let challenge = proving.until(async { self
-            .http
-            .post(format!("{}/pow", self.api))
-            .header(FORWARDED_FOR, address)
-            .send()
+        let mut proving =
+            crate::waits::Call::begin("issuer", &self.api, "proof challenge", "sign-in")?;
+        let challenge = proving
+            .until(async {
+                self.http
+                    .post(format!("{}/pow", self.api))
+                    .header(FORWARDED_FOR, address)
+                    .send()
+                    .await
+                    .map_err(unreachable_issuer)?
+                    .text()
+                    .await
+                    .map_err(unreachable_issuer)
+            })
             .await
-            .map_err(unreachable_issuer)?
-            .text()
-            .await
-            .map_err(unreachable_issuer) }).await.map_err(failed)??;
+            .map_err(failed)??;
         drop(proving);
         let challenge = challenge.trim().to_owned();
         let expires = challenge_expiry(&challenge)?;
@@ -539,14 +547,20 @@ impl IssuerSignIn {
             check_challenge(opened.expires)?;
         }
         let mut call = crate::waits::Call::begin("issuer", &self.api, path, "sign-in")?;
-        let response = call.until(self.http
-            .post(format!("{}{path}", self.api))
-            .header(reqwest::header::CONTENT_TYPE, "application/json")
-            .header(reqwest::header::COOKIE, opened.jar.header())
-            .header(REQUEST_TOKEN, &opened.token)
-            .header(FORWARDED_FOR, address)
-            .body(body.to_string())
-            .send()).await.map_err(failed)?.map_err(unreachable_issuer)?;
+        let response = call
+            .until(
+                self.http
+                    .post(format!("{}{path}", self.api))
+                    .header(reqwest::header::CONTENT_TYPE, "application/json")
+                    .header(reqwest::header::COOKIE, opened.jar.header())
+                    .header(REQUEST_TOKEN, &opened.token)
+                    .header(FORWARDED_FOR, address)
+                    .body(body.to_string())
+                    .send(),
+            )
+            .await
+            .map_err(failed)?
+            .map_err(unreachable_issuer)?;
         Ok((response, call))
     }
 
@@ -571,7 +585,9 @@ impl IssuerSignIn {
                 &Value::Object(credentials),
             )
             .await?;
-        call.until(accepted(answer, Some(opened.expires), unix_second()?)).await.map_err(failed)?
+        call.until(accepted(answer, Some(opened.expires), unix_second()?))
+            .await
+            .map_err(failed)?
     }
 }
 

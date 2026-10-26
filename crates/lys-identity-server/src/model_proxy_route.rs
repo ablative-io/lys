@@ -97,8 +97,21 @@ pub async fn forward(local: &str, request: Request) -> Response {
         Err(error) => return refused(StatusCode::SERVICE_UNAVAILABLE, &error.to_string()),
     };
     let (run, path) = lys_home::proxy::forward::run_key(parts.uri.path());
-    let subject = run.map_or_else(|| path.to_owned(), |key| format!("run {}", crate::routes::hex(&Sha256::digest(key.as_bytes()))));
-    let mut call = match crate::waits::Call::begin("model upstream", origin_of(local), parts.method.as_str(), &subject) {
+    let subject = run.map_or_else(
+        || path.to_owned(),
+        |key| {
+            format!(
+                "run {}",
+                crate::routes::hex(&Sha256::digest(key.as_bytes()))
+            )
+        },
+    );
+    let mut call = match crate::waits::Call::begin(
+        "model upstream",
+        origin_of(local),
+        parts.method.as_str(),
+        &subject,
+    ) {
         Ok(call) => call,
         Err(error) => return refused(StatusCode::SERVICE_UNAVAILABLE, &error.to_string()),
     };
@@ -178,7 +191,10 @@ fn refused(status: StatusCode, reason: &str) -> Response {
         "refusal":"model_upstream_unreachable", "reason":format!("lys refused the model call: {reason}"),
     }).to_string()));
     *response.status_mut() = status;
-    response.headers_mut().insert(header::CONTENT_TYPE, axum::http::HeaderValue::from_static("application/json"));
+    response.headers_mut().insert(
+        header::CONTENT_TYPE,
+        axum::http::HeaderValue::from_static("application/json"),
+    );
     response
 }
 

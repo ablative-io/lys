@@ -32,7 +32,8 @@ impl Client {
         bearer: &str,
         body: &str,
     ) -> Result<Answer, String> {
-        let call = crate::waits::Call::begin("SpiceDB", authority, "POST", path).map_err(|error| error.to_string())?;
+        let call = crate::waits::Call::begin("SpiceDB", authority, "POST", path)
+            .map_err(|error| error.to_string())?;
         if path
             .bytes()
             .chain(bearer.bytes())
@@ -95,15 +96,17 @@ fn connect(authority: &str) -> Result<std::io::BufReader<TcpStream>, String> {
 
 fn hold(call: &crate::waits::Call, stream: &TcpStream) -> Result<(), String> {
     let close = stream.try_clone().map_err(|error| error.to_string())?;
-    call.closer().hold(Box::new(move || {
-        match close.shutdown(std::net::Shutdown::Both) {
-            Ok(()) => {},
-            Err(error) if error.kind() == std::io::ErrorKind::NotConnected => {
-                tracing::debug!("spicedb_already_closed: {error}");
-            },
-            Err(error) => tracing::error!("spicedb_close_failed: {error}"),
-        }
-    })).map_err(|error| error.to_string())
+    call.closer()
+        .hold(Box::new(move || {
+            match close.shutdown(std::net::Shutdown::Both) {
+                Ok(()) => {}
+                Err(error) if error.kind() == std::io::ErrorKind::NotConnected => {
+                    tracing::debug!("spicedb_already_closed: {error}");
+                }
+                Err(error) => tracing::error!("spicedb_close_failed: {error}"),
+            }
+        }))
+        .map_err(|error| error.to_string())
 }
 
 struct Failure {

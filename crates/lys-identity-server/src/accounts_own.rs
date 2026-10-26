@@ -162,10 +162,18 @@ pub(super) async fn own_email(
     let code = crate::foundings_store::new_token()?;
     let held_code = crate::foundings_store::new_token()?;
     // A newer ask invalidates both predecessors even if either send fails.
-    let sending = pending::Sending::new(api, &id, PendingEmail {
-        email:email.clone(), held:held.clone(), digest:crate::foundings_store::digest(&code),
-        held_digest:crate::foundings_store::digest(&held_code), owner, sent:false,
-    })?;
+    let sending = pending::Sending::new(
+        api,
+        &id,
+        PendingEmail {
+            email: email.clone(),
+            held: held.clone(),
+            digest: crate::foundings_store::digest(&code),
+            held_digest: crate::foundings_store::digest(&held_code),
+            owner,
+            sent: false,
+        },
+    )?;
     drop(guard);
     for (address, code, leaving) in [(&email, &code, false), (&held, &held_code, true)] {
         let letter = crate::mail_letters::Letter::EmailChange {
@@ -250,19 +258,20 @@ pub(super) async fn confirm_email(
         return Err(ServerError::EmailChangeCodeRefused);
     };
     let email = {
-    let changes = pending::changes(api)?;
-    let pending = changes
-        .get(&id)
-        .filter(|pending| {
-            pending.sent && pending.owner == owner
-                && pending.digest == crate::foundings_store::digest(&code)
-                && pending.held_digest == crate::foundings_store::digest(&held_code)
-        })
-        .ok_or(ServerError::EmailChangeCodeRefused)?;
-    if super::email_changes::held(&state, &owner)? != pending.held {
-        return Err(ServerError::EmailChangeCodeRefused);
-    }
-    pending.email.clone()
+        let changes = pending::changes(api)?;
+        let pending = changes
+            .get(&id)
+            .filter(|pending| {
+                pending.sent
+                    && pending.owner == owner
+                    && pending.digest == crate::foundings_store::digest(&code)
+                    && pending.held_digest == crate::foundings_store::digest(&held_code)
+            })
+            .ok_or(ServerError::EmailChangeCodeRefused)?;
+        if super::email_changes::held(&state, &owner)? != pending.held {
+            return Err(ServerError::EmailChangeCodeRefused);
+        }
+        pending.email.clone()
     };
     super::email_changes::available(&state, api, &owner, &email).await?;
     // Spend both before the issuer write, including uncertain transport outcomes.

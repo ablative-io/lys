@@ -73,10 +73,30 @@ pub(crate) type Entry = (Method, &'static str, Schema, Schema);
 /// What each entry of the table takes and answers, by method and path.
 pub(crate) fn types(api: &mut Api) -> BTreeMap<(Method, &'static str), (Schema, Schema)> {
     let mut entries = sign_in_and_identities(api);
-    entries.push((POST, "/runtime/sessions/{id}/stop", Some(api.schema::<crate::runner_api::Empty>()), Some(api.schema::<crate::stop_api::SessionAnswer>())));
-    entries.push((POST, "/runtime/sessions/{id}/end-now", Some(api.schema::<crate::runner_api::Empty>()), Some(api.schema::<crate::stop_api::SessionAnswer>())));
-    entries.push((GET, "/waits", None, Some(api.schema::<crate::waits_api::Waits>())));
-    entries.push((POST, "/waits/{id}/cancel", Some(api.schema::<crate::runner_api::Empty>()), Some(api.schema::<crate::waits_api::Cancelled>())));
+    entries.push((
+        POST,
+        "/runtime/sessions/{id}/stop",
+        Some(api.schema::<crate::runner_api::Empty>()),
+        Some(api.schema::<crate::stop_api::SessionAnswer>()),
+    ));
+    entries.push((
+        POST,
+        "/runtime/sessions/{id}/end-now",
+        Some(api.schema::<crate::runner_api::Empty>()),
+        Some(api.schema::<crate::stop_api::SessionAnswer>()),
+    ));
+    entries.push((
+        GET,
+        "/waits",
+        None,
+        Some(api.schema::<crate::waits_api::Waits>()),
+    ));
+    entries.push((
+        POST,
+        "/waits/{id}/cancel",
+        Some(api.schema::<crate::runner_api::Empty>()),
+        Some(api.schema::<crate::waits_api::Cancelled>()),
+    ));
     entries.push((
         GET,
         "/security-events",

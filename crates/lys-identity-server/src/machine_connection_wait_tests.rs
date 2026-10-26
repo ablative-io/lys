@@ -28,13 +28,19 @@ async fn closing_a_local_control_caller_closes_its_peer_and_removes_its_wait()
         _ = &mut asking => return Err("quiet control answered before a close".into()),
     }
     assert_eq!(command, [b'S']);
-    let call = crate::waits::snapshot()?.into_iter()
-        .find(|call| call.subject == "control-close-test").ok_or("control wait absent")?;
+    let call = crate::waits::snapshot()?
+        .into_iter()
+        .find(|call| call.subject == "control-close-test")
+        .ok_or("control wait absent")?;
     drop(asking);
     assert_eq!(peer.read(&mut command).await?, 0);
     peer.shutdown().await?;
     drop(peer);
     relay.await??;
-    assert!(!crate::waits::snapshot()?.iter().any(|entry| entry.id == call.id));
+    assert!(
+        !crate::waits::snapshot()?
+            .iter()
+            .any(|entry| entry.id == call.id)
+    );
     Ok(())
 }

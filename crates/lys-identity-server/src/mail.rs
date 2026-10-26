@@ -14,10 +14,10 @@
 use std::io::Write as _;
 use std::path::PathBuf;
 
+use lettre::Message;
 use lettre::message::Mailbox;
 use lettre::message::header::ContentType;
 use lettre::transport::smtp::authentication::Credentials;
-use lettre::Message;
 use serde::{Deserialize, Serialize};
 use std::sync::{Mutex, MutexGuard};
 use zeroize::Zeroizing;
@@ -206,7 +206,9 @@ impl Mailer {
                 user.clone(),
                 password.trim_end().to_owned(),
             ))
-        } else { None };
+        } else {
+            None
+        };
         Ok(Self {
             transport: transport::Transport::new(settings, credentials),
             from,
@@ -227,7 +229,10 @@ impl Mailer {
         operation: &str,
         letter: &Letter,
     ) -> Result<LetterView, ServerError> {
-        let claim = self.claims.take(&format!("{operation}/{}", letter.name())).await?;
+        let claim = self
+            .claims
+            .take(&format!("{operation}/{}", letter.name()))
+            .await?;
         let recorded = {
             let record = self.record()?;
             let recorded = self.recorded(operation, letter.name());
@@ -250,8 +255,11 @@ impl Mailer {
             .header(ContentType::TEXT_PLAIN)
             .body(letter.body())
             .map_err(|error| not_sent(format!("the letter could not be built: {error}")))?;
-        let call = crate::waits::Call::begin("mail", &self.transport.peer(), letter.name(), operation)?;
-        call.run(self.transport.send(&message)).await.map_err(not_sent)?;
+        let call =
+            crate::waits::Call::begin("mail", &self.transport.peer(), letter.name(), operation)?;
+        call.run(self.transport.send(&message))
+            .await
+            .map_err(not_sent)?;
         let record = self.record()?;
         self.append(operation, letter, Sender::Lys)?;
         drop(record);
@@ -270,7 +278,10 @@ impl Mailer {
         operation: &str,
         letter: &Letter,
     ) -> Result<LetterView, ServerError> {
-        let claim = self.claims.take(&format!("{operation}/{}", letter.name())).await?;
+        let claim = self
+            .claims
+            .take(&format!("{operation}/{}", letter.name()))
+            .await?;
         let record = self.record()?;
         if let Some(by) = self.recorded(operation, letter.name())? {
             return Ok(LetterView::sent(letter, by));
@@ -301,7 +312,9 @@ impl Mailer {
     }
 
     /// Admission addresses already recorded by Lys; a read never repairs data.
-    pub(crate) fn added_addresses(&self) -> std::future::Ready<Result<Vec<(String, String)>, ServerError>> {
+    pub(crate) fn added_addresses(
+        &self,
+    ) -> std::future::Ready<Result<Vec<(String, String)>, ServerError>> {
         std::future::ready(self.read_added_addresses())
     }
 
@@ -312,7 +325,8 @@ impl Mailer {
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
             Err(error) => return Err(record_unavailable(&self.sent_file, &error)),
         };
-        let addresses = text.lines()
+        let addresses = text
+            .lines()
             .filter(|line| !line.trim().is_empty())
             .map(|line| {
                 serde_json::from_str::<Sent>(line)
@@ -329,7 +343,9 @@ impl Mailer {
     }
 
     fn record(&self) -> Result<MutexGuard<'_, ()>, ServerError> {
-        self.record.lock().map_err(|error| record_unavailable(&self.sent_file, &error))
+        self.record
+            .lock()
+            .map_err(|error| record_unavailable(&self.sent_file, &error))
     }
 
     /// Who the record says sent `letter` for `operation`, if anyone.

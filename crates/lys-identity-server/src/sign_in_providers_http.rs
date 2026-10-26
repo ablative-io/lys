@@ -14,9 +14,19 @@ impl SignInProviders {
         url: impl reqwest::IntoUrl,
         body: Option<&Value>,
     ) -> Result<Value, ServerError> {
-        let url = url.into_url().map_err(|error| ServerError::SignInProvidersUnavailable { reason:error.to_string() })?;
-        let mut call = crate::waits::Call::begin("issuer", &url.origin().ascii_serialization(), method.as_str(), url.path())?;
-        call.until(self.send_untracked(method, url, body)).await
+        let url = url
+            .into_url()
+            .map_err(|error| ServerError::SignInProvidersUnavailable {
+                reason: error.to_string(),
+            })?;
+        let mut call = crate::waits::Call::begin(
+            "issuer",
+            &url.origin().ascii_serialization(),
+            method.as_str(),
+            url.path(),
+        )?;
+        call.until(self.send_untracked(method, url, body))
+            .await
             .map_err(|reason| ServerError::SignInProvidersUnavailable { reason })?
     }
 
@@ -98,25 +108,32 @@ impl SignInProviders {
             .append_pair("response_type", "code")
             .append_pair("redirect_uri", redirect)
             .append_pair("scope", field("scope"));
-        let mut call = crate::waits::Call::begin("issuer", &url.origin().ascii_serialization(), "prove provider", provider.name())?;
+        let mut call = crate::waits::Call::begin(
+            "issuer",
+            &url.origin().ascii_serialization(),
+            "prove provider",
+            provider.name(),
+        )?;
         let proving = async {
-        let answer = self.probe.get(url).send().await.map_err(|error| {
-            ServerError::SignInProvidersUnavailable {
-                reason: format!(
-                    "{} could not be reached to check the client id: {}",
-                    provider.name(),
-                    unreached(error)
-                ),
+            let answer = self.probe.get(url).send().await.map_err(|error| {
+                ServerError::SignInProvidersUnavailable {
+                    reason: format!(
+                        "{} could not be reached to check the client id: {}",
+                        provider.name(),
+                        unreached(error)
+                    ),
+                }
+            })?;
+            let status = answer.status();
+            if status.is_client_error() || status.is_server_error() {
+                let text = answer.text().await.unwrap_or_default();
+                return Err(refused(status.as_u16(), provider_words(&text)));
             }
-        })?;
-        let status = answer.status();
-        if status.is_client_error() || status.is_server_error() {
-            let text = answer.text().await.unwrap_or_default();
-            return Err(refused(status.as_u16(), provider_words(&text)));
-        }
-        Ok(())
+            Ok(())
         };
-        call.until(proving).await.map_err(|reason| ServerError::SignInProvidersUnavailable { reason })?
+        call.until(proving)
+            .await
+            .map_err(|reason| ServerError::SignInProvidersUnavailable { reason })?
     }
 }
 

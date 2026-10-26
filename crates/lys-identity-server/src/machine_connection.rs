@@ -60,21 +60,52 @@ async fn reconnect(
     local_control(&socket, &machine, b'R').await.map(Json)
 }
 
-async fn local_control(socket: &std::path::Path, machine: &str, command: u8) -> Result<Value, ServerError> {
+async fn local_control(
+    socket: &std::path::Path,
+    machine: &str,
+    command: u8,
+) -> Result<Value, ServerError> {
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
-    let failed = |words: String| ServerError::Runner { refusal:"runner_reconnect_control_failed".to_owned(), words };
+    let failed = |words: String| ServerError::Runner {
+        refusal: "runner_reconnect_control_failed".to_owned(),
+        words,
+    };
     let path = socket.with_extension("reconnect.sock");
-    let mut call = crate::waits::Call::begin("runner", &path.to_string_lossy(),
-        if command == b'S' { "connection status" } else { "reconnect" }, machine)?;
+    let mut call = crate::waits::Call::begin(
+        "runner",
+        &path.to_string_lossy(),
+        if command == b'S' {
+            "connection status"
+        } else {
+            "reconnect"
+        },
+        machine,
+    )?;
     let work = async {
-        let mut stream = tokio::net::UnixStream::connect(&path).await.map_err(|error| failed(error.to_string()))?;
-        stream.write_all(&[command]).await.map_err(|error| failed(error.to_string()))?;
+        let mut stream = tokio::net::UnixStream::connect(&path)
+            .await
+            .map_err(|error| failed(error.to_string()))?;
+        stream
+            .write_all(&[command])
+            .await
+            .map_err(|error| failed(error.to_string()))?;
         let mut bytes = Vec::new();
-        stream.take(1_048_576).read_to_end(&mut bytes).await.map_err(|error| failed(error.to_string()))?;
-        let value: Value = serde_json::from_slice(&bytes).map_err(|error| failed(format!(
-            "invalid control response: {:?} at {}:{}", error.classify(), error.line(), error.column()
-        )))?;
-        if let Some(reason) = value.get("refusal").and_then(Value::as_str) { return Err(failed(reason.to_owned())); }
+        stream
+            .take(1_048_576)
+            .read_to_end(&mut bytes)
+            .await
+            .map_err(|error| failed(error.to_string()))?;
+        let value: Value = serde_json::from_slice(&bytes).map_err(|error| {
+            failed(format!(
+                "invalid control response: {:?} at {}:{}",
+                error.classify(),
+                error.line(),
+                error.column()
+            ))
+        })?;
+        if let Some(reason) = value.get("refusal").and_then(Value::as_str) {
+            return Err(failed(reason.to_owned()));
+        }
         Ok(value)
     };
     call.until(work).await.map_err(failed)?

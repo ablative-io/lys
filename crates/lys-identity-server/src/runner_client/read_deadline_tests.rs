@@ -39,13 +39,25 @@ async fn an_unanswered_status_read_ends_on_its_caller_and_closes_its_socket()
         let (stream, _) = listener.accept().await?;
         let mut stream = BufReader::new(stream);
         let greeting = Greeting::fresh("0123456789abcdef0123456789abcdef");
-        stream.get_mut().write_all(format!("{}\n", greeting.line()).as_bytes()).await?;
+        stream
+            .get_mut()
+            .write_all(format!("{}\n", greeting.line()).as_bytes())
+            .await?;
         line.clear();
         stream.read_line(&mut line).await?;
-        assert!(matches!(lys_runner::protocol::verify_request(&line, &key, &greeting)
-            .map_err(std::io::Error::other)?, Act::Status { session:None }));
-        let refused = lys_runner::Answer::refusal(&lys_runner::RunnerError::refused("operation_refused", "the next ask reached the runner"));
-        stream.get_mut().write_all(format!("{}\n", lys_runner::protocol::reply_line(refused)).as_bytes()).await?;
+        assert!(matches!(
+            lys_runner::protocol::verify_request(&line, &key, &greeting)
+                .map_err(std::io::Error::other)?,
+            Act::Status { session: None }
+        ));
+        let refused = lys_runner::Answer::refusal(&lys_runner::RunnerError::refused(
+            "operation_refused",
+            "the next ask reached the runner",
+        ));
+        stream
+            .get_mut()
+            .write_all(format!("{}\n", lys_runner::protocol::reply_line(refused)).as_bytes())
+            .await?;
         Ok::<_, std::io::Error>(())
     });
     let state = std::sync::Arc::clone(&table.state);
@@ -63,13 +75,27 @@ async fn an_unanswered_status_read_ends_on_its_caller_and_closes_its_socket()
     entered.await?;
     let (mut peer, _) = quiet.accept().await?;
     assert!(peer.read(&mut [0; 4096]).await? > 0);
-    let call = crate::waits::snapshot()?.into_iter().find(|call| call.peer == peer_name).ok_or("runner wait absent")?;
+    let call = crate::waits::snapshot()?
+        .into_iter()
+        .find(|call| call.peer == peer_name)
+        .ok_or("runner wait absent")?;
     asking.abort();
     assert!(asking.await.unwrap_err().is_cancelled());
     assert_eq!(peer.read(&mut [0; 1]).await?, 0);
     drop(peer);
-    assert!(!crate::waits::snapshot()?.iter().any(|entry| entry.id == call.id));
-    let next = ask(&table.state, "machine", RunnerRecord::Socket { path:peer_name }, Act::Status { session:None }).await.unwrap_err();
+    assert!(
+        !crate::waits::snapshot()?
+            .iter()
+            .any(|entry| entry.id == call.id)
+    );
+    let next = ask(
+        &table.state,
+        "machine",
+        RunnerRecord::Socket { path: peer_name },
+        Act::Status { session: None },
+    )
+    .await
+    .unwrap_err();
     assert_eq!(next.name(), "operation_refused");
     worker.await??;
     dir.close()?;
@@ -80,7 +106,11 @@ async fn an_unanswered_status_read_ends_on_its_caller_and_closes_its_socket()
 async fn a_dialled_status_ticket_expires_only_when_its_own_caller_leaves()
 -> Result<(), Box<dyn Error>> {
     let table = crate::budgets_feed::entry_tests::fixture().await?;
-    table.state.runners.hub().with("machine", |held| held.bridges = 1)?;
+    table
+        .state
+        .runners
+        .hub()
+        .with("machine", |held| held.bridges = 1)?;
     let state = std::sync::Arc::clone(&table.state);
     let asking = tokio::spawn(async move {
         super::ask_exactly(

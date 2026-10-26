@@ -300,12 +300,10 @@ fn asking(source: &MonitorSource) -> Result<Asking, Refusal> {
             Some((header_name, header))
         }
     };
-    let client = crate::outbound::http()
-        .build()
-        .map_err(|error| {
-            let detail = format!("the client that asks the monitor could not be built: {error}");
-            refusal(SOURCE_UNAVAILABLE, &base, detail)
-        })?;
+    let client = crate::outbound::http().build().map_err(|error| {
+        let detail = format!("the client that asks the monitor could not be built: {error}");
+        refusal(SOURCE_UNAVAILABLE, &base, detail)
+    })?;
     Ok(Asking {
         client,
         base,
@@ -318,11 +316,16 @@ fn asking(source: &MonitorSource) -> Result<Asking, Refusal> {
 async fn ask(asking: &Asking, path: &str, body: Option<&Value>) -> Result<Value, Refusal> {
     let mut call = crate::waits::Call::begin("app", &asking.base, path, "seat import")
         .map_err(|error| refusal(SOURCE_UNAVAILABLE, path, error.to_string()))?;
-    call.until(ask_untracked(asking, path, body)).await
+    call.until(ask_untracked(asking, path, body))
+        .await
         .map_err(|reason| refusal(SOURCE_UNAVAILABLE, path, reason))?
 }
 
-async fn ask_untracked(asking: &Asking, path: &str, body: Option<&Value>) -> Result<Value, Refusal> {
+async fn ask_untracked(
+    asking: &Asking,
+    path: &str,
+    body: Option<&Value>,
+) -> Result<Value, Refusal> {
     let address = format!("{}{path}", asking.base);
     let method = if body.is_some() { "POST" } else { "GET" };
     let member = format!("{method} {address}");

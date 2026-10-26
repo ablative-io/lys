@@ -68,7 +68,9 @@ pub(crate) async fn after(after: Option<u64>) -> Result<(u64, Vec<Wait>), Server
 }
 
 fn unavailable(error: &dyn std::fmt::Display) -> ServerError {
-    ServerError::WaitsUnavailable { reason: error.to_string() }
+    ServerError::WaitsUnavailable {
+        reason: error.to_string(),
+    }
 }
 
 /// An entry held by the call itself, never by a detached worker.
@@ -89,34 +91,58 @@ impl Call {
         crate::wait_request::register(&close)?;
         let (cancelled, receiving) = watch::channel(None);
         let view = Wait {
-            id: id.clone(), service: service.to_owned(), peer: peer.to_owned(),
-            act: act.to_owned(), subject: subject.to_owned(), started_at: crate::session::now(),
+            id: id.clone(),
+            service: service.to_owned(),
+            peer: peer.to_owned(),
+            act: act.to_owned(),
+            subject: subject.to_owned(),
+            started_at: crate::session::now(),
         };
         let mut held = table().lock().map_err(|error| unavailable(&error))?;
         changed(&mut held);
         let order = held.order;
-        held.entries.insert(id.clone(), Entry { view, cancelled, close: Arc::clone(&close), order });
-        Ok(Self { id, cancelled: receiving, close })
+        held.entries.insert(
+            id.clone(),
+            Entry {
+                view,
+                cancelled,
+                close: Arc::clone(&close),
+                order,
+            },
+        );
+        Ok(Self {
+            id,
+            cancelled: receiving,
+            close,
+        })
     }
 
     /// Its cancellation identity.
     #[must_use]
-    pub fn id(&self) -> &str { &self.id }
+    pub fn id(&self) -> &str {
+        &self.id
+    }
 
     /// The same leave signal that a blocking transport checks and closes on.
     #[must_use]
-    pub fn closer(&self) -> Arc<Leave> { Arc::clone(&self.close) }
+    pub fn closer(&self) -> Arc<Leave> {
+        Arc::clone(&self.close)
+    }
 
     /// A person's cancellation reason, also readable by synchronous transports.
     #[must_use]
-    pub fn reason(&self) -> Option<String> { self.cancelled.borrow().clone() }
+    pub fn reason(&self) -> Option<String> {
+        self.cancelled.borrow().clone()
+    }
 
     /// Wait on work or a person's cancel. The losing future is dropped here.
     ///
     /// # Errors
     /// Returns the cancelling person's recorded words.
     pub async fn until<F: Future>(&mut self, work: F) -> Result<F::Output, String> {
-        if let Some(reason) = self.cancelled.borrow().clone() { return Err(reason); }
+        if let Some(reason) = self.cancelled.borrow().clone() {
+            return Err(reason);
+        }
         tokio::select! {
             biased;
             changed = self.cancelled.changed() => {
@@ -131,16 +157,24 @@ impl Call {
     ///
     /// # Errors
     /// Returns the peer's error or a person's cancel.
-    pub async fn run<T>(mut self, work: impl Future<Output = Result<T, String>>) -> Result<T, String> {
+    pub async fn run<T>(
+        mut self,
+        work: impl Future<Output = Result<T, String>>,
+    ) -> Result<T, String> {
         self.until(work).await?
     }
 }
 
 impl Drop for Call {
     fn drop(&mut self) {
-        if let Err(error) = self.close.leave() { tracing::error!("outbound_close_failed: {error}"); }
+        if let Err(error) = self.close.leave() {
+            tracing::error!("outbound_close_failed: {error}");
+        }
         match table().lock() {
-            Ok(mut held) => { held.entries.remove(&self.id); changed(&mut held); }
+            Ok(mut held) => {
+                held.entries.remove(&self.id);
+                changed(&mut held);
+            }
             Err(error) => tracing::error!("wait_withdrawal_failed: {error}"),
         }
     }
@@ -158,7 +192,10 @@ pub fn snapshot() -> Result<Vec<Wait>, ServerError> {
 fn listed(held: &Table) -> Vec<Wait> {
     let mut entries: Vec<_> = held.entries.values().collect();
     entries.sort_by_key(|entry| entry.order);
-    entries.into_iter().map(|entry| entry.view.clone()).collect()
+    entries
+        .into_iter()
+        .map(|entry| entry.view.clone())
+        .collect()
 }
 
 /// Cancel by a person's explicit word; the call answers under its own service name.
@@ -169,7 +206,9 @@ pub fn cancel(id: &str, by: &str) -> Result<(), ServerError> {
     let close = {
         let held = table().lock().map_err(|error| unavailable(&error))?;
         let entry = held.entries.get(id).ok_or(ServerError::WaitUnknown)?;
-        entry.cancelled.send_replace(Some(format!("cancelled by {by}")));
+        entry
+            .cancelled
+            .send_replace(Some(format!("cancelled by {by}")));
         Arc::clone(&entry.close)
     };
     close.leave().map_err(|error| unavailable(&error))

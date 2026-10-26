@@ -8,11 +8,6 @@
 //! crate holds sign-in, sessions, admission and the HTTP routes over it.
 
 pub mod accounts;
-mod outbound;
-mod wait_request;
-pub mod wait_turns;
-pub mod waits;
-pub mod waits_api;
 pub mod admission;
 mod agent_acts;
 mod agent_grants_api;
@@ -20,12 +15,17 @@ pub mod agent_pass;
 mod agent_pass_recovery;
 pub mod agent_pass_store;
 mod agent_seat;
+mod outbound;
 pub mod pair;
 pub mod pair_decide;
 pub mod pair_store;
 #[cfg(test)]
 #[path = "pair_tests.rs"]
 mod pair_tests;
+mod wait_request;
+pub mod wait_turns;
+pub mod waits;
+pub mod waits_api;
 
 pub mod agent_policy_api;
 pub mod agent_policy_store;

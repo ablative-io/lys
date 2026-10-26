@@ -160,8 +160,10 @@ impl IssuerSignIn {
             .and_then(|value| value.to_str().ok())
             .map(str::to_owned)
             .ok_or_else(|| failed("the sign-in service named no provider address"))?;
-        let xsrf = call.until(answer.text())
-            .await.map_err(failed)?
+        let xsrf = call
+            .until(answer.text())
+            .await
+            .map_err(failed)?
             .map_err(unreachable_issuer)?
             .trim()
             .to_owned();
@@ -276,7 +278,9 @@ impl IssuerSignIn {
             )
             .await
         {
-            Ok((answer, mut call)) if answer.status().is_client_error() && answer.status() != 429 => {
+            Ok((answer, mut call))
+                if answer.status().is_client_error() && answer.status() != 429 =>
+            {
                 match call.until(callback_refusal(answer)).await {
                     Ok(refusal) => Err(refusal),
                     Err(reason) => Err(failed(reason).into()),

@@ -258,18 +258,27 @@ async fn carry(State(proxy): State<Arc<Proxy>>, request: Request) -> Result<Resp
     let address = crate::sign_in_address::resolve(peer, request.headers(), &proxy.trusted)?;
     let headers = request_headers(request.headers())?;
     let (parts, body) = request.into_parts();
-    let mut call = crate::waits::Call::begin("issuer", &target.origin().ascii_serialization(), parts.method.as_str(), target.path())?;
-    let answer = call.until(proxy
-        .http
-        .request(parts.method, target)
-        .headers(headers)
-        .header(header::HOST, proxy.host.clone())
-        .header("x-forwarded-host", proxy.host.clone())
-        .header("x-forwarded-proto", proxy.public.scheme())
-        .header("x-forwarded-for", address.to_string())
-        .body(reqwest::Body::wrap_stream(body.into_data_stream()))
-        .send())
-        .await.map_err(|reason| refused(&reason))?
+    let mut call = crate::waits::Call::begin(
+        "issuer",
+        &target.origin().ascii_serialization(),
+        parts.method.as_str(),
+        target.path(),
+    )?;
+    let answer = call
+        .until(
+            proxy
+                .http
+                .request(parts.method, target)
+                .headers(headers)
+                .header(header::HOST, proxy.host.clone())
+                .header("x-forwarded-host", proxy.host.clone())
+                .header("x-forwarded-proto", proxy.public.scheme())
+                .header("x-forwarded-for", address.to_string())
+                .body(reqwest::Body::wrap_stream(body.into_data_stream()))
+                .send(),
+        )
+        .await
+        .map_err(|reason| refused(&reason))?
         .map_err(|error| {
             refused(&format!(
                 "the native issuer could not answer the request: {}",

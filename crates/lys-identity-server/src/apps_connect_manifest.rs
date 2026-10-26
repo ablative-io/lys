@@ -134,87 +134,94 @@ pub(super) async fn read(
     let origin = url.origin().ascii_serialization();
     let mut call = crate::waits::Call::begin("app", &origin, "manifest", &query.address)?;
     let reading = async {
-    let client = crate::outbound::http()
-        .redirect(reqwest::redirect::Policy::none())
-        .build()
-        .map_err(|error| unavailable(&format!("the manifest reader could not start: {error}")))?;
-    let mut answer = match client
-        .get(url)
-        .header(header::ACCEPT, "application/json")
-        .send()
-        .await
-    {
-        Ok(answer) => answer,
-        Err(error) => {
-            let said = words(&error);
-            return Ok(unread(
-                StatusCode::BAD_GATEWAY,
-                "manifest_not_answering",
-                &format!("Lys could not reach {origin}: {said}"),
-                json!({"error": said}),
-            ));
-        }
-    };
-    let status = answer.status();
-    if !status.is_success() {
-        return Ok(unread(
-            StatusCode::BAD_GATEWAY,
-            "manifest_answered_status",
-            &format!(
-                "the app at {origin} answered {} for its manifest",
-                status.as_u16()
-            ),
-            json!({"status": status.as_u16()}),
-        ));
-    }
-    let kind = answer
-        .headers()
-        .get(header::CONTENT_TYPE)
-        .and_then(|value| value.to_str().ok())
-        .and_then(|value| value.split(';').next())
-        .map(|value| value.trim().to_ascii_lowercase());
-    let mut bytes = Vec::new();
-    let mut whole = true;
-    loop {
-        match answer.chunk().await {
-            Ok(Some(chunk)) if bytes.len() + chunk.len() <= MOST_BYTES => {
-                bytes.extend_from_slice(&chunk);
-            }
-            Ok(Some(_over)) => {
-                whole = false;
-                break;
-            }
-            Ok(None) => break,
+        let client = crate::outbound::http()
+            .redirect(reqwest::redirect::Policy::none())
+            .build()
+            .map_err(|error| {
+                unavailable(&format!("the manifest reader could not start: {error}"))
+            })?;
+        let mut answer = match client
+            .get(url)
+            .header(header::ACCEPT, "application/json")
+            .send()
+            .await
+        {
+            Ok(answer) => answer,
             Err(error) => {
                 let said = words(&error);
                 return Ok(unread(
                     StatusCode::BAD_GATEWAY,
                     "manifest_not_answering",
-                    &format!("{origin} stopped answering partway through its manifest: {said}"),
+                    &format!("Lys could not reach {origin}: {said}"),
                     json!({"error": said}),
                 ));
             }
+        };
+        let status = answer.status();
+        if !status.is_success() {
+            return Ok(unread(
+                StatusCode::BAD_GATEWAY,
+                "manifest_answered_status",
+                &format!(
+                    "the app at {origin} answered {} for its manifest",
+                    status.as_u16()
+                ),
+                json!({"status": status.as_u16()}),
+            ));
         }
-    }
-    let manifest = if whole {
-        serde_json::from_slice::<Manifest>(&bytes).ok()
-    } else {
-        None
-    };
-    if let Some(manifest) = manifest {
-        return Ok(Json(ManifestRead { manifest, origin }).into_response());
-    }
-    let found = found(kind.as_deref(), bytes.len(), whole);
-    Ok(unread(
-        StatusCode::BAD_GATEWAY,
-        "manifest_not_a_manifest",
-        &format!("the app at {origin} answered with {found}, not a manifest"),
-        json!({"found": found}),
-    ))
+        let kind = answer
+            .headers()
+            .get(header::CONTENT_TYPE)
+            .and_then(|value| value.to_str().ok())
+            .and_then(|value| value.split(';').next())
+            .map(|value| value.trim().to_ascii_lowercase());
+        let mut bytes = Vec::new();
+        let mut whole = true;
+        loop {
+            match answer.chunk().await {
+                Ok(Some(chunk)) if bytes.len() + chunk.len() <= MOST_BYTES => {
+                    bytes.extend_from_slice(&chunk);
+                }
+                Ok(Some(_over)) => {
+                    whole = false;
+                    break;
+                }
+                Ok(None) => break,
+                Err(error) => {
+                    let said = words(&error);
+                    return Ok(unread(
+                        StatusCode::BAD_GATEWAY,
+                        "manifest_not_answering",
+                        &format!("{origin} stopped answering partway through its manifest: {said}"),
+                        json!({"error": said}),
+                    ));
+                }
+            }
+        }
+        let manifest = if whole {
+            serde_json::from_slice::<Manifest>(&bytes).ok()
+        } else {
+            None
+        };
+        if let Some(manifest) = manifest {
+            return Ok(Json(ManifestRead { manifest, origin }).into_response());
+        }
+        let found = found(kind.as_deref(), bytes.len(), whole);
+        Ok(unread(
+            StatusCode::BAD_GATEWAY,
+            "manifest_not_a_manifest",
+            &format!("the app at {origin} answered with {found}, not a manifest"),
+            json!({"found": found}),
+        ))
     };
     match call.until(reading).await {
         Ok(answer) => answer,
-        Err(reason) => Ok(unread(StatusCode::SERVICE_UNAVAILABLE, "manifest_not_answering", &reason, json!({}))),
+        Err(reason) => Ok(unread(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "manifest_not_answering",
+            &reason,
+            json!({}),
+        )),
     }
 }
 

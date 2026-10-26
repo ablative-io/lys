@@ -44,8 +44,10 @@ async fn a_quiet_letter_leaves_the_record_free_and_its_caller_closes_the_socket(
         accepted = listener.accept() => accepted?,
         result = &mut sending => return Err(format!("quiet SMTP answered: {result:?}").into()),
     };
-    let waiting = lys_identity_server::waits::snapshot()?.into_iter()
-        .find(|call| call.subject == "first").ok_or("quiet letter was not listed")?;
+    let waiting = lys_identity_server::waits::snapshot()?
+        .into_iter()
+        .find(|call| call.subject == "first")
+        .ok_or("quiet letter was not listed")?;
     // An independent operation must reach the same transport while the first is quiet.
     let second = letter("b@example.test");
     let mut other = Box::pin(sender.send_once("second", &second));
@@ -55,14 +57,21 @@ async fn a_quiet_letter_leaves_the_record_free_and_its_caller_closes_the_socket(
     };
     let sink = identity_contract::mail_sink::MailSink::start().await?;
     let mut answering = tokio::net::TcpStream::connect(("127.0.0.1", sink.port())).await?;
-    let (sent, relayed) = tokio::join!(other, tokio::io::copy_bidirectional(&mut second_socket, &mut answering));
+    let (sent, relayed) = tokio::join!(
+        other,
+        tokio::io::copy_bidirectional(&mut second_socket, &mut answering)
+    );
     assert!(sent?.sent);
     relayed?;
     drop(sending);
     assert_eq!(socket.read(&mut [0; 1]).await?, 0);
     assert!(sender.recorded_by("first", first.name()).await?.is_none());
     assert!(sender.recorded_by("second", second.name()).await?.is_some());
-    assert!(!lys_identity_server::waits::snapshot()?.iter().any(|call| call.id == waiting.id));
+    assert!(
+        !lys_identity_server::waits::snapshot()?
+            .iter()
+            .any(|call| call.id == waiting.id)
+    );
     // The departed operation's own claim is available again, too.
     let retry = sender.send_once("first", &first);
     let relay = async {
@@ -89,8 +98,16 @@ async fn the_same_letter_in_flight_is_sent_once() -> Outcome {
     );
     assert!(first?.sent);
     assert!(second?.sent);
-    assert_eq!(sink.next().await.ok_or("sink closed")?.to, ["once@example.test"]);
-    assert_eq!(std::fs::read_to_string(directory.path().join("sent"))?.lines().count(), 1);
+    assert_eq!(
+        sink.next().await.ok_or("sink closed")?.to,
+        ["once@example.test"]
+    );
+    assert_eq!(
+        std::fs::read_to_string(directory.path().join("sent"))?
+            .lines()
+            .count(),
+        1
+    );
     Ok(())
 }
 
@@ -101,7 +118,9 @@ async fn a_model_peer_close_is_a_named_refusal_with_a_status_and_body() -> Outco
     let request = Request::builder()
         .uri("/0123456789abcdef0123456789abcdef/openai/v1/responses")
         .body(Body::empty())?;
-    let mut forwarding = Box::pin(lys_identity_server::model_proxy_route::forward(&address, request));
+    let mut forwarding = Box::pin(lys_identity_server::model_proxy_route::forward(
+        &address, request,
+    ));
     let (mut socket, _) = tokio::select! {
         accepted = listener.accept() => accepted?,
         _ = &mut forwarding => return Err("quiet model answered".into()),
@@ -128,7 +147,9 @@ async fn a_model_call_dropped_by_its_caller_closes_the_quiet_peer() -> Outcome {
     let request = Request::builder()
         .uri("/0123456789abcdef0123456789abcdef/openai/v1/responses")
         .body(Body::empty())?;
-    let mut forwarding = Box::pin(lys_identity_server::model_proxy_route::forward(&address, request));
+    let mut forwarding = Box::pin(lys_identity_server::model_proxy_route::forward(
+        &address, request,
+    ));
     let (mut socket, _) = tokio::select! {
         accepted = listener.accept() => accepted?,
         _ = &mut forwarding => return Err("quiet model answered".into()),
@@ -138,16 +159,24 @@ async fn a_model_call_dropped_by_its_caller_closes_the_quiet_peer() -> Outcome {
         read = socket.read(&mut bytes) => assert!(read? > 0),
         _ = &mut forwarding => return Err("quiet model answered".into()),
     }
-    let waiting = lys_identity_server::waits::snapshot()?.into_iter()
-        .find(|call| call.peer == address).ok_or("quiet model was not listed")?;
+    let waiting = lys_identity_server::waits::snapshot()?
+        .into_iter()
+        .find(|call| call.peer == address)
+        .ok_or("quiet model was not listed")?;
     assert!(!waiting.subject.contains("0123456789abcdef0123456789abcdef"));
     drop(forwarding);
     assert_eq!(socket.read(&mut bytes).await?, 0);
-    assert!(!lys_identity_server::waits::snapshot()?.iter().any(|call| call.id == waiting.id));
+    assert!(
+        !lys_identity_server::waits::snapshot()?
+            .iter()
+            .any(|call| call.id == waiting.id)
+    );
     let next = Request::builder()
         .uri("/0123456789abcdef0123456789abcdef/openai/v1/responses")
         .body(Body::empty())?;
-    let mut forwarding = Box::pin(lys_identity_server::model_proxy_route::forward(&address, next));
+    let mut forwarding = Box::pin(lys_identity_server::model_proxy_route::forward(
+        &address, next,
+    ));
     let (mut socket, _) = tokio::select! {
         accepted = listener.accept() => accepted?,
         _ = &mut forwarding => return Err("the next model call did not connect".into()),
@@ -157,7 +186,10 @@ async fn a_model_call_dropped_by_its_caller_closes_the_quiet_peer() -> Outcome {
         _ = &mut forwarding => return Err("the next model call answered without its peer".into()),
     }
     drop(socket);
-    assert_eq!(forwarding.await.status(), axum::http::StatusCode::SERVICE_UNAVAILABLE);
+    assert_eq!(
+        forwarding.await.status(),
+        axum::http::StatusCode::SERVICE_UNAVAILABLE
+    );
     Ok(())
 }
 

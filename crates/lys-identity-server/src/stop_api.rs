@@ -51,10 +51,10 @@ mod exit;
 mod handles;
 mod runners;
 mod session_stop;
-pub(crate) use session_stop::asked;
-pub(crate) use session_stop::SessionAnswer;
 pub(crate) use handles::{end_handles, end_handles_as_owner};
 use runners::{confirmed, through_runners};
+pub(crate) use session_stop::SessionAnswer;
+pub(crate) use session_stop::asked;
 
 /// A stop to make.
 #[derive(Deserialize, utoipa::ToSchema)]
@@ -148,7 +148,10 @@ pub fn routes() -> Router<Arc<AppState>> {
         .route("/agents/{id}/stop", post(stop))
         .route("/agents/{id}/stops", get(stops))
         .route("/runtime/sessions/{id}/stop", post(session_stop::stop))
-        .route("/runtime/sessions/{id}/end-now", post(session_stop::end_now))
+        .route(
+            "/runtime/sessions/{id}/end-now",
+            post(session_stop::end_now),
+        )
         .merge(crate::cord_api::routes())
 }
 

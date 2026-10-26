@@ -227,7 +227,10 @@ fn settings(state: &AppState) -> Result<&SetupSettings, ServerError> {
 async fn turn(state: &AppState) -> Result<crate::wait_turns::Claim<'static>, ServerError> {
     static TURNS: std::sync::OnceLock<crate::wait_turns::Turns> = std::sync::OnceLock::new();
     let subject = settings(state)?.code_file.to_string_lossy().into_owned();
-    TURNS.get_or_init(crate::wait_turns::Turns::default).take(&subject).await
+    TURNS
+        .get_or_init(crate::wait_turns::Turns::default)
+        .take(&subject)
+        .await
 }
 
 fn pending(settings: &SetupSettings) -> Result<Option<PendingCode>, ServerError> {

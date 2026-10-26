@@ -14,7 +14,9 @@ pub(super) struct Control {
 }
 
 impl Control {
-    pub(super) fn connected(&self) -> bool { self.waiting > 0 }
+    pub(super) fn connected(&self) -> bool {
+        self.waiting > 0
+    }
 }
 
 struct Waiting<'a>(&'a DialHub, &'a str);
@@ -26,8 +28,10 @@ impl Drop for Waiting<'_> {
             if held.control.waiting == 0 && held.bridges == 0 {
                 for (_, reply) in held.delivered.drain() {
                     if let Err(error) = reply.send(Err(lys_runner::RunnerError::Unreachable {
-                        reason:"the runner's connection closed".to_owned(),
-                    })) { tracing::debug!("runner_close_receiver_left: {error}"); }
+                        reason: "the runner's connection closed".to_owned(),
+                    })) {
+                        tracing::debug!("runner_close_receiver_left: {error}");
+                    }
                 }
                 held.queue.clear();
             }
@@ -45,7 +49,9 @@ impl DialHub {
             let changed = notify.notified();
             tokio::pin!(changed);
             changed.as_mut().enable();
-            if self.with(machine, |held| held.bridges > 0 || !held.control.connected())? {
+            if self.with(machine, |held| {
+                held.bridges > 0 || !held.control.connected()
+            })? {
                 return Ok(());
             }
             changed.await;

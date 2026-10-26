@@ -237,15 +237,20 @@ pub(super) async fn ask_exactly(
     standing: bool,
 ) -> Result<Answer, ServerError> {
     let encoded = serde_json::to_value(&act).map_err(|error| ServerError::Runner {
-        refusal:"runner_request_malformed".to_owned(), words:error.to_string(),
+        refusal: "runner_request_malformed".to_owned(),
+        words: error.to_string(),
     })?;
     let peer = match &record {
         RunnerRecord::Socket { path } => path.as_str(),
         RunnerRecord::Lys => "local runner socket",
         RunnerRecord::Dialled { .. } => machine,
     };
-    let mut call = crate::waits::Call::begin("runner", peer,
-        encoded["act"].as_str().unwrap_or("request"), act.session().unwrap_or(machine))?;
+    let mut call = crate::waits::Call::begin(
+        "runner",
+        peer,
+        encoded["act"].as_str().unwrap_or("request"),
+        act.session().unwrap_or(machine),
+    )?;
     let leave = call.closer();
     let guard = LeaveOnDrop(Arc::clone(&leave));
     let (shared, asked_machine, asked_record) =
@@ -260,9 +265,12 @@ pub(super) async fn ask_exactly(
         Err(words) => {
             guard.0.leave()?;
             let outcome = waiting.await.map_err(|error| ServerError::Runner {
-                refusal:"runner_unreachable".to_owned(), words:error.to_string(),
+                refusal: "runner_unreachable".to_owned(),
+                words: error.to_string(),
             })?;
-            if let Err(error) = outcome { tracing::debug!("cancelled_runner_returned: {error}"); }
+            if let Err(error) = outcome {
+                tracing::debug!("cancelled_runner_returned: {error}");
+            }
             return Err(ServerError::Runner {
                 refusal: "runner_unreachable".to_owned(),
                 words,

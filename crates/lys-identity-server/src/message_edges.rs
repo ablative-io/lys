@@ -212,37 +212,42 @@ async fn read(
         .url
         .join("conversation/message-edges")
         .map_err(|error| unavailable(error.to_string()))?;
-    let mut call = crate::waits::Call::begin("app", &url.origin().ascii_serialization(), "message edges", &caller)?;
+    let mut call = crate::waits::Call::begin(
+        "app",
+        &url.origin().ascii_serialization(),
+        "message edges",
+        &caller,
+    )?;
     let reading = async {
-    let response = bridge
-        .client
-        .get(url)
-        .query(&query)
-        .header(header::COOKIE, cookie(headers, &bridge.cookie)?)
-        .send()
-        .await
-        .map_err(|error| unavailable(format!("the message service read failed: {error}")))?;
-    if !response.status().is_success() {
-        let status = response.status();
-        let refusal = read_json::<UpstreamRefusal>(response)
+        let response = bridge
+            .client
+            .get(url)
+            .query(&query)
+            .header(header::COOKIE, cookie(headers, &bridge.cookie)?)
+            .send()
+            .await
+            .map_err(|error| unavailable(format!("the message service read failed: {error}")))?;
+        if !response.status().is_success() {
+            let status = response.status();
+            let refusal = read_json::<UpstreamRefusal>(response)
             .await
             .map_err(|error| {
                 unavailable(format!(
                     "the message service answered HTTP {status} with an unreadable refusal: {error}"
                 ))
             })?;
-        return Err(EdgeError::Refused {
-            status,
-            reason: format!(
-                "the message service refused, {}: {}",
-                refusal.kind, refusal.reason
-            ),
-        });
-    }
-    let page: UpstreamPage = read_json(response)
-        .await
-        .map_err(|error| unavailable(format!("the message service page is unreadable: {error}")))?;
-    map_page(page, bridge, &caller, &visible).map(Json)
+            return Err(EdgeError::Refused {
+                status,
+                reason: format!(
+                    "the message service refused, {}: {}",
+                    refusal.kind, refusal.reason
+                ),
+            });
+        }
+        let page: UpstreamPage = read_json(response).await.map_err(|error| {
+            unavailable(format!("the message service page is unreadable: {error}"))
+        })?;
+        map_page(page, bridge, &caller, &visible).map(Json)
     };
     call.until(reading).await.map_err(unavailable)?
 }

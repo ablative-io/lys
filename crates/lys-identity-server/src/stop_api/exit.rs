@@ -13,13 +13,14 @@ pub(super) async fn end_within(
     driven: &Driven,
 ) -> Result<Answer, ServerError> {
     let liveness = crate::runner_client::ask(
-            state,
-            &driven.machine,
-            driven.runner.clone(),
-            Act::Liveness {
-                session: Some(driven.session.clone()),
-            },
-        ).await?;
+        state,
+        &driven.machine,
+        driven.runner.clone(),
+        Act::Liveness {
+            session: Some(driven.session.clone()),
+        },
+    )
+    .await?;
     let Answer::Liveness { sessions } = liveness else {
         return Err(ServerError::Runner {
             refusal: "runner_reply_malformed".to_owned(),
@@ -38,16 +39,14 @@ pub(super) async fn end_within(
             words: "an end's liveness answer names another session".to_owned(),
         });
     }
-    wait_for_reap(
-        crate::runner_client::ask(
-            state,
-            &driven.machine,
-            driven.runner.clone(),
-            Act::End {
-                session: driven.session.clone(),
-            },
-        ),
-    )
+    wait_for_reap(crate::runner_client::ask(
+        state,
+        &driven.machine,
+        driven.runner.clone(),
+        Act::End {
+            session: driven.session.clone(),
+        },
+    ))
     .await
 }
 
@@ -60,8 +59,8 @@ async fn wait_for_reap(
         Ok(answer)
     } else {
         Err(ServerError::Runner {
-            refusal:"runner_reply_malformed".to_owned(),
-            words:"an end was not answered with the runner's reap".to_owned(),
+            refusal: "runner_reply_malformed".to_owned(),
+            words: "an end was not answered with the runner's reap".to_owned(),
         })
     }
 }

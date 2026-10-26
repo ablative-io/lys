@@ -5,8 +5,7 @@ use super::answers;
 use std::error::Error;
 
 #[tokio::test]
-async fn every_runner_is_asked_before_unreachable_runners_close()
--> Result<(), Box<dyn Error>> {
+async fn every_runner_is_asked_before_unreachable_runners_close() -> Result<(), Box<dyn Error>> {
     let (sent, mut received) = tokio::sync::mpsc::unbounded_channel();
     let (closed, closing) = tokio::sync::watch::channel(false);
     let asking = tokio::spawn(answers(
@@ -27,11 +26,16 @@ async fn every_runner_is_asked_before_unreachable_runners_close()
                 if machine == "ready" {
                     Ok(Vec::new())
                 } else {
-                    closing.changed().await.map_err(|error| crate::error::ServerError::Runner {
-                        refusal:"fixture_closed".to_owned(), words:error.to_string(),
-                    })?;
+                    closing
+                        .changed()
+                        .await
+                        .map_err(|error| crate::error::ServerError::Runner {
+                            refusal: "fixture_closed".to_owned(),
+                            words: error.to_string(),
+                        })?;
                     Err(crate::error::ServerError::Runner {
-                        refusal:"runner_unreachable".to_owned(), words:format!("{machine}: its connection closed"),
+                        refusal: "runner_unreachable".to_owned(),
+                        words: format!("{machine}: its connection closed"),
                     })
                 }
             }
@@ -46,12 +50,7 @@ async fn every_runner_is_asked_before_unreachable_runners_close()
     assert!(answered[2].2.is_ok());
     for reading in &answered[..2] {
         assert_eq!(
-            reading
-                .2
-                .as_ref()
-                .err()
-                .ok_or("no close refusal")?
-                .name(),
+            reading.2.as_ref().err().ok_or("no close refusal")?.name(),
             "runner_unreachable"
         );
         assert!(

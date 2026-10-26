@@ -73,16 +73,21 @@ impl Oidc {
             .build()
             .map_err(|error| failed(&error))?;
         let api = config.sign_in_api();
-        let mut discovery = crate::waits::Call::begin("issuer", &api, "OIDC discovery", &config.issuer)?;
-        let text = discovery.until(async { http
-            .get(format!("{api}/.well-known/openid-configuration"))
-            .header(reqwest::header::ACCEPT, "application/json")
-            .send()
+        let mut discovery =
+            crate::waits::Call::begin("issuer", &api, "OIDC discovery", &config.issuer)?;
+        let text = discovery
+            .until(async {
+                http.get(format!("{api}/.well-known/openid-configuration"))
+                    .header(reqwest::header::ACCEPT, "application/json")
+                    .send()
+                    .await
+                    .map_err(|error| failed(&error))?
+                    .text()
+                    .await
+                    .map_err(|error| failed(&error))
+            })
             .await
-            .map_err(|error| failed(&error))?
-            .text()
-            .await
-            .map_err(|error| failed(&error)) }).await.map_err(|reason| failed(&reason))??;
+            .map_err(|reason| failed(&reason))??;
         drop(discovery);
         let mut document: serde_json::Value =
             serde_json::from_str(&text).map_err(|error| failed(&error))?;
@@ -108,9 +113,16 @@ impl Oidc {
         }
         let metadata: CoreProviderMetadata =
             serde_json::from_value(document).map_err(|error| failed(&error))?;
-        let mut fetching = crate::waits::Call::begin("issuer", metadata.jwks_uri().as_str(), "OIDC keys", &config.issuer)?;
-        let keys = fetching.until(CoreJsonWebKeySet::fetch_async(metadata.jwks_uri(), &http))
-            .await.map_err(|reason| failed(&reason))?
+        let mut fetching = crate::waits::Call::begin(
+            "issuer",
+            metadata.jwks_uri().as_str(),
+            "OIDC keys",
+            &config.issuer,
+        )?;
+        let keys = fetching
+            .until(CoreJsonWebKeySet::fetch_async(metadata.jwks_uri(), &http))
+            .await
+            .map_err(|reason| failed(&reason))?
             .map_err(|error| failed(&error))?;
         drop(fetching);
         let metadata = metadata.set_jwks(keys);
@@ -251,13 +263,21 @@ impl Oidc {
             Some(self.secret.clone()),
         )
         .set_redirect_uri(self.redirect.clone());
-        let mut exchanging = crate::waits::Call::begin("issuer", self.metadata.issuer().as_str(), "OIDC code exchange", self.client_id.as_str())?;
+        let mut exchanging = crate::waits::Call::begin(
+            "issuer",
+            self.metadata.issuer().as_str(),
+            "OIDC code exchange",
+            self.client_id.as_str(),
+        )?;
         let exchange = client
             .exchange_code(AuthorizationCode::new(code))
             .map_err(|error| failed(&error))?
             .set_pkce_verifier(verifier)
             .request_async(&self.http);
-        let answer = exchanging.until(exchange).await.map_err(|reason| failed(&reason))?
+        let answer = exchanging
+            .until(exchange)
+            .await
+            .map_err(|reason| failed(&reason))?
             .map_err(|error| match error {
                 // The issuer's own refusal is said; a transport failure is
                 // said without the issuer's address, which a browser reads.

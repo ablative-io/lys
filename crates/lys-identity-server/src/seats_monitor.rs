@@ -36,35 +36,88 @@ pub(crate) async fn stop_pty(
     caller: &str,
     operation: &str,
 ) -> Result<(bool, Vec<String>), ServerError> {
-    crate::stop_api::asked(state, driven, caller, "Stop asked; waiting for the process exit")?;
-    stop_operation(state, driven, caller, operation, OperationRequest::Notice { text:"/exit".to_owned() })
-        .await.map(|(_ended, notes)| (true, notes))
+    crate::stop_api::asked(
+        state,
+        driven,
+        caller,
+        "Stop asked; waiting for the process exit",
+    )?;
+    stop_operation(
+        state,
+        driven,
+        caller,
+        operation,
+        OperationRequest::Notice {
+            text: "/exit".to_owned(),
+        },
+    )
+    .await
+    .map(|(_ended, notes)| (true, notes))
 }
 
 pub(crate) async fn stop_session(
-    state: &Arc<AppState>, driven: &Driven, caller: &str, operation: &str,
+    state: &Arc<AppState>,
+    driven: &Driven,
+    caller: &str,
+    operation: &str,
 ) -> Result<(Ended, Vec<String>), ServerError> {
-    crate::stop_api::asked(state, driven, caller, "Stop asked; waiting for the process exit")?;
-    let answer = crate::runner_client::ask(state, &driven.machine, driven.runner.clone(),
-        Act::Liveness { session:Some(driven.session.clone()) }).await?;
+    crate::stop_api::asked(
+        state,
+        driven,
+        caller,
+        "Stop asked; waiting for the process exit",
+    )?;
+    let answer = crate::runner_client::ask(
+        state,
+        &driven.machine,
+        driven.runner.clone(),
+        Act::Liveness {
+            session: Some(driven.session.clone()),
+        },
+    )
+    .await?;
     let Answer::Liveness { sessions } = answer else {
-        return Err(ServerError::Runner { refusal:"runner_reply_malformed".to_owned(), words:"the stop's liveness read was not answered with liveness".to_owned() });
+        return Err(ServerError::Runner {
+            refusal: "runner_reply_malformed".to_owned(),
+            words: "the stop's liveness read was not answered with liveness".to_owned(),
+        });
     };
     let [live] = sessions.as_slice() else {
-        return Err(ServerError::Runner { refusal:"runner_reply_malformed".to_owned(), words:"the stop's liveness read did not name exactly one session".to_owned() });
+        return Err(ServerError::Runner {
+            refusal: "runner_reply_malformed".to_owned(),
+            words: "the stop's liveness read did not name exactly one session".to_owned(),
+        });
     };
     if live.session != driven.session {
-        return Err(ServerError::Runner { refusal:"runner_reply_malformed".to_owned(), words:"the stop's liveness read names another session".to_owned() });
+        return Err(ServerError::Runner {
+            refusal: "runner_reply_malformed".to_owned(),
+            words: "the stop's liveness read names another session".to_owned(),
+        });
     }
-    if live.ended { return Ok((reaped(state, driven).await?, Vec::new())); }
-    let request = if live.harness.managed { OperationRequest::Stop } else { OperationRequest::Notice { text:"/exit".to_owned() } };
+    if live.ended {
+        return Ok((reaped(state, driven).await?, Vec::new()));
+    }
+    let request = if live.harness.managed {
+        OperationRequest::Stop
+    } else {
+        OperationRequest::Notice {
+            text: "/exit".to_owned(),
+        }
+    };
     stop_operation(state, driven, caller, operation, request).await
 }
 
 async fn stop_operation(
-    state: &Arc<AppState>, driven: &Driven, caller: &str, operation: &str, request: OperationRequest,
+    state: &Arc<AppState>,
+    driven: &Driven,
+    caller: &str,
+    operation: &str,
+    request: OperationRequest,
 ) -> Result<(Ended, Vec<String>), ServerError> {
-    let text = match &request { OperationRequest::Notice { text } => Some(Digested::of(text)), _ => None };
+    let text = match &request {
+        OperationRequest::Notice { text } => Some(Digested::of(text)),
+        _ => None,
+    };
     let exit = Operation {
         operation: operation.to_owned(),
         session: driven.session.clone(),
