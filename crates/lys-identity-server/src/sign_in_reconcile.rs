@@ -355,7 +355,7 @@ async fn repair_one(
         _ => return Ok(Outcome::Waiting),
     };
     // Dead logins go only with the live one that replaces them.
-    if !commit(state, actor, person, &read.dead, new)? {
+    if !commit(state, actor, person, &read.dead, &new)? {
         return Ok(Outcome::Waiting);
     }
     let pruned = read.dead.len();
@@ -495,7 +495,7 @@ fn commit(
     actor: &Actor,
     seen: &Seen,
     dead: &[String],
-    new: String,
+    new: &str,
 ) -> Result<bool, ServerError> {
     let issuer = state.oidc.issuer().to_owned();
     with_directory(state, |directory| {
@@ -515,7 +515,7 @@ fn commit(
         // An account another record holds, a retired one included, is
         // never taken: an administrator moves it on People.
         if projection
-            .person_for(&LoginBinding::new(&issuer, &new)?)
+            .person_for(&LoginBinding::new(&issuer, new)?)
             .is_some()
         {
             return Ok(false);
@@ -525,8 +525,8 @@ fn commit(
         let mut events = Vec::new();
         for (step, change) in dead
             .iter()
-            .map(|subject| ("unbind", subject))
-            .chain(std::iter::once(("bind", &new)))
+            .map(|subject| ("unbind", subject.as_str()))
+            .chain(std::iter::once(("bind", new)))
             .enumerate()
             .map(|(at, (verb, subject))| {
                 let binding = LoginBinding::new(&issuer, subject)?;

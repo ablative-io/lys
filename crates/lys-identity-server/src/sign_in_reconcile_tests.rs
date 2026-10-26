@@ -1,3 +1,4 @@
+#![cfg(test)]
 //! Each judgement of DIRECTORY-124 R1, on the facts as the repair reads them.
 use std::str::FromStr;
 
