@@ -192,10 +192,10 @@ async fn seat_pty_ignoring_exit_keeps_the_stop_until_end_now() -> TestResult {
     // The harness prints ignored-exit when it reads the stop's /exit: the
     // event that the stop was delivered and is waiting on the process.
     let watcher = client(&table);
-    let watched = session.clone();
+    let ignoring = session.clone();
     let ignored = tokio::task::spawn_blocking(move || {
         watcher.ask(&Act::Wait {
-            session: watched,
+            session: ignoring,
             cursor: Some(0),
             pattern: "ignored-exit".to_owned(),
             regex: false,
