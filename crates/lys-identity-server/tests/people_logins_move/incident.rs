@@ -112,7 +112,7 @@ async fn october_26_link_email_and_google_each_refuse_becoming_dean() -> TestRes
         .post(
             &format!("/people/{source_id}/logins/move"),
             Some(&ada),
-            &move_body(&service, &dean, json!({"person":target_id}))?,
+            &move_body(&service, &dean, &json!({"person":target_id}))?,
         )
         .await?;
     assert_eq!(status, 200, "{moved}");

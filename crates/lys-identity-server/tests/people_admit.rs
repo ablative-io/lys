@@ -8,15 +8,15 @@
 //! nothing twice; a failed step is answered by its name with the steps that
 //! completed before it, and every answer carries one receipt.
 
+#[path = "people_admit/admit_only.rs"]
+mod admit_only;
 #[path = "people_admit/table.rs"]
 mod table;
 
+use admit_only::{CY, STEPS, accounts_for, people, table};
 use lys_identity::{OperationId, OrganisationId};
 use serde_json::{Value, json};
-use table::{
-    BEA, CY, STEPS, TestResult, accounts_for, admission_files, admit, people, signed_in_as, table,
-    table_with_mail,
-};
+use table::{BEA, TestResult, admission_files, admit, signed_in_as, table_with_mail};
 
 #[tokio::test]
 async fn one_act_registers_makes_the_account_binds_activates_and_grants() -> TestResult {

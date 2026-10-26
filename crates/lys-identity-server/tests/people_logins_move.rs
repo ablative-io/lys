@@ -50,7 +50,7 @@ async fn historical_email(
 fn move_body(
     service: &Service,
     added: &Value,
-    target: Value,
+    target: &Value,
 ) -> Result<Value, Box<dyn std::error::Error>> {
     Ok(
         json!({"operation":OperationId::generate()?.to_string(), "issuer":service.issuer.issuer(), "subject":added["subject"], "target":target}),
@@ -84,7 +84,7 @@ async fn moving_a_historical_mix_up_records_one_batch_keeps_grants_and_ends_the_
         .post(
             &path,
             Some(&ada),
-            &move_body(&service, &dean, json!({"display_name":"Annabel"}))?,
+            &move_body(&service, &dean, &json!({"display_name":"Annabel"}))?,
         )
         .await?;
     assert_eq!(status, 200, "{moved}");
@@ -165,7 +165,7 @@ async fn move_refusals_are_named_and_leave_both_records_and_sessions_alone() -> 
         .get(&format!("/identities/{person}"), Some(&ada))
         .await?;
     let target = json!({"person":annabel["person"]});
-    let body = move_body(&service, &dean, target)?;
+    let body = move_body(&service, &dean, &target)?;
     let mut missing = body.clone();
     missing["subject"] = json!("not-bound");
     let (_, refused) = service.post(&path, Some(&ada), &missing).await?;
@@ -250,7 +250,7 @@ async fn moving_a_login_to_its_current_person_is_same_target_and_writes_nothing(
         .post(
             &format!("/people/{person}/logins/move"),
             Some(&ada),
-            &move_body(&service, &dean, json!({"person":person}))?,
+            &move_body(&service, &dean, &json!({"person":person}))?,
         )
         .await?;
     assert_eq!(status, 409, "{refused}");
@@ -325,7 +325,7 @@ async fn an_existing_person_in_the_same_organisation_receives_only_the_login() -
         .post(
             &path,
             Some(&ada),
-            &move_body(&service, &dean, json!({"person":id}))?,
+            &move_body(&service, &dean, &json!({"person":id}))?,
         )
         .await?;
     assert_eq!(status, 200, "{moved}");
@@ -364,7 +364,7 @@ async fn moving_to_a_person_in_another_organisation_is_refused_before_any_write(
         .post(
             &format!("/people/{source}/logins/move"),
             Some(&ada),
-            &move_body(&service, &dean, json!({"person":other["person"]}))?,
+            &move_body(&service, &dean, &json!({"person":other["person"]}))?,
         )
         .await?;
     assert_eq!(status, 409, "{refused}");
