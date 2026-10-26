@@ -342,7 +342,7 @@ async fn an_administrator_withdraws_a_link_by_digest_and_the_persons_events_name
     assert_eq!(status, 200, "{key}");
     let key: [u8; 32] = unhex(key["ed25519"].as_str().ok_or("the public key")?)?
         .try_into()
-        .map_err(|_| "a 32-byte key")?;
+        .map_err(|bytes: Vec<u8>| format!("a 32-byte key, not {} bytes", bytes.len()))?;
     let signed = lys_identity::verify_event(
         &unhex(event["message"].as_str().ok_or("the signed event")?)?,
         &key,
