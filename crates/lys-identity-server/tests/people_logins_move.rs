@@ -390,12 +390,12 @@ async fn moving_to_a_person_in_another_organisation_is_refused_before_any_write(
 }
 
 #[tokio::test]
-async fn moving_the_configured_administrators_login_does_not_give_the_target_their_authority()
--> TestResult {
+async fn the_configured_administrators_login_is_never_moved_to_another_person() -> TestResult {
     let (service, _rauthy, ada) = table_with_mail(false).await?;
     let (_, me) = service.get("/me", Some(&ada)).await?;
     let person = me["person"]["id"].as_str().ok_or("the administrator")?;
-    let (status, moved) = service
+    let (_, before) = service.get("/directory/people", Some(&ada)).await?;
+    let (status, refused) = service
         .post(
             &format!("/people/{person}/logins/move"),
             Some(&ada),
@@ -406,21 +406,19 @@ async fn moving_the_configured_administrators_login_does_not_give_the_target_the
             }),
         )
         .await?;
-    assert_eq!(status, 200, "{moved}");
-    assert_eq!(moved["target_grants"], json!([]));
-    assert!(
-        !moved["source_grants"]
-            .as_array()
-            .ok_or("the retained grants")?
-            .is_empty()
-    );
-    let target = service
-        .sign_in_with("ada@example.test", "Analytical-Engine-1843")
-        .await?;
-    let (_, own) = service.get("/me", Some(&target)).await?;
-    assert_eq!(own["person"]["id"], moved["target"]);
-    let (status, refused) = service.get("/directory/people", Some(&target)).await?;
     assert_eq!(status, 403, "{refused}");
     assert_eq!(refused["refusal"], "NotAdmitted");
+    assert!(
+        refused["reason"]
+            .as_str()
+            .ok_or("the reason")?
+            .contains("administrator's own sign-in"),
+        "{refused}"
+    );
+    let (status, after) = service.get("/directory/people", Some(&ada)).await?;
+    assert_eq!(status, 200, "{after}");
+    assert_eq!(after, before);
+    let (_, own) = service.get("/me", Some(&ada)).await?;
+    assert_eq!(own["person"]["id"], person);
     Ok(())
 }

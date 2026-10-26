@@ -410,7 +410,8 @@ fn with_directory_grants_model<A, T>(
                 .ok_or(ServerError::NotAdmitted {
                     reason: "no administrator is set up yet, so there is no root authority to judge a grant under",
                 })?;
-        let root = crate::admission::Admission::administrator_person(&projection, &administrator)
+        let root = projection
+            .person_for(&administrator)
             .ok_or(ServerError::NotAdmitted {
                 reason: "the configured administrator's login is bound to no person, so there is no root authority to judge a grant under",
             })?;

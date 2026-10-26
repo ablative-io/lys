@@ -76,18 +76,26 @@ async fn account_mutation(active: bool, password: bool) -> TestResult {
     let users = rauthy.users()?;
     let bytes = stored(&service)?;
     let answer = service.post(path, Some(&cookie), &body).await?;
-    if active {
+    if active && !password {
+        assert_eq!(answer.0, 409, "{}", answer.1);
+        assert_eq!(answer.1["refusal"], "EmailChangeNeedsMail");
+        assert_eq!(
+            rauthy.users()?,
+            users,
+            "the refused change reached the issuer"
+        );
+        service
+            .sign_in_with("registered@example.test", "Original-Password-12345")
+            .await?;
+    } else if active {
         assert_eq!(answer.0, 200, "{}", answer.1);
         assert!(
             rauthy.request_count() > requests,
             "Active control did not reach issuer"
         );
-        let (email, secret) = if password {
-            ("registered@example.test", "Replacement-Password-23456")
-        } else {
-            ("changed@example.test", "Original-Password-12345")
-        };
-        service.sign_in_with(email, secret).await?;
+        service
+            .sign_in_with("registered@example.test", "Replacement-Password-23456")
+            .await?;
     } else {
         assert_eq!(
             rauthy.request_count(),
@@ -116,7 +124,7 @@ async fn registered_password_change_never_reaches_issuer() -> TestResult {
 }
 
 #[tokio::test]
-async fn active_email_change_reaches_issuer_and_new_email_signs_in() -> TestResult {
+async fn active_email_change_without_mail_is_refused_and_the_old_email_signs_in() -> TestResult {
     account_mutation(true, false).await
 }
 

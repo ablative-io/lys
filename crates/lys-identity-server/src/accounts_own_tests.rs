@@ -347,6 +347,10 @@ async fn both_mailed_codes_are_bound_to_the_person_replaced_and_spent() -> Resul
 #[tokio::test]
 async fn another_persons_held_email_is_refused_before_either_letter() -> Result {
     let (service, rauthy, gail, mut sink) = table_with_mail(true).await?;
+    rauthy.remember(
+        json!({"id": ADMINISTRATOR, "email": "ada@example.test", "email_verified": true,
+        "enabled": true, "language": "en", "roles": [], "user_values": {}}),
+    )?;
     let ada = service
         .sign_in(identity_contract::fake_issuer::Login {
             subject: ADMINISTRATOR.to_owned(),
@@ -364,9 +368,10 @@ async fn another_persons_held_email_is_refused_before_either_letter() -> Result 
         )
         .await?;
     assert_eq!(status, 200, "{admitted}");
-    let _added = sink.next().await.ok_or("Dean's admission letter")?;
+    // A fresh account's letter is the issuer's own, so Lys writes none.
+    assert_eq!(admitted["letter"]["by"], "issuer", "{admitted}");
     let before = rauthy.users()?;
-    let sent = std::fs::read(service.dir.path().join("letters-sent.jsonl"))?;
+    let sent = std::fs::read(service.dir.path().join("letters-sent.jsonl")).ok();
     let (status, refused) = service
         .post(
             "/me/account/email",
@@ -378,7 +383,7 @@ async fn another_persons_held_email_is_refused_before_either_letter() -> Result 
     assert_eq!(refused["refusal"], "EmailHeldByAnother");
     assert!(refused["reason"].as_str().ok_or("reason")?.contains("Dean"));
     assert_eq!(
-        std::fs::read(service.dir.path().join("letters-sent.jsonl"))?,
+        std::fs::read(service.dir.path().join("letters-sent.jsonl")).ok(),
         sent
     );
     assert!(sink.taken().is_none());

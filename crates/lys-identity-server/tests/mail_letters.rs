@@ -213,7 +213,7 @@ async fn a_person_whose_account_the_issuer_held_is_written_to_by_lys_once() -> T
     assert_eq!(
         letter.body,
         format!(
-            "Hello Bea, you have been added to Lys. Sign in at {} with {BEA}.",
+            "Hello Bea, you have been added to Lys. This sign-in opens your record and signs you in as Bea. Sign in at {} with {BEA}.",
             service.base
         )
     );

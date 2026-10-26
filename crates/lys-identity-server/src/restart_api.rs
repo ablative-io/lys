@@ -124,19 +124,14 @@ async fn restart(
         false,
     )
     .await?;
-    let Json(stopped) = perform(
+    // perform refuses an end answered without the session's exit.
+    perform(
         &state,
         (&driven, caller, "end"),
         Carried::default(),
         Act::End { session },
     )
     .await?;
-    if stopped["answer"]["kind"] != "ended" {
-        return Err(ServerError::Runner {
-            refusal: "runner_reply_malformed".to_owned(),
-            words: "the restart's end answered without the session's exit".to_owned(),
-        });
-    }
     crate::agent_pass::end_session(&state, &given.session)?;
     start_profile(
         &state,

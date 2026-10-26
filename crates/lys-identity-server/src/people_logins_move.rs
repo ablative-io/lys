@@ -169,6 +169,14 @@ pub(crate) async fn move_login(
         target,
         profile,
     };
+    // The install's administrator authority is the configured login's, so
+    // that login is never handed to another person: moving it would move
+    // the authority with it.
+    if state.admission.administrator_login()?.as_ref() == Some(&moving.binding) {
+        return Err(ServerError::NotAdmitted {
+            reason: "the administrator's own sign-in is never moved to another person, as it carries the install's administrator authority",
+        });
+    }
     // Admission and account changes take this same account hold before the
     // directory, so a session cannot slip across a completed move.
     let guard = match state.sign_in_providers.as_ref() {

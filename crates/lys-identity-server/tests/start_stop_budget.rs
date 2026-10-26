@@ -1,5 +1,7 @@
 #![cfg(test)]
-//! A runner that retains the harness past the end budget prevents another start.
+//! A stop whose runner closes before the process exits is named on the stop and
+//! in the stops record, and the lingering process refuses another start
+//! (HOME-040 R3: no end budget decides it).
 
 #[path = "support/runner_start.rs"]
 pub mod support;
@@ -7,7 +9,6 @@ pub mod support;
 use std::error::Error;
 use std::io::{BufRead, BufReader, Write};
 use std::os::unix::net::UnixListener;
-use std::sync::mpsc;
 
 use lys_runner::protocol::{Greeting, reply_line, verify_request};
 use lys_runner::{Act, Answer};
@@ -15,7 +16,8 @@ use serde_json::json;
 use support::{Table, operation};
 
 #[tokio::test(flavor = "multi_thread")]
-async fn stop_end_budget_records_lingering_pid_and_refuses_start() -> Result<(), Box<dyn Error>> {
+async fn a_runner_closing_on_the_end_is_named_and_the_lingering_pid_refuses_start()
+-> Result<(), Box<dyn Error>> {
     let table = Table::set().await?;
     let socket = table.dir.path().join("lingering.sock");
     let listener = UnixListener::bind(&socket)?;
@@ -43,14 +45,13 @@ async fn stop_end_budget_records_lingering_pid_and_refuses_start() -> Result<(),
         .await?;
     let key = table.server_key.public_key_bytes();
     let serving_session = session.clone();
-    let (release, released) = mpsc::channel();
-    let responder = respond(listener, key, serving_session, released);
+    let responder = respond(listener, key, serving_session);
     let stop = table
         .service
         .post(
             &format!("/agents/{}/stop", table.agent()),
             Some(&table.ada),
-            &json!({"operation": operation()?, "reason": "prove the end budget"}),
+            &json!({"operation": operation()?, "reason": "prove the runner close"}),
         )
         .await?;
     assert_eq!(stop.0, 200, "{}", stop.1);
@@ -61,12 +62,7 @@ async fn stop_end_budget_records_lingering_pid_and_refuses_start() -> Result<(),
     assert!(
         stop.1["sessions_refused"]
             .to_string()
-            .contains("process_lingering"),
-        "{}",
-        stop.1
-    );
-    assert!(
-        stop.1["sessions_refused"].to_string().contains("pid 4242"),
+            .contains("runner_unreachable"),
         "{}",
         stop.1
     );
@@ -81,7 +77,7 @@ async fn stop_end_budget_records_lingering_pid_and_refuses_start() -> Result<(),
     assert!(
         stops["stops"][0]["sessions_refused"]
             .to_string()
-            .contains("pid 4242"),
+            .contains("runner_unreachable"),
         "{stops}"
     );
     table.ok(&format!("/identities/{}/transitions", table.agent()),
@@ -101,7 +97,6 @@ async fn stop_end_budget_records_lingering_pid_and_refuses_start() -> Result<(),
             &json!({"profile_version": profile["profile"]["operation"], "machine": machine}),
         )
         .await?;
-    release.send(())?;
     responder
         .join()
         .map_err(|error| format!("runner responder panicked: {error:?}"))??;
@@ -120,11 +115,8 @@ fn respond(
     listener: UnixListener,
     key: [u8; 32],
     serving_session: String,
-    released: mpsc::Receiver<()>,
 ) -> std::thread::JoinHandle<Result<(), String>> {
     std::thread::spawn(move || -> Result<(), String> {
-        let mut pending = None;
-        let mut released = Some(released);
         let mut liveness = 0;
         let mut ends = 0;
         while liveness < 2 || ends < 1 {
@@ -178,24 +170,16 @@ fn respond(
                         }],
                     }
                 }
+                // The runner closes with the process still held: no reap.
                 Act::End { session } if session == serving_session => {
                     ends += 1;
-                    let released = released.take().ok_or("a second End was sent")?;
-                    pending = Some(std::thread::spawn(move || -> Result<(), String> {
-                        released.recv().map_err(|error| error.to_string())?;
-                        drop(stream);
-                        Ok(())
-                    }));
+                    drop(stream);
                     continue;
                 }
                 other => return Err(format!("unexpected runner request {other:?}")),
             };
             writeln!(writer, "{}", reply_line(answer)).map_err(|error| error.to_string())?;
         }
-        pending
-            .ok_or("no End was held")?
-            .join()
-            .map_err(|error| format!("held End panicked: {error:?}"))??;
         if liveness != 2 || ends != 1 {
             return Err(format!("liveness={liveness}, ends={ends}"));
         }

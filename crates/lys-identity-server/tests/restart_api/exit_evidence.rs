@@ -87,7 +87,7 @@ async fn an_end_without_exit_evidence_does_not_start_another_session() -> TestRe
         refused["reason"]
             .as_str()
             .ok_or("no refusal reason")?
-            .contains("the restart's end answered without the session's exit"),
+            .contains("the end answered without the session's exit"),
         "{refused}"
     );
     assert!(held.status(&session)?.ended.is_none());

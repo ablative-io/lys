@@ -48,6 +48,22 @@ async fn waits_are_oldest_first_and_an_administrators_cancel_names_them()
 }
 
 #[tokio::test]
+async fn cancelling_a_wait_nobody_holds_is_wait_unknown() -> Result<(), Box<dyn Error>> {
+    let (service, _) = seeded().await?;
+    let cookie = service.sign_in(login(ADMINISTRATOR)).await?;
+    let (status, refused) = service
+        .post(
+            "/waits/no-such-wait/cancel",
+            Some(&cookie),
+            &serde_json::json!({}),
+        )
+        .await?;
+    assert_eq!(status, 404, "{refused}");
+    assert_eq!(refused["refusal"], "wait_unknown");
+    Ok(())
+}
+
+#[tokio::test]
 async fn a_non_administrator_cannot_read_or_cancel_waits() -> Result<(), Box<dyn Error>> {
     let (service, _) = seeded().await?;
     let cookie = service.sign_in(login(BEA)).await?;

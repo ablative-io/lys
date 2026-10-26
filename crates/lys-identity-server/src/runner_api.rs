@@ -183,7 +183,7 @@ pub(crate) async fn perform(
                 let lys_runner::Answer::Ended { session, ended } = &answer else {
                     return Err(ServerError::Runner {
                         refusal: "runner_reply_malformed".to_owned(),
-                        words: "the end was not answered with a reap".to_owned(),
+                        words: "the end answered without the session's exit".to_owned(),
                     });
                 };
                 if session != &driven.session {

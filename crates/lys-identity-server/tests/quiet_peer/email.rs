@@ -142,8 +142,8 @@ async fn quiet_email_change_releases_admission_and_another_persons_change() -> O
             provider,
         )
         .await?;
-    let (status, answer) = service.get(&callback, Some(&browser)).await?;
-    assert_eq!(status, 200, "{answer}");
+    let (status, to, signed_in) = service.get_page(&callback, &browser).await?;
+    assert!(signed_in, "A's sign-in began no session: {status} {to:?}");
     let change = json!({"email":"b@next.test"});
     let second = service.post("/me/account/email", Some(&cookies[1]), &change);
     let mut sink = identity_contract::mail_sink::MailSink::start().await?;

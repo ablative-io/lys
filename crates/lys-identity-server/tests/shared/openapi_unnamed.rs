@@ -91,6 +91,14 @@ pub(crate) const OPEN_ANSWERS: &[(&str, &str)] = &[
         "answers the account as the issuer reports it after the change",
     ),
     (
+        "post /me/account/email/confirm",
+        "answers the account as the issuer reports it after the confirmed change",
+    ),
+    (
+        "post /people/{id}/logins/move",
+        "answers both persons, the batch's receipts and the grants each holds",
+    ),
+    (
         "post /me/account/password",
         "answers the account as the issuer reports it after the change",
     ),
@@ -277,6 +285,10 @@ pub(crate) const NO_BODY: &[(&str, &str)] = &[
     ("post /grants/agent-roots", "takes no body"),
     ("post /network/machines/{id}/retire", "takes no body"),
     ("post /sessions/{id}/end", "takes no body"),
+    (
+        "post /people/{id}/admission/withdraw",
+        "takes no body: the person is named in the path",
+    ),
     (
         "post /pair/{code}/decline",
         "takes no body: the four words are in the path",

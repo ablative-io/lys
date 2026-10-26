@@ -81,8 +81,28 @@ impl Table {
         resource: &str,
         starts_at: u64,
     ) -> Result<(String, String), Box<dyn Error>> {
-        let holder = &self.seeded.people[person];
         let receiver = &self.seeded.people[recipient];
+        self.lend_agent(
+            person,
+            (&receiver.agents[0].id.to_string(), &receiver.id.to_string()),
+            cookie,
+            resource,
+            starts_at,
+        )
+        .await
+    }
+
+    /// Ada issues `person` a root grant on `resource` that may be lent to
+    /// agents, and `person` lends it to `agent`, answering to `responsible`.
+    pub(super) async fn lend_agent(
+        &self,
+        person: usize,
+        (agent, responsible): (&str, &str),
+        cookie: &str,
+        resource: &str,
+        starts_at: u64,
+    ) -> Result<(String, String), Box<dyn Error>> {
+        let holder = &self.seeded.people[person];
         let root = json!({
             "operation": operation()?,
             "route": "api",
@@ -102,8 +122,8 @@ impl Table {
             "operation": operation()?,
             "route": "api",
             "source": source,
-            "recipient": receiver.agents[0].id.to_string(),
-            "responsible": receiver.id.to_string(),
+            "recipient": agent,
+            "responsible": responsible,
             "resource": { "kind": "doc", "id": resource },
             "relation": "beta",
             "pass_on": { "kind": "use_only" },

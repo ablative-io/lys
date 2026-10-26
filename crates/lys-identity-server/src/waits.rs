@@ -213,3 +213,7 @@ pub fn cancel(id: &str, by: &str) -> Result<(), ServerError> {
     };
     close.leave().map_err(|error| unavailable(&error))
 }
+
+#[cfg(test)]
+#[path = "waits_poison_tests.rs"]
+mod poison_tests;

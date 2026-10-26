@@ -7,7 +7,6 @@ pub mod support;
 use std::error::Error;
 use std::os::unix::fs::PermissionsExt;
 use std::sync::Arc;
-use std::time::{Duration, Instant};
 
 use lys_runner::operations::OperationState;
 use lys_runner::tracking::{CLAUDE_ADAPTER, Harness, Tracking};
@@ -157,12 +156,10 @@ async fn seat_pty_idle_stop_delivers_exit_and_observes_process_exit() -> TestRes
     let session = started(&table, false).await?;
     hook(&table, &session, "Stop")?;
     let operation = operation()?;
-    let before = Instant::now();
     let stopped = table
         .ok("/seats/waffles/stop", &json!({ "operation": operation }))
         .await?;
     assert_eq!(stopped["ended"], true, "{stopped}");
-    assert!(before.elapsed() < Duration::from_secs(30));
     let receipt = sessions(&table)?.outcome(&operation)?;
     assert_eq!(receipt.request, "notice");
     assert_eq!(
@@ -181,28 +178,47 @@ async fn seat_pty_idle_stop_delivers_exit_and_observes_process_exit() -> TestRes
             .iter()
             .any(|note| note
                 .as_str()
-                .is_some_and(|note| note.contains("stop_wait=30s"))),
+                .is_some_and(|note| note.contains("reaped the process after the stop"))),
         "{stopped}"
     );
     table.close()
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn seat_pty_ignoring_exit_is_ended_after_stop_wait_and_says_so() -> TestResult {
+async fn seat_pty_ignoring_exit_keeps_the_stop_until_end_now() -> TestResult {
     let table = seated(false).await?;
     let session = started(&table, false).await?;
     hook(&table, &session, "Stop")?;
-    let before = Instant::now();
-    let stopped = table
-        .ok("/seats/waffles/stop", &json!({ "operation": operation()? }))
-        .await?;
+    // The harness prints ignored-exit when it reads the stop's /exit: the
+    // event that the stop was delivered and is waiting on the process.
+    let watcher = client(&table);
+    let watched = session.clone();
+    let ignored = tokio::task::spawn_blocking(move || {
+        watcher.ask(&Act::Wait {
+            session: watched,
+            cursor: Some(0),
+            pattern: "ignored-exit".to_owned(),
+            regex: false,
+        })
+    });
+    let stop = json!({ "operation": operation()? });
+    let stopping = table.ok("/seats/waffles/stop", &stop);
+    let ending = async {
+        let seen = ignored.await??;
+        assert!(matches!(seen, Answer::Matched { .. }), "{seen:?}");
+        table
+            .ok(&format!("/runtime/sessions/{session}/end"), &json!({}))
+            .await
+    };
+    let (stopped, ended) = tokio::join!(stopping, ending);
+    let (stopped, ended) = (stopped?, ended?);
+    assert_eq!(ended["answer"]["kind"], "ended", "{ended}");
     assert_eq!(stopped["ended"], true, "{stopped}");
-    assert!(before.elapsed() >= Duration::from_secs(30));
     let notes = stopped["notes"].as_array().ok_or("no notes")?;
     assert!(
-        notes.iter().any(|note| note
+        notes.iter().all(|note| note
             .as_str()
-            .is_some_and(|note| note.contains("stop_wait=30s") && note.contains("Act::End"))),
+            .is_some_and(|note| !note.contains("stop_wait"))),
         "{stopped}"
     );
     assert!(!sessions(&table)?.liveness(Some(&session))?[0].alive);

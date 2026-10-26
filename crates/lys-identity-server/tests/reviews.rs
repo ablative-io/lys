@@ -123,21 +123,17 @@ mod tom_26_october {
                     .await?;
                 assert_eq!(status, 200, "{active}");
             }
+            let tom = table.seeded.people[0].id.to_string();
             for grant in 0..90 {
-                let (status, issued) = table
-                    .service
-                    .post(
-                        "/grants/roots",
-                        Some(&table.ada),
-                        &json!({
-                            "operation": operation()?, "route": "api", "holder": id,
-                            "resource": {"kind": "doc", "id": format!("replay-{number}-{grant}")},
-                            "relation": "beta", "pass_on": {"kind": "use_only"},
-                            "window": {"starts_at": 1_800_000_000 - 31 * 86_400, "ends_at": null},
-                        }),
+                table
+                    .lend_agent(
+                        0,
+                        (&id, &tom),
+                        &table.ada,
+                        &format!("replay-{number}-{grant}"),
+                        1_800_000_000 - 31 * 86_400,
                     )
                     .await?;
-                assert_eq!(status, 200, "{issued}");
             }
             agents.push(id);
         }

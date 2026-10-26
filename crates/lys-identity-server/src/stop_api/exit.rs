@@ -81,6 +81,7 @@ pub(super) fn read_refusals(
                     .filter(|report| {
                         report.what.starts_with("process_lingering:")
                             || report.what.starts_with("process_exit_unconfirmed:")
+                            || report.what.starts_with("runner_")
                     })
                     .map(|report| format!("{}: {}", tracked.session, report.what))
             })

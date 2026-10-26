@@ -4,7 +4,7 @@ use std::str::FromStr;
 use std::sync::Arc;
 
 use axum::Json;
-use axum::extract::{Path, State};
+use axum::extract::State;
 use axum::http::HeaderMap;
 use lys_identity::{OperationId, PersonId};
 use serde_json::{Value, json};
@@ -28,6 +28,7 @@ pub(crate) async fn steps(
         operation,
         email,
         issuer,
+        organisation,
         ..
     } = *act;
     let [register, account, bind, activate, _, _] = STEPS;
@@ -102,36 +103,86 @@ pub(crate) async fn steps(
         .map_err(at(account))?;
     receipt.done(account, None);
 
-    let bound = crate::routes::bind_login(
-        State(Arc::clone(state)),
-        headers.clone(),
-        Path(person.clone()),
-        body(json!({
-            "operation": derived(operation, bind),
-            "issuer": issuer,
-            "subject": subject,
-        }))
-        .map_err(at(bind))?,
-    )
-    .await
-    .map_err(at(bind))?;
-    receipt.done(bind, Some(("directory", bound.0.receipt.log.index)));
+    let within = Within {
+        state,
+        headers,
+        organisation,
+        person: &person,
+    };
+    let bound = within
+        .change(&derived(operation, bind), Some((issuer, &subject)))
+        .map_err(at(bind))?;
+    receipt.done(bind, Some(("directory", bound)));
 
-    let activated = crate::routes::transition(
-        State(Arc::clone(state)),
-        headers.clone(),
-        Path(person.clone()),
-        body(json!({
-            "operation": derived(operation, activate),
-            "transition": "activate",
-            "reason": "admitted in one act",
-        }))
-        .map_err(at(activate))?,
-    )
-    .await
-    .map_err(at(activate))?;
-    receipt.done(activate, Some(("directory", activated.0.receipt.log.index)));
+    let activated = within
+        .change(&derived(operation, activate), None)
+        .map_err(at(activate))?;
+    receipt.done(activate, Some(("directory", activated)));
     granted_and_written(state, headers, act, receipt, person, subject, made).await
+}
+
+/// The bind and activate steps of one admission. The caller was admitted
+/// to the act by organisation.admit on their own organisation, which the
+/// register step exercised, and these steps change only the person that
+/// step registered there, still Registered; so they are not judged again
+/// as the install's administrator, and an organisation's own administrator
+/// admits their people. A retried act replays its own leaves.
+struct Within<'a> {
+    state: &'a Shared,
+    headers: &'a HeaderMap,
+    organisation: lys_identity::OrganisationId,
+    person: &'a str,
+}
+
+impl Within<'_> {
+    /// Bind the login at the issuer and subject `login` names, or activate
+    /// when it names none, answering the directory index of the leaf.
+    fn change(&self, operation: &str, login: Option<(&str, &str)>) -> Result<u64, ServerError> {
+        let actor = crate::routes::signed_in(self.state, self.headers)?;
+        let operation = OperationId::from_str(operation)?;
+        let person = PersonId::from_str(self.person)?;
+        let binding = login
+            .map(|(issuer, subject)| lys_identity::LoginBinding::new(issuer, subject))
+            .transpose()?;
+        if let Some(binding) = &binding
+            && self.state.admission.administrator_login()?.as_ref() == Some(binding)
+        {
+            return Err(ServerError::NotAdmitted {
+                reason: "an admission never binds the administrator's own sign-in",
+            });
+        }
+        crate::routes::with_directory(self.state, |directory| {
+            let projection = directory.projection()?;
+            if projection.operation(operation).is_none() {
+                let registered = projection
+                    .record(lys_identity::IdentityId::Person(person))
+                    .is_some_and(|record| {
+                        record.state() == lys_identity::LifecycleState::Registered
+                    });
+                if !registered
+                    || projection.organisation_of(lys_identity::IdentityId::Person(person))
+                        != Some(self.organisation)
+                {
+                    return Err(ServerError::NotAdmitted {
+                        reason: "an admission binds and activates only the person it registered in the caller's own organisation",
+                    });
+                }
+            }
+            let now = crate::session::now();
+            let receipt = match binding {
+                Some(binding) => directory.bind_login(actor, operation, person, binding, now)?,
+                None => directory.transition(
+                    actor,
+                    operation,
+                    lys_identity::IdentityId::Person(person),
+                    lys_identity::Transition::Activate,
+                    "admitted in one act",
+                    now,
+                )?,
+            };
+            Ok(crate::directory_views::receipt_view(&receipt).log.index)
+        })
+    }
 }
 
 /// The person `email` is already admitted as, with their issuer subject:
