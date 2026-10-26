@@ -49,6 +49,13 @@ pub fn render(
     if let Some(membership) = &carried.membership {
         rendered["membership"] = membership.clone();
     }
+    // The installer and upgrade share this renderer. Only an absent key
+    // gets 30; a malformed written value remains for the service to refuse.
+    let mut reviews = carried.reviews.clone().unwrap_or_else(|| json!({}));
+    if let Some(settings) = reviews.as_object_mut() {
+        settings.entry("period_days").or_insert(json!(30));
+    }
+    rendered["reviews"] = reviews;
     if let Some(cap) = &carried.rights_bytes {
         rendered["provider"]["rights_bytes"] = cap.clone();
     }

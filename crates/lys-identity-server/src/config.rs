@@ -5,18 +5,21 @@
 //! start and held by openidconnect's `ClientSecret`, whose debug form is
 //! redacted. No diagnostic prints a secret value.
 
-use std::collections::BTreeSet;
 use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
 
 use lys_identity::LoginBinding;
-use lys_identity::grants::{Action, Model, Relation};
 use serde::Deserialize;
 
 use crate::error::ServerError;
 use crate::spicedb::SpiceDbSettings;
 
+mod membership;
+mod model;
 mod retired;
+mod reviews;
+pub use membership::MembershipSettings;
+pub use reviews::ReviewSettings;
 
 /// An issuer and subject pair as the configuration names it.
 #[derive(Debug, Clone, Deserialize)]
@@ -207,6 +210,8 @@ pub struct Config {
     /// not exist. Without it keeping a grant answers `ReviewsUnavailable`.
     #[serde(default)]
     pub reviews_dir: Option<PathBuf>,
+    /// The required, written cadence for checking grants.
+    pub reviews: ReviewSettings,
     /// The issuer's administration API the sign-in providers are set
     /// through. Without it the sign-in provider routes answer
     /// `SignInProvidersUnavailable`.
@@ -273,53 +278,6 @@ pub struct Config {
     pub membership: Option<MembershipSettings>,
 }
 
-/// The operator's bounds on channel membership pages: the most rows and
-/// bytes any page may ask for, and how long and how many continuation
-/// cursors are kept. No member has a default; each must be positive.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct MembershipSettings {
-    /// The most rows a page may ask for.
-    pub page_rows_max: u32,
-    /// The most bytes a page's rows may encode to, as JSON.
-    pub page_bytes_max: u32,
-    /// How long an issued cursor is kept, in seconds; after it the cursor is
-    /// refused `membership_cursor_expired`.
-    pub cursor_seconds: u64,
-    /// The most cursors kept at once; a page that would need one more is
-    /// refused `membership_cursors_full`.
-    pub cursors_max: u32,
-}
-
-impl MembershipSettings {
-    /// Refuse a setting of zero, by its member's name.
-    ///
-    /// # Errors
-    /// Refuses a zero membership setting, naming the setting.
-    pub fn validate(&self) -> Result<(), ServerError> {
-        for (name, value) in [
-            ("page_rows_max", u64::from(self.page_rows_max)),
-            ("page_bytes_max", u64::from(self.page_bytes_max)),
-            ("cursor_seconds", self.cursor_seconds),
-            ("cursors_max", u64::from(self.cursors_max)),
-        ] {
-            if value == 0 {
-                return Err(invalid(format!("membership.{name} is zero")));
-            }
-        }
-        Ok(())
-    }
-}
-
-/// The permission model as its file writes it: a version, and each relation
-/// with the actions it carries.
-#[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
-struct ModelFile {
-    version: u64,
-    relations: std::collections::BTreeMap<String, Vec<String>>,
-}
-
 /// `text` with the stores receipt keys written in where it lacks them, and
 /// whether any was: each names its file under `install/` in the folder the
 /// configuration at `path` is kept in, where the installer keeps them. The
@@ -375,6 +333,7 @@ impl Config {
         let text = std::fs::read_to_string(path)
             .map_err(|error| invalid(format!("{} could not be read: {error}", path.display())))?;
         retired::refuse(&text, path)?;
+        reviews::written(&text)?;
         let (text, written) = stores_keys_written(&text, path)?;
         let config: Self = serde_json::from_str(&text).map_err(|error| {
             if error
@@ -413,6 +372,7 @@ impl Config {
     /// administrator or link-audit logins, an invalid password policy, zero
     /// session lifetime or an empty client id.
     pub fn validate(&self) -> Result<(), ServerError> {
+        self.reviews.validate()?;
         if let Some(settings) = &self.message_service {
             crate::message_edges::validate(settings)?;
         }
@@ -495,34 +455,6 @@ impl Config {
     #[must_use]
     pub fn apps_dir(&self) -> PathBuf {
         self.grant_log_dir.with_file_name("apps")
-    }
-
-    /// The permission model, read from its file and checked. It is read only
-    /// when the apps log does not yet hold the app `lys`, to record it there
-    /// once; afterwards the log is the only source and the file is not read.
-    ///
-    /// # Errors
-    /// Refuses an unreadable model file, malformed model bytes or relations
-    /// and app kinds the identity model cannot accept.
-    pub fn grant_model(&self) -> Result<Model, ServerError> {
-        let path = &self.grant_model_file;
-        let text = std::fs::read_to_string(path)
-            .map_err(|error| invalid(format!("{} could not be read: {error}", path.display())))?;
-        let file: ModelFile = serde_json::from_str(&text)
-            .map_err(|error| invalid(format!("{} is not a model: {error}", path.display())))?;
-        let mut relations = Vec::with_capacity(file.relations.len());
-        for (relation, actions) in file.relations {
-            let actions = actions
-                .iter()
-                .map(|action| Action::new(action))
-                .collect::<Result<BTreeSet<_>, _>>()
-                .map_err(|error| invalid(format!("grant model: {error}")))?;
-            let relation = Relation::new(&relation)
-                .map_err(|error| invalid(format!("grant model: {error}")))?;
-            relations.push((relation, actions));
-        }
-        Model::new(file.version, relations)
-            .map_err(|error| invalid(format!("grant model: {error}")))
     }
 
     /// The client secret, read from its file. The value is never part of an error.

@@ -22,7 +22,7 @@ import { APPROVE, DECLINE, DRAFT_STATE } from '../requests/decision-words';
 const nameOf = (names: Map<string, string>, id: string | undefined): string =>
   id === undefined ? 'not answered' : names.get(id) ?? 'someone outside your view';
 
-function Decide({ draft, person, changed }: { draft: ProductDraft; person: string; changed: () => void }) {
+export function ProductDraftDecide({ draft, person, changed }: { draft: ProductDraft; person: string; changed: () => void }) {
   const path = '/product-drafts/' + encodeURIComponent(draft.id);
   const approve = useRoleChange<ProductDraftAnswer>('lys.pending.product-draft-approve.' + person + '.' + draft.id, path + '/approve', confirmsProduct(draft.id), changed);
   const refuse = useRoleChange<ProductDraftAnswer>('lys.pending.product-draft-refuse.' + person + '.' + draft.id, path + '/refuse', confirmsProduct(draft.id), changed);
@@ -62,7 +62,7 @@ function Row({ draft, names, apps, person, changed }: { draft: ProductDraft; nam
     <td data-label="Wants to" title={draft.words}>{draft.target.action} · {kindLabel(draft.target.kind)} {names.get(draft.target.id) ?? draft.target.id}{draft.mode ? <span className="sec"> · {modeWords(draft.mode)}</span> : null}</td>
     <td data-label="Holder">{nameOf(names, draft.holder)}<span className="sec"> · answered for by {nameOf(names, draft.responsible)}</span></td>
     <td className="sec" data-col="approvals" data-label="Approved by">{approvals.length ? approvals.map((approval) => nameOf(names, approval.by) + ', ' + clock(approval.at)).join('; ') : 'No approval yet'}</td>
-    <td data-label="State">{draft.state === 'waiting' ? <Decide draft={draft} person={person} changed={changed} /> : <Closed draft={draft} />}</td>
+    <td data-label="State">{draft.state === 'waiting' ? <ProductDraftDecide draft={draft} person={person} changed={changed} /> : <Closed draft={draft} />}</td>
   </tr>;
 }
 

@@ -25,7 +25,7 @@ fn state_of(record: &ProductDraftRecord) -> &'static str {
     }
 }
 
-fn view(record: &ProductDraftRecord) -> ProductDraftView {
+pub(super) fn view(record: &ProductDraftRecord) -> ProductDraftView {
     let created = &record.created;
     let request_digest = hex(&created.request_digest);
     let execution = record.closed.as_ref().map(|closed| match closed {

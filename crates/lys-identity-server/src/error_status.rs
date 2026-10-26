@@ -81,6 +81,7 @@ macro_rules! conflicting_refusals {
             | ServerError::StopReused { .. }
             | ServerError::PolicyVersionConflict { .. }
             | ServerError::GrantNotDue { .. }
+            | ServerError::AgentMismatch { .. }
             | ServerError::NoLiveSession { .. }
             | ServerError::RunnerAbsent { .. }
             | ServerError::AuthorityUnavailable { .. }

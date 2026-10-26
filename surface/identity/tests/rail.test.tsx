@@ -102,6 +102,23 @@ describe('rail and dock side (conformance 9.1)', () => {
     expect($('#rail a[data-nav="waiting"] .cnt')?.textContent).toBe('2');
   });
 
+  it('opens Home with Waiting on you focused and shares its count and list links', async () => {
+    const waiting = [{ kind: 'request', id: 'r1', asked_by: { id: 'sam', name: 'Sam' }, about: 'Sam asks for access', asked_at: '2026-10-26T01:00:00Z', can_decide: true }];
+    const { requests } = await mount('#/people', { ...SERVICE, '/waiting': ok({ waiting }) });
+    const before = requests.filter((path) => path === '/waiting').length;
+    await click($('#rail a[data-nav="waiting"]'));
+    expect(location.hash).toBe('#/?section=waiting-on-you');
+    const section = $('section[aria-label="Waiting on you"]');
+    expect(document.activeElement).toBe(section);
+    expect(requests.filter((path) => path === '/waiting')).toHaveLength(before + 1);
+    expect(section?.querySelector('[data-waiting="count"]')?.textContent).toBe($('#rail a[data-nav="waiting"] .cnt')?.textContent);
+    expect([...section?.querySelectorAll('footer a') ?? []].map((link) => [link.textContent, link.getAttribute('href')])).toEqual([
+      ['Requests', '#/requests'], ['Checks', '#/reviews'], ['Drafts', '#/access/drafts'],
+    ]);
+    await click($('#rail a[data-nav="waiting"]'));
+    expect(document.activeElement).toBe(section);
+  });
+
   it('palette act and backslash switch the dock side', async () => {
     await mount('#/people');
     expect(localStorage.getItem('iam.dock')).toBeNull();

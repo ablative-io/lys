@@ -393,6 +393,9 @@ pub(crate) fn open_count(state: &AppState, headers: &HeaderMap) -> Result<usize,
 pub(crate) fn waiting_on(
     state: &AppState,
     headers: &HeaderMap,
-) -> Result<Vec<(ProductDraftRecord, Option<String>)>, ServerError> {
-    listing::deciding(state, headers)
+) -> Result<Vec<(wire::ProductDraftView, Option<String>, u64)>, ServerError> {
+    Ok(listing::deciding(state, headers)?
+        .into_iter()
+        .map(|(record, name)| (listing::view(&record), name, record.created.recorded_at))
+        .collect())
 }

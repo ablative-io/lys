@@ -363,6 +363,7 @@ fn configured_service(
         variables_dir: Some(dir.path().join("variables")),
         schedules_dir: Some(dir.path().join("schedules")),
         reviews_dir: Some(dir.path().join("reviews")),
+        reviews: lys_identity_server::config::ReviewSettings { period_days: 30 },
         sign_in_providers,
         provider_origins: Some(ProviderOrigins {
             google: issuer.provider_base().to_owned(),

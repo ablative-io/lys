@@ -98,7 +98,7 @@ pub struct ApprovedPage {
 }
 
 /// One approval, as a person reads it: who and when, in seconds.
-#[derive(Debug, Serialize, utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 pub struct ApprovalView {
     /// The approving person.
     pub by: String,
@@ -107,7 +107,7 @@ pub struct ApprovalView {
 }
 
 /// lys-pass's `Execution`: how the product closed the draft.
-#[derive(Debug, Serialize, utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 #[serde(tag = "state", rename_all = "snake_case")]
 pub enum ExecutionView {
     /// The product applied the act and committed this receipt.
@@ -130,7 +130,7 @@ pub enum ExecutionView {
 
 /// A product draft as a signed-in person reads it: lys-pass's
 /// `ApprovedDraft` with where it stands and who decided it.
-#[derive(Debug, Serialize, utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 pub struct ProductDraftView {
     /// The draft's id.
     pub id: String,

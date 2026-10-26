@@ -164,7 +164,7 @@ impl Table {
             "listen": "127.0.0.1:0", "log_dir": path.join("log"),
             "log_origin": "example.test/lys/directory", "event_key_file": key_file,
             "issuer": issuer, "client_id": "settlement-test", "client_secret_file": path.join("client-secret"),
-            "redirect_url": "http://127.0.0.1/callback", "session_seconds": 300, "secure_cookie": false,
+            "redirect_url": "http://127.0.0.1/callback", "reviews": {"period_days": 30}, "session_seconds": 300, "secure_cookie": false,
             "link_audit_source": {"issuer": issuer, "subject": "audit"},
             "grant_log_dir": path.join("grants"), "grant_log_origin": "example.test/lys/grants",
             "grant_model_file": model_file,

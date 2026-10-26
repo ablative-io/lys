@@ -6,6 +6,21 @@ import { useRoleChange } from '../roles/useRoleChange';
 import { Act } from '../../shell/Act';
 import { APPROVE } from '../requests/decision-words';
 export interface Kept { grant: string; kept_by: string; note: string; operation: string; at: number; revision: number }
+/** `reviews_state.rs` `KeptBatch`: one recorded act, with a decision for every id shown. */
+export interface KeptBatch { agent: string; operation: string; kept: Kept[] }
+
+export function KeepAll({ agent, grants, person, changed }: { agent: string; grants: string[]; person: string; changed: () => void }) {
+  const change = useRoleChange<KeptBatch>('lys.pending.keep-all.' + person + '.' + agent, '/reviews/agents/' + encodeURIComponent(agent) + '/keep',
+    (answer, body) => {
+      const sent = body.grants;
+      return answer.agent === agent && answer.operation === body.operation && Array.isArray(sent)
+        && Array.isArray(answer.kept) && answer.kept.length === sent.length
+        && answer.kept.every((kept, index) => kept.grant === sent[index] && kept.kept_by === person
+          && kept.operation === body.operation && kept.note === '' && Number.isSafeInteger(kept.at) && kept.at >= 0);
+    }, changed);
+  return <><Act symbol="approve" name="Keep all" word="Keep all" tone="primary" disabled={change.blocked}
+    onClick={() => change.submit({ operation: operationId(), grants })} /><ChangeStatus change={change} /></>;
+}
 export function KeepGrant({ grant, person, changed }: { grant: string; person: string; changed: (answer: Kept) => void }) {
   const [open, setOpen] = useState(false);
   const [note, setNote] = useState('');

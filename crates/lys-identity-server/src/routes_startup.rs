@@ -27,6 +27,7 @@ pub(crate) async fn started_with_clock(
     say: Say,
     clock: lys_core::clock::ClockSource,
 ) -> Result<crate::stores_receipt::Started, ServerError> {
+    config.reviews.validate()?;
     let mut checked = crate::stores_receipt::Checked::before_open(config, &say)?;
     if !checked.refused.is_empty() {
         return crate::boot_refused::refused(config, checked.refused);
@@ -298,6 +299,7 @@ async fn make_state(
         runtime: primary.runtime.map(Mutex::new),
         service_accounts: primary.service_accounts.map(Mutex::new),
         reviews: primary.reviews.map(Mutex::new),
+        review_period_days: config.reviews.period_days,
         teams: primary.teams.map(Mutex::new),
         stops: primary.stops.map(Mutex::new),
         cord: Mutex::new(auxiliary.cord),

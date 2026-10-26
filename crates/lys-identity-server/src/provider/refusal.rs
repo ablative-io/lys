@@ -134,6 +134,7 @@ macro_rules! server_refusals {
             | ServerError::ReviewsUnavailable { .. }
             | ServerError::ReviewerOnly
             | ServerError::GrantNotDue { .. }
+            | ServerError::AgentMismatch { .. }
             | ServerError::ReviewReused { .. }
             | ServerError::DirectoryUnavailable { .. }
             | ServerError::SignInProvidersUnavailable { .. }

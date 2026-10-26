@@ -1,7 +1,8 @@
 //! The review routes: what the agents a person answers for hold now, so the
 //! person can decide what each still needs, and the decision to keep one.
 //!
-//! A grant is due for review when an agent holds it, the agent is not retired
+//! A grant is due after its written review period since its last keep (or
+//! the start of its window), when an agent holds it, the agent is not retired
 //! and the grant stands at the moment of asking: no grant on its ancestry is
 //! revoked, every grant on it has started and none has ended. The signed-in
 //! person is shown the grants of the agents that answer to them, and the root
@@ -17,10 +18,8 @@
 //! nothing, and the same operation in other words is refused by name.
 //! `GET /reviews` shows each due grant's latest decision to keep it.
 //!
-//! No next review date is answered. When a kept grant is due again is a
-//! renewal policy that is not decided, so no date is invented for it: a
-//! decision records that the grant was kept, by whom, when and why, and
-//! nothing more.
+//! A batch keeps exactly the due grants shown, as one durable act. A keep
+//! changes when a check is due, never the grant's permissions or window.
 
 use std::str::FromStr;
 use std::sync::{Arc, MutexGuard};
@@ -43,16 +42,16 @@ use crate::grant_sight::{is_root, sees};
 use crate::grants::{grant_view, with_grants};
 use crate::read_api::{own_person, person_summary};
 use crate::read_views::{AgentSummary, PersonSummary};
-use crate::reviews_state::Kept;
+use crate::reviews_state::{Kept, KeptBatch, period_passed};
 use crate::reviews_store::ReviewStore;
 use crate::routes::{AppState, signed_in};
-use crate::session::now;
 
 /// The review routes.
 pub fn routes() -> Router<Arc<AppState>> {
     Router::new()
         .route("/reviews", get(reviews))
         .route("/reviews/{grant}/keep", post(keep))
+        .route("/reviews/agents/{agent}/keep", post(keep_agent))
 }
 
 /// A decision to keep a grant, as the reviewer sends it.
@@ -61,6 +60,14 @@ pub fn routes() -> Router<Arc<AppState>> {
 pub(crate) struct KeepBody {
     operation: String,
     note: String,
+}
+
+/// Exactly the grants shown to the reviewer, under one operation.
+#[derive(Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct KeepAgentBody {
+    operation: String,
+    grants: Vec<String>,
 }
 
 /// The latest decision to keep a grant.
@@ -191,6 +198,12 @@ fn decisions(state: &AppState) -> Result<Option<MutexGuard<'_, ReviewStore>>, Se
     Ok(Some(store))
 }
 
+/// The one due rule read by reviews, waiting and the batch act.
+fn due(book: &GrantBook, record: &GrantRecord, kept: Option<&Kept>, at: u64, days: u32) -> bool {
+    stands(book, record, at)
+        && period_passed(record.grant().window().starts_at(), kept, at, days)
+}
+
 async fn reviews(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
@@ -213,12 +226,22 @@ pub(crate) fn review_view(
         } else {
             Some(own_person(judged.directory, &actor)?)
         };
-        let judged_at = now();
+        let judged_at = state.sessions.now()?;
         let kept = decisions(state)?;
         let book = judged.grants.book();
         let due = book
             .records()
-            .filter(|record| stands(book, record, judged_at))
+            .filter(|record| {
+                due(
+                    book,
+                    record,
+                    kept.as_ref().and_then(|store| {
+                        store.last_for(&record.grant().id().to_string())
+                    }),
+                    judged_at,
+                    state.review_period_days,
+                )
+            })
             .filter_map(|record| {
                 answering(judged.directory, record.grant().holder(), viewer).map(|held| {
                     Ok(DueView {
@@ -291,7 +314,7 @@ async fn keep(
         if !whole && IdentityId::Person(held.person) != caller {
             return Err(ServerError::ReviewerOnly);
         }
-        let at = now();
+        let at = state.sessions.now()?;
         let kept = Kept {
             grant: grant.to_string(),
             kept_by: caller.to_string(),
@@ -313,5 +336,94 @@ async fn keep(
             });
         }
         Ok(Json(store.keep(kept)?))
+    })
+}
+
+async fn keep_agent(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(agent): Path<String>,
+    body: Result<Json<KeepAgentBody>, JsonRejection>,
+) -> Result<Json<KeptBatch>, ServerError> {
+    let actor = signed_in(&state, &headers)?;
+    let Json(body) = body.map_err(|refused| ServerError::RequestMalformed {
+        reason: refused.body_text(),
+    })?;
+    let agent = AgentId::from_str(&agent)?;
+    let operation = OperationId::from_str(&body.operation)?.to_string();
+    let grants = body
+        .grants
+        .iter()
+        .map(|id| grant_id(id))
+        .collect::<Result<Vec<_>, _>>()?;
+    let distinct: std::collections::BTreeSet<_> = grants.iter().collect();
+    if grants.is_empty() || distinct.len() != grants.len() {
+        return Err(ServerError::RequestMalformed {
+            reason: "grants names at least one distinct grant shown to the reviewer".to_owned(),
+        });
+    }
+    with_grants(&state, |judged| {
+        let caller = crate::caller_admission::active_caller(judged.directory, &actor)?;
+        let pass = crate::routes::admitted_agent(judged.directory, &actor)?;
+        let whole = pass || is_root(caller, judged.root);
+        let reviewer = caller.to_string();
+        let mut store = decisions(&state)?.ok_or_else(|| ServerError::ReviewsUnavailable {
+            reason: "the configuration names no reviews_dir".to_owned(),
+        })?;
+        let shown: Vec<String> = grants.iter().map(ToString::to_string).collect();
+        if let Some(recorded) = store.already_batch(&operation, &agent.to_string(), &reviewer, &shown)? {
+            return Ok(Json(recorded));
+        }
+        let at = state.sessions.now()?;
+        let book = judged.grants.book();
+        let mut kept = Vec::with_capacity(grants.len());
+        for grant in grants {
+            let record = book
+                .record(grant)
+                .filter(|record| pass || sees(&judged, caller, record))
+                .ok_or(ServerError::GrantNotVisible)?;
+            if record.grant().holder() != IdentityId::Agent(agent) {
+                return Err(ServerError::AgentMismatch {
+                    grant: grant.to_string(),
+                    agent: agent.to_string(),
+                });
+            }
+            let held = answering(judged.directory, record.grant().holder(), None).ok_or_else(|| {
+                ServerError::GrantNotDue {
+                    grant: grant.to_string(),
+                    why: "the holding agent no longer answers to a person",
+                }
+            })?;
+            if !whole && caller != IdentityId::Person(held.person) {
+                return Err(ServerError::ReviewerOnly);
+            }
+            if !due(
+                book,
+                record,
+                store.last_for(&grant.to_string()),
+                at,
+                state.review_period_days,
+            ) {
+                return Err(ServerError::GrantNotDue {
+                    grant: grant.to_string(),
+                    why: "it does not stand or its review period has not passed since its last check",
+                });
+            }
+            kept.push(Kept {
+                grant: grant.to_string(),
+                kept_by: reviewer.clone(),
+                note: String::new(),
+                operation: operation.clone(),
+                at,
+                revision: judged.grants.revision(),
+            });
+        }
+        store
+            .keep_batch(KeptBatch {
+                operation,
+                agent: agent.to_string(),
+                kept,
+            })
+            .map(Json)
     })
 }

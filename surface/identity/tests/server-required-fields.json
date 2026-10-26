@@ -55,6 +55,7 @@
   "POST /product-drafts/{id}/refuse": ["operation", "reason", "request_digest"],
   "POST /requests": ["operation", "relation", "resource", "why"],
   "POST /requests/{id}/approve": ["note", "operation", "route"],
+  "POST /reviews/agents/{agent}/keep": ["grants", "operation"],
   "POST /reviews/{grant}/keep": ["note", "operation"],
   "POST /roles": ["goals", "grant_templates", "name", "note", "operation", "practice", "profile", "responsibilities"],
   "POST /roles/{id}/holders": ["holder", "operation"],

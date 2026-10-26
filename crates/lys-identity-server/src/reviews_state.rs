@@ -41,12 +41,42 @@ impl Kept {
     }
 }
 
+/// One recorded act keeping exactly the grants the reviewer saw.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct KeptBatch {
+    /// The operation naming the whole act.
+    pub operation: String,
+    /// The agent whose access was checked.
+    pub agent: String,
+    /// One decision per grant, in the order the reviewer sent them.
+    pub kept: Vec<Kept>,
+}
+
+/// A durable leaf: old single-grant decisions keep their original encoding.
+#[derive(Serialize, Deserialize)]
+#[serde(untagged)]
+pub(crate) enum Decision {
+    Single(Kept),
+    Batch(KeptBatch),
+}
+
+/// Whether the written period has elapsed since the last check. Giving is
+/// the first check; a future instant never counts as an elapsed period.
+#[must_use]
+pub fn period_passed(starts_at: u64, last: Option<&Kept>, at: u64, days: u32) -> bool {
+    let checked_at = last.map_or(starts_at, |kept| kept.at);
+    at.checked_sub(checked_at)
+        .is_some_and(|elapsed| elapsed >= u64::from(days) * 86_400)
+}
+
 /// The decisions as their log folds them, in the order recorded.
 #[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, from = "Records")]
 pub struct Held {
     /// The decisions.
     pub kept: Vec<Kept>,
+    batches: Vec<KeptBatch>,
     #[serde(skip)]
     index: Arc<Index>,
 }
@@ -55,12 +85,15 @@ pub struct Held {
 struct Index {
     operations: HashMap<String, usize>,
     grants: HashMap<String, usize>,
+    batches: HashMap<String, usize>,
 }
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Records {
     kept: Vec<Kept>,
+    #[serde(default)]
+    batches: Vec<KeptBatch>,
 }
 
 impl From<Records> for Held {
@@ -73,8 +106,12 @@ impl From<Records> for Held {
                 .or_insert(position);
             index.grants.insert(kept.grant.clone(), position);
         }
+        for (position, batch) in records.batches.iter().enumerate() {
+            index.batches.insert(batch.operation.clone(), position);
+        }
         Self {
             kept: records.kept,
+            batches: records.batches,
             index: Arc::new(index),
         }
     }
@@ -94,6 +131,50 @@ struct Sealed {
 }
 
 impl Held {
+    /// The whole act recorded under an operation, if it was a batch.
+    #[must_use]
+    pub fn batch(&self, operation: &str) -> Option<&KeptBatch> {
+        self.index
+            .batches
+            .get(operation)
+            .and_then(|position| self.batches.get(*position))
+    }
+
+    /// Fold a whole leaf atomically, validating it before changing the state.
+    pub(crate) fn hold_decision(&mut self, decision: Decision) -> Result<(), String> {
+        match decision {
+            Decision::Single(kept) => self.hold(kept),
+            Decision::Batch(batch) => {
+                let mut grants = std::collections::BTreeSet::new();
+                let Some(first) = batch.kept.first() else {
+                    return Err("a review batch contains at least one decision".to_owned());
+                };
+                if self.index.operations.contains_key(&batch.operation)
+                    || batch.kept.iter().any(|kept| {
+                        kept.operation != batch.operation
+                            || kept.kept_by != first.kept_by
+                            || !grants.insert(kept.grant.clone())
+                    })
+                {
+                    return Err("a review batch reuses an operation or is not one reviewer's distinct grants".to_owned());
+                }
+                let index = Arc::make_mut(&mut self.index);
+                index
+                    .operations
+                    .insert(batch.operation.clone(), self.kept.len());
+                index
+                    .batches
+                    .insert(batch.operation.clone(), self.batches.len());
+                for kept in &batch.kept {
+                    index.grants.insert(kept.grant.clone(), self.kept.len());
+                    self.kept.push(kept.clone());
+                }
+                self.batches.push(batch);
+                Ok(())
+            }
+        }
+    }
+
     /// The decision recorded under `operation`.
     #[must_use]
     pub fn operation(&self, operation: &str) -> Option<&Kept> {
@@ -143,7 +224,7 @@ impl Held {
         for (index, bytes) in (tail.from..).zip(&tail.leaves) {
             let kept = serde_json::from_slice(bytes)
                 .map_err(|error| format!("leaf {index} is not a review decision: {error}"))?;
-            self.hold(kept)
+            self.hold_decision(kept)
                 .map_err(|reason| format!("leaf {index}: {reason}"))?;
         }
         Ok(())

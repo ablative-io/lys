@@ -14,9 +14,10 @@
 //! Every entry is one the caller may decide; what they may only watch is not
 //! listed. A `request` entry carries the request exactly as `GET /requests`
 //! answers it and an `agent_draft` entry the draft exactly as `GET /drafts`
-//! answers it, the very views those lists built the entry from, so one read
-//! serves both the count and a decision in the row; a `product_draft` or
-//! `review` entry carries neither, as each is decided on its own page. Entries are oldest first by when they were asked, equal instants in
+//! answers it, the very views those lists built the entry from. An app action
+//! carries its product draft; a review row carries one agent's due grants.
+//! One read serves the count and every decision in its row. Entries are oldest
+//! first by when they were asked, equal instants in
 //! kind and then id order. A grant records no issue time of its own, so a
 //! review was asked when the grant was last kept, else when its window opened.
 //!
@@ -25,6 +26,7 @@
 //! nothing. The route answers the signed-in caller's own list and no one else's;
 //! a caller not signed in is refused outright.
 
+use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use axum::extract::{Query, State};
@@ -66,7 +68,7 @@ pub struct Asker {
 pub struct WaitingEntry {
     /// `request`, `agent_draft`, `product_draft` or `review`.
     pub kind: &'static str,
-    /// The request's, the draft's or the grant's id, as its own route names it.
+    /// The request's, draft's or holding agent's id.
     pub id: String,
     /// Who asked: the asker, the drafting agent, the drafting holder or the holding agent.
     pub asked_by: Asker,
@@ -82,6 +84,36 @@ pub struct WaitingEntry {
     /// An `agent_draft` entry's draft, exactly as `GET /drafts` answers it; absent on every other kind.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub draft: Option<Box<crate::drafts_list::DraftView>>,
+    /// An app action, exactly as `GET /product-drafts` answers it.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub product_draft: Option<Box<crate::product_drafts::wire::ProductDraftView>>,
+    /// One agent's due grants, exactly the ids a Keep all act sends.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub review: Option<Box<WaitingReview>>,
+}
+
+/// One agent's checks, counted as one line waiting on the person.
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
+pub struct WaitingReview {
+    /// The agent whose access is checked.
+    pub agent: crate::read_views::AgentSummary,
+    /// Each due grant, in grant id order.
+    pub grants: Vec<WaitingGrant>,
+    /// How many grants this one row checks.
+    pub count: usize,
+}
+
+/// What the reviewer needs to recognise one grant and its last check.
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
+pub struct WaitingGrant {
+    /// The exact id a keep will name.
+    pub id: String,
+    /// The access level.
+    pub relation: String,
+    /// The resource in the list's words.
+    pub resource: String,
+    /// Last keep, else the start of the window, in Unix seconds.
+    pub last_check: u64,
 }
 
 /// A part the caller may not read, in place of its entries.
@@ -194,6 +226,8 @@ fn dated(
             can_decide: true,
             request: None,
             draft: None,
+            product_draft: None,
+            review: None,
         },
     })
 }
@@ -289,25 +323,26 @@ fn agent_drafts(state: &AppState, headers: &HeaderMap) -> Result<Vec<Dated>, Ser
 fn product_drafts(state: &AppState, headers: &HeaderMap) -> Result<Vec<Dated>, ServerError> {
     crate::product_drafts::waiting_on(state, headers)?
         .into_iter()
-        .map(|(record, name)| {
-            let created = &record.created;
+        .map(|(draft, name, at)| {
             let who = name.as_deref().unwrap_or("Someone outside your view");
             let about = format!(
                 "{who} asks to {} {} through {}",
-                created.target.action,
-                resource_words(&created.target.kind, &created.target.id),
-                created.app
+                draft.target.action,
+                resource_words(&draft.target.kind, &draft.target.id),
+                draft.app
             );
-            dated(
+            let mut dated = dated(
                 "product_draft",
-                created.operation.to_string(),
+                draft.id.clone(),
                 Asker {
-                    id: created.holder.to_string(),
+                    id: draft.holder.clone(),
                     name,
                 },
                 about,
-                created.recorded_at,
-            )
+                at,
+            )?;
+            dated.entry.product_draft = Some(Box::new(draft));
+            Ok(dated)
         })
         .collect()
 }
@@ -319,30 +354,53 @@ fn reviews(state: &AppState, headers: &HeaderMap) -> Result<Vec<Dated>, ServerEr
         crate::read_api::own_person(directory.projection()?, &actor)
     })?
     .to_string();
-    view.due
-        .into_iter()
-        .filter(|due| due.reviewer.id == person)
-        .map(|due| {
+    let mut groups: BTreeMap<String, WaitingReview> = BTreeMap::new();
+    for due in view.due.into_iter().filter(|due| due.reviewer.id == person) {
+        let last_check = due
+            .last_kept
+            .as_ref()
+            .map_or(due.grant.window.starts_at, |kept| kept.at);
+        let group = groups
+            .entry(due.agent.id.clone())
+            .or_insert_with(|| WaitingReview {
+                agent: due.agent,
+                grants: Vec::new(),
+                count: 0,
+            });
+        group.grants.push(WaitingGrant {
+            id: due.grant.id,
+            relation: due.grant.relation,
+            resource: resource_words(&due.grant.resource.kind, &due.grant.resource.id),
+            last_check,
+        });
+        group.count += 1;
+    }
+    groups.into_values()
+        .map(|group| {
+            let at = group
+                .grants
+                .iter()
+                .map(|grant| grant.last_check)
+                .min()
+                .ok_or_else(|| ServerError::ReviewsUnavailable {
+                    reason: "a review row has no grants".to_owned(),
+                })?;
             let about = format!(
-                "Check the access {} holds: {} on {}",
-                due.agent.display_name,
-                due.grant.relation,
-                resource_words(&due.grant.resource.kind, &due.grant.resource.id)
+                "Check the access {} holds: {} grants",
+                group.agent.display_name, group.count
             );
-            let at = due
-                .last_kept
-                .as_ref()
-                .map_or(due.grant.window.starts_at, |kept| kept.at);
-            dated(
+            let mut dated = dated(
                 "review",
-                due.grant.id,
+                group.agent.id.clone(),
                 Asker {
-                    id: due.agent.id,
-                    name: Some(due.agent.display_name),
+                    id: group.agent.id.clone(),
+                    name: Some(group.agent.display_name.clone()),
                 },
                 about,
                 at,
-            )
+            )?;
+            dated.entry.review = Some(Box::new(group));
+            Ok(dated)
         })
         .collect()
 }

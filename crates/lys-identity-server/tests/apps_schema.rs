@@ -277,7 +277,7 @@ fn config(dir: &Path, model: &str) -> Result<Config, Box<dyn Error>> {
         "redirect_url": "https://lys.example.test/callback",
         "administrator": {"issuer": "https://issuer.example.test", "subject": "ada"},
         "link_audit_source": {"issuer": "https://issuer.example.test", "subject": "audit"},
-        "session_seconds": 600,
+        "reviews": {"period_days": 30}, "session_seconds": 600,
         "secure_cookie": false,
         "grant_log_dir": dir.join("grant-log"),
         "grant_log_origin": "example.test/lys/grants",

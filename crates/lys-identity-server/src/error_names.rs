@@ -155,6 +155,7 @@ fn server(error: &ServerError) -> &str {
         ServerError::ReviewsUnavailable { .. } => "ReviewsUnavailable",
         ServerError::ReviewerOnly => "ReviewerOnly",
         ServerError::GrantNotDue { .. } => "GrantNotDue",
+        ServerError::AgentMismatch { .. } => "AgentMismatch",
         ServerError::ReviewReused { .. } => "ReviewReused",
         ServerError::DirectoryUnavailable { .. } => "DirectoryUnavailable",
         ServerError::OrganisationBootRefused { .. } => "OrganisationBootRefused",

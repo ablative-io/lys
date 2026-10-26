@@ -1,6 +1,6 @@
 //! The review decisions as they are kept: a leaf store of their own, one
-//! leaf for each decision to keep a grant, written before the decision is
-//! answered. A leaf is stored whole or not at all.
+//! leaf for each act: a single decision or a batch of decisions, written
+//! before the act is answered. A leaf is stored whole or not at all.
 //!
 //! An append that fails leaves its outcome unknown. It is settled by opening
 //! the leaf store again and reading what it holds, before anything else is
@@ -26,7 +26,7 @@ use lys_log_store::{
 
 use crate::config::Config;
 use crate::error::ServerError;
-use crate::reviews_state::{DOMAIN, Held, Kept};
+use crate::reviews_state::{DOMAIN, Decision, Held, Kept, KeptBatch};
 
 /// How the leaf store is opened again after an append whose outcome is not known.
 pub type Reopen<S> = Box<dyn Fn() -> StoreResult<S> + Send>;
@@ -178,15 +178,18 @@ impl<S: LeafStore> ReviewStore<S> {
     /// Append one decision as one leaf. A failed append is settled by
     /// reading back: the decision is kept only if the leaf store holds
     /// exactly it.
-    fn append(&mut self, kept: Kept) -> Result<(), ServerError> {
-        let bytes = serde_json::to_vec(&kept).map_err(unavailable)?;
+    fn append(&mut self, decision: Decision) -> Result<(), ServerError> {
+        let bytes = serde_json::to_vec(&decision).map_err(unavailable)?;
         let index = self.log.len();
         let Err(failure) = self.log.append(&bytes) else {
-            if let Err(reason) = self.held.hold(kept) {
+            if let Err(reason) = self.held.hold_decision(decision) {
                 self.uncertain = true;
                 return Err(unavailable(reason));
             }
             self.since_snapshot += 1;
+            // The decision is the one leaf above; a snapshot only folds what
+            // the log already holds, so a batch pays its debt like any act and
+            // reopening never replays more than SNAPSHOT_EVERY leaves.
             if self.since_snapshot >= SNAPSHOT_EVERY.get() {
                 self.write_snapshot();
             }
@@ -208,6 +211,72 @@ impl<S: LeafStore> ReviewStore<S> {
         &self.held.kept
     }
 
+    /// Durable review acts in the log: each leaf was one write and flush,
+    /// including a whole batch. Retries add no leaf.
+    #[must_use]
+    pub fn write_count(&self) -> u64 {
+        self.log.len()
+    }
+
+    /// Answer an already recorded batch without writing, or refuse an
+    /// operation used by another reviewer, agent, list or single keep.
+    ///
+    /// # Errors
+    /// Refuses an unsettled store or a reused review operation.
+    pub fn already_batch(
+        &mut self,
+        operation: &str,
+        agent: &str,
+        reviewer: &str,
+        grants: &[String],
+    ) -> Result<Option<KeptBatch>, ServerError> {
+        self.settle()?;
+        if let Some(batch) = self.held.batch(operation) {
+            if batch.agent == agent
+                && batch.kept.iter().all(|kept| kept.kept_by == reviewer)
+                && batch.kept.iter().map(|kept| &kept.grant).eq(grants.iter())
+            {
+                return Ok(Some(batch.clone()));
+            }
+        } else if self.held.operation(operation).is_none() {
+            return Ok(None);
+        }
+        Err(ServerError::ReviewReused {
+            operation: operation.to_owned(),
+        })
+    }
+
+    /// Record the whole batch as one leaf, hence one atomic write and one
+    /// flush. Memory advances only after its durable answer or readback.
+    ///
+    /// # Errors
+    /// Refuses a reused operation, malformed batch or durable write failure.
+    pub fn keep_batch(&mut self, batch: KeptBatch) -> Result<KeptBatch, ServerError> {
+        let grants: Vec<String> = batch.kept.iter().map(|kept| kept.grant.clone()).collect();
+        let reviewer = batch
+            .kept
+            .first()
+            .ok_or_else(|| unavailable("an empty review batch"))?
+            .kept_by
+            .clone();
+        if let Some(recorded) =
+            self.already_batch(&batch.operation, &batch.agent, &reviewer, &grants)?
+        {
+            return Ok(recorded);
+        }
+        // Validate on a copy before the write; a refused fold writes nothing.
+        let mut checked = self.held.clone();
+        checked
+            .hold_decision(Decision::Batch(batch.clone()))
+            .map_err(unavailable)?;
+        let operation = batch.operation.clone();
+        self.append(Decision::Batch(batch))?;
+        self.held
+            .batch(&operation)
+            .cloned()
+            .ok_or_else(|| unavailable(format!("batch `{operation}` was not recorded")))
+    }
+
     /// The latest decision to keep `grant`.
     pub fn last_for(&self, grant: &str) -> Option<&Kept> {
         self.held.last_for(grant)
@@ -221,6 +290,11 @@ impl<S: LeafStore> ReviewStore<S> {
     /// an uncertain decision append that cannot be settled.
     pub fn already(&mut self, kept: &Kept) -> Result<Option<Kept>, ServerError> {
         self.settle()?;
+        if self.held.batch(&kept.operation).is_some() {
+            return Err(ServerError::ReviewReused {
+                operation: kept.operation.clone(),
+            });
+        }
         match self.held.operation(&kept.operation) {
             None => Ok(None),
             Some(recorded) if recorded.same_words(kept) => Ok(Some(recorded.clone())),
@@ -242,7 +316,7 @@ impl<S: LeafStore> ReviewStore<S> {
             return Ok(recorded);
         }
         let operation = kept.operation.clone();
-        self.append(kept)?;
+        self.append(Decision::Single(kept))?;
         self.held
             .operation(&operation)
             .cloned()

@@ -23,6 +23,35 @@ fn deployment() -> Result<(tempfile::TempDir, DeploymentConfig), Box<dyn Error>>
 }
 
 #[test]
+fn review_period_is_written_as_30_on_install_and_upgrade_and_preserves_a_named_period()
+-> Result<(), Box<dyn Error>> {
+    let (folder, config) = deployment()?;
+    let layout = Layout::at(folder.path().to_path_buf());
+    let mut fresh = render(&layout, &config, &Carried::default(), false);
+    assert_eq!(fresh["reviews"]["period_days"], 30);
+    for (reviews, period) in [
+        (None, json!(30)),
+        (Some(json!({})), json!(30)),
+        (Some(json!({"period_days": 7})), json!(7)),
+        (Some(json!({"period_days": "malformed"})), json!("malformed")),
+    ] {
+        fresh.as_object_mut().ok_or("configuration")?.remove("reviews");
+        if let Some(reviews) = reviews {
+            fresh["reviews"] = reviews;
+        }
+        std::fs::write(layout.service_config(), serde_json::to_vec(&fresh)?)?;
+        std::fs::set_permissions(
+            layout.service_config(),
+            std::os::unix::fs::PermissionsExt::from_mode(0o600),
+        )?;
+        let earlier = carried(&layout)?.ok_or("earlier install")?;
+        let upgrade = render(&layout, &config, &earlier, false);
+        assert_eq!(upgrade["reviews"]["period_days"], period);
+    }
+    Ok(())
+}
+
+#[test]
 fn no_membership_setting_is_written_unless_the_operator_named_one() -> Result<(), Box<dyn Error>> {
     let (folder, config) = deployment()?;
     let layout = Layout::at(folder.path().to_path_buf());

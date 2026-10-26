@@ -48,26 +48,21 @@ use lys_openapi::{Api, Method};
 use crate::connections_api::ConnectionsView;
 use crate::directory_views::{
     AgentRegistered, IdentitiesView, IdentityRecordView, PersonRegistered, ReceiptAnswer,
-    ReceiptPage, ServiceKeyView, SignedInView,
+    SignedInView,
 };
-use crate::grant_contract::{
-    ActionBody, CannotGiveAnswer, DelegateBody, GrantList, GrantView, ModelView, PermitView,
-    RecordedView, RevokeBody, RootBody, WhoBody, WhoPage,
-};
-use crate::grants_reach::{ReachAnswer, ReachBody};
 use crate::openapi_table::{GET, POST};
 use crate::read_views::{AgentView, MeView, PeopleView};
 use crate::requests_api::AskBody;
 use crate::requests_decide::{ApproveBody, DeclineBody};
 use crate::requests_views::{RequestList, RequestView};
 use crate::restart_api::openapi as restart_types;
-use crate::reviews_api::{KeepBody, ReviewView};
-use crate::reviews_state::Kept;
 use crate::roles_api::{AssignBody, EndBody, MakeBody, MoveBody, VersionBody};
 use crate::roles_views::{MovedView, RoleList, RoleView};
 use crate::routes::{AgentRegistration, Bound, Moved, Named};
 use crate::setup::SetupRequest;
 use crate::sign_in_providers::{ProvidersView, SetBody as ProviderBody};
+
+mod grants_reviews;
 
 /// A schema's name in the document, or none where a route names none.
 pub(crate) type Schema = Option<Cow<'static, str>>;
@@ -116,7 +111,7 @@ pub(crate) fn types(api: &mut Api) -> BTreeMap<(Method, &'static str), (Schema, 
     entries.extend(crate::operations_api::types(api));
     entries.extend(crate::getting_started_api::types(api));
     entries.push(restart_types(api));
-    entries.extend(grants_and_reviews(api));
+    entries.extend(grants_reviews::grants_and_reviews(api));
     entries.extend(roles_and_requests(api));
     entries.extend(machines_and_runtime(api));
     entries.extend(crate::openapi_accounts_types::accounts_teams_and_sessions(
@@ -314,81 +309,6 @@ fn sign_in_and_identities(api: &mut Api) -> Vec<Entry> {
 
 /// The grants, the questions asked of them, the receipts that prove a
 /// directory change, and the grants due for review.
-fn grants_and_reviews(api: &mut Api) -> Vec<Entry> {
-    let list = api.schema::<GrantList>();
-    let (delegate, root) = (api.schema::<DelegateBody>(), api.schema::<RootBody>());
-    let recorded = api.schema::<RecordedView>();
-    let (action, permit) = (api.schema::<ActionBody>(), api.schema::<PermitView>());
-    let (who, page) = (api.schema::<WhoBody>(), api.schema::<WhoPage>());
-    let revoke = api.schema::<RevokeBody>();
-    let keep = api.schema::<KeepBody>();
-    vec![
-        (
-            GET,
-            "/agent/grants",
-            None,
-            Some(api.schema::<crate::agent_grants_api::AgentGrants>()),
-        ),
-        (GET, "/grants", None, Some(list)),
-        (POST, "/grants", Some(delegate), Some(recorded.clone())),
-        (GET, "/grants/model", None, Some(api.schema::<ModelView>())),
-        (POST, "/grants/roots", Some(root), Some(recorded.clone())),
-        (
-            POST,
-            "/grants/agent-roots",
-            None,
-            Some(api.schema::<crate::agent_roots::AgentRoots>()),
-        ),
-        (
-            POST,
-            "/grants/check",
-            Some(action.clone()),
-            Some(permit.clone()),
-        ),
-        (POST, "/grants/why", Some(action), Some(permit)),
-        (POST, "/grants/who", Some(who), Some(page)),
-        (
-            POST,
-            "/grants/held",
-            Some(api.schema::<crate::grant_contract::ActionBody>()),
-            Some(api.schema::<crate::grants::held::HeldAnswer>()),
-        ),
-        (
-            POST,
-            "/grants/reach",
-            Some(api.schema::<ReachBody>()),
-            Some(api.schema::<ReachAnswer>()),
-        ),
-        (
-            GET,
-            "/grants/cannot-give",
-            None,
-            Some(api.schema::<CannotGiveAnswer>()),
-        ),
-        (GET, "/grants/{id}", None, Some(api.schema::<GrantView>())),
-        (POST, "/grants/{id}/revoke", Some(revoke), Some(recorded)),
-        (
-            GET,
-            "/receipts/{index}",
-            None,
-            Some(api.schema::<ReceiptPage>()),
-        ),
-        (
-            GET,
-            "/service-key",
-            None,
-            Some(api.schema::<ServiceKeyView>()),
-        ),
-        (GET, "/reviews", None, Some(api.schema::<ReviewView>())),
-        (
-            POST,
-            "/reviews/{grant}/keep",
-            Some(keep),
-            Some(api.schema::<Kept>()),
-        ),
-    ]
-}
-
 /// The roles, the access requests decided against them, and the two
 /// administrator reads over what this installation is wired to.
 fn roles_and_requests(api: &mut Api) -> Vec<Entry> {

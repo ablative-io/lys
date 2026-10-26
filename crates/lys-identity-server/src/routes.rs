@@ -109,6 +109,8 @@ pub struct AppState {
     pub service_accounts: Option<Mutex<ServiceAccountStore>>,
     /// The review decisions, when the configuration names their directory.
     pub reviews: Option<Mutex<ReviewStore>>,
+    /// The cadence written by install or upgrade, validated before serving.
+    pub review_period_days: u32,
     /// The teams, when the configuration names their directory.
     pub teams: Option<Mutex<crate::teams_store::TeamStore>>,
     /// The budgets, when the configuration names their directory.

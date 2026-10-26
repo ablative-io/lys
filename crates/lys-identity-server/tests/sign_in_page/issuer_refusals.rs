@@ -97,7 +97,7 @@ async fn issuer_refusal(
         "issuer": base, "client_id": "test", "client_secret_file": secret,
         "redirect_url": format!("{base}/callback"),
         "link_audit_source": {"issuer": base, "subject": "test"},
-        "session_seconds": 60, "secure_cookie": false,
+        "reviews": {"period_days": 30}, "session_seconds": 60, "secure_cookie": false,
         "grant_log_dir": directory.path(), "grant_log_origin": "test",
         "grant_model_file": directory.path().join("unused-model"),
         "stores_receipt_file": directory.path().join("install").join("stores.json"),

@@ -2,7 +2,7 @@
 // mirrors the Rust that writes it, named beside it: the screens' views are
 // crates/lys-identity-server/src/read_api.rs. Change them together.
 
-import type { Draft } from '../features/drafts/contract';
+import type { Draft, ProductDraft } from '../features/drafts/contract';
 import type { AccessRequest } from '../features/requests/contract';
 
 /** `IdentityId` text form: `person-` or `agent-` and 32 lowercase hex digits. */
@@ -318,7 +318,21 @@ export interface WaitingEntryView {
   request?: AccessRequest;
   /** An agent_draft entry's draft, exactly as GET /drafts answers it; absent on every other kind and from an older service. */
   draft?: Draft;
+  /** An app action, exactly as GET /product-drafts answers it. */
+  product_draft?: ProductDraft;
+  /** One review row per agent, containing exactly the grants shown. */
+  review?: WaitingReviewView;
 }
+
+/** `waiting_api.rs` `WaitingReview`. */
+export interface WaitingReviewView {
+  agent: AgentSummary;
+  grants: { id: string; relation: string; resource: string; last_check: number }[];
+  count: number;
+}
+
+/** POST /reviews/agents/{agent}/keep. */
+export interface KeepAgentBody { operation: string; grants: string[] }
 
 /** `organisations_found.rs` `Founded`: POST /organisations/found. One shape to everyone, naming no identity (DIRECTORY-111). */
 export interface OrganisationFounded {

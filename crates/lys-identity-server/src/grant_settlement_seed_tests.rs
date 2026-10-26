@@ -234,6 +234,7 @@ fn fixture_state(
         runtime: None,
         service_accounts: None,
         reviews: None,
+        review_period_days: config.reviews.period_days,
         teams: None,
         budgets: None,
         policies: None,

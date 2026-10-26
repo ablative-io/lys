@@ -315,6 +315,14 @@ directory::directory_refusals! {
         /// Why it is not due.
         why: &'static str,
     },
+    /// A batch named a grant held by another identity.
+    #[error("AgentMismatch: grant `{grant}` is not held by agent `{agent}`")]
+    AgentMismatch {
+        /// The mismatched grant.
+        grant: String,
+        /// The agent whose batch was asked for.
+        agent: String,
+    },
     /// The operation id already names a review decision made in other words.
     #[error(
         "ReviewReused: operation `{operation}` already names a review decision made in other words: keep this grant under a new operation id"

@@ -108,6 +108,8 @@ pub struct Carried {
     /// its own: no number for them is decided, so a service with none
     /// refuses every membership page by name until the operator names them.
     pub membership: Option<Value>,
+    /// The written review cadence an upgrade preserves.
+    pub reviews: Option<Value>,
     /// The ceiling on a pass's rights an earlier configuration named
     /// (`provider.rights_bytes`, ACCESS-002 R1). The install writes none of its
     /// own; one the operator named survives every install and upgrade run.
@@ -234,6 +236,7 @@ pub fn carried(layout: &Layout) -> IdentityResult<Option<Carried>> {
         message_service: message_service(&earlier, &path)?,
         trusted_proxies: named(earlier.get("trusted_proxies")),
         membership: named(earlier.get("membership")),
+        reviews: earlier.get("reviews").cloned(),
         rights_bytes: named(
             earlier
                 .get("provider")

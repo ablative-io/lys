@@ -7,13 +7,14 @@
 import { request } from '../../api';
 import type { WaitingEntryView } from '../../generated';
 import { counted } from '../../shell/count';
+import { subscribeChanges } from '../../live';
 
 export type WaitingKind = WaitingEntryView['kind'];
 
 /**
  * One thing the person may decide. A request entry carries the request as `GET /requests` answers it and an agent draft
- * the draft as `GET /drafts` answers it, so the row decides it from this one read; an app action and a check due carry
- * neither and are opened on their own pages.
+ * the draft as `GET /drafts` answers it. An app action carries its product draft; a check row carries one agent's
+ * due grants. Every complete row is decided from this one read.
  */
 export type WaitingEntry = WaitingEntryView;
 
@@ -35,6 +36,15 @@ export const UNREAD: Record<WaitingKind, string> = {
 /** The page each part stands for. */
 export const PLACE: Record<WaitingKind, string> = { request: '#/requests', agent_draft: '#/access/drafts', product_draft: '#/access/drafts', review: '#/reviews' };
 
+export const WAITING_HOME = '#/?section=waiting-on-you';
+
+/** Focus the section where it stands today; mounting Home also honours the same address. */
+export function focusWaiting(): void {
+  const section = document.getElementById('waiting-on-you');
+  section?.focus();
+  section?.scrollIntoView?.({ block: 'start' });
+}
+
 /** The page a line opens and the word on its button, always Open: a request opens itself on Requests. */
 export function opens(line: WaitingEntry): { href: string; word: string } {
   if (line.kind === 'request') return { href: PLACE.request + '/' + encodeURIComponent(line.id), word: 'Open' };
@@ -42,10 +52,58 @@ export function opens(line: WaitingEntry): { href: string; word: string } {
 }
 
 /** Read `GET /waiting`, refusing an answer that is not a list, so nothing missing is shown as nothing. */
-export async function readWaiting(): Promise<WaitingLine[]> {
-  const answer = await request<{ waiting?: unknown }>('/waiting');
-  if (!answer || !Array.isArray(answer.waiting)) throw new Error('WaitingUnreadable: the service did not answer a list of what waits on you.');
-  return answer.waiting as WaitingLine[];
+export function readWaiting(): Promise<WaitingLine[]> {
+  if (!reading) {
+    reading = request<{ waiting?: unknown }>('/waiting').then((answer) => {
+      if (!answer || !Array.isArray(answer.waiting)) throw new Error('WaitingUnreadable: the service did not answer a list of what waits on you.');
+      return answer.waiting as WaitingLine[];
+    });
+  }
+  return reading;
+}
+
+// Home and the rail share this answer until the service signals a change.
+// The last observer leaving releases it, so no sign-in inherits another's list.
+let reading: Promise<WaitingLine[]> | null = null;
+type Observer = { changed: (lines: WaitingLine[]) => void; refused: (error: unknown) => void };
+const observers = new Set<Observer>();
+let stop: (() => void) | null = null;
+
+function publish(read: Promise<WaitingLine[]>): void {
+  void read.then((lines) => {
+    if (reading === read) for (const observer of observers) observer.changed(lines);
+  }, (error: unknown) => {
+    if (reading === read) for (const observer of observers) observer.refused(error);
+  });
+}
+
+/** Observe the one waiting answer and invalidate it only on a service change signal. */
+export function watchWaiting(changed: Observer['changed'], refused: Observer['refused']): () => void {
+  const observer = { changed, refused };
+  observers.add(observer);
+  if (observers.size === 1) {
+    let known = false;
+    stop = subscribeChanges(() => {
+      if (known) reading = null;
+      known = true;
+      publish(readWaiting());
+    }, (error) => {
+      reading = null;
+      for (const each of observers) each.refused(error);
+    });
+  }
+  publish(readWaiting());
+  return () => {
+    observers.delete(observer);
+    if (!observers.size) { stop?.(); stop = null; reading = null; }
+  };
+}
+
+/** A confirmed in-row decision updates both counts before Home reads again. */
+export function waitingSettled(kind: WaitingKind, id: string): void {
+  if (!reading) return;
+  reading = reading.then((lines) => lines.filter((line) => isRefusedPart(line) || line.kind !== kind || line.id !== id));
+  publish(reading);
 }
 
 /** How many lines the person can act on; null when a part could not be read, so no number stands for it. */

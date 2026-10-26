@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useLocation } from 'react-router';
 import { api, Refused, useLoad } from '../api';
-import { railWaiting, readWaiting } from '../features/dashboard/waiting';
+import { refreshLive } from '../live';
+import { focusWaiting, railWaiting, watchWaiting } from '../features/dashboard/waiting';
 import { SignOut } from '../features/me/SignOut';
 import type { MeView } from '../generated';
 import { Act } from './Act';
@@ -32,16 +33,17 @@ const waitingOf = (refused: Refused): Waiting => refused.status === 401 || refus
  * The person stays known when the waiting read is refused, so Sign out is drawn for everyone.
  */
 function useWaiting(): { me: MeView | null; waiting: Waiting } {
-  const load = useLoad(async () => {
-    const me = await api.me();
-    const waiting = await readWaiting().then((lines) => ({ lines }), (error: unknown) => ({ refused: error instanceof Refused ? error : new Refused(0, { refusal: 'WaitingUnreadable', reason: String(error) }) }));
-    return { me, waiting };
-  }, 'rail-waiting');
-  if (load.status === 'loading') return { me: null, waiting: null };
+  const load = useLoad(api.me, 'rail-person');
+  const me = load.status === 'ok' ? load.data : null;
+  const [waiting, setWaiting] = useState<Waiting>(null);
+  useEffect(() => {
+    if (!me) return undefined;
+    return watchWaiting((lines) => setWaiting(railWaiting(lines)), (error: unknown) => {
+      setWaiting(waitingOf(error instanceof Refused ? error : new Refused(0, { refusal: 'WaitingUnreadable', reason: String(error) })));
+    });
+  }, [me]);
   if (load.status === 'refused') return { me: null, waiting: waitingOf(load.refused) };
-  const { me, waiting: read } = load.data;
-  if ('refused' in read) return { me, waiting: waitingOf(read.refused) };
-  return { me, waiting: railWaiting(read.lines) };
+  return { me, waiting };
 }
 
 export function Rail() {
@@ -97,6 +99,7 @@ export function Rail() {
         if (item.t === 'a') {
           const link = (
             <a key={index} href={item.href} data-nav={item.nav} data-shut={verdict.open ? undefined : verdict.definite ? 'refused' : 'unchecked'}
+              onClick={() => { setDrawer(false); if (item.nav === 'waiting') { focusWaiting(); refreshLive(); } }}
               title={forThisComputer(item.title) + (verdict.open ? '' : ': ' + verdict.words)} className={item.nav === on ? 'on' : undefined}>
               {inner}
             </a>

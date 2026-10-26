@@ -167,7 +167,7 @@ impl PublicSignIn {
                 "redirect_url": "http://127.0.0.1/callback",
                 "administrator": {"issuer": base, "subject": "administrator"},
                 "link_audit_source": {"issuer": base, "subject": "test"},
-                "session_seconds": 60, "secure_cookie": false,
+                "reviews": {"period_days": 30}, "session_seconds": 60, "secure_cookie": false,
                 "grant_log_dir": directory.path().join("grants"), "grant_log_origin": "test",
                 "grant_model_file": model,
                 "stores_receipt_file": directory.path().join("install").join("stores.json"),
