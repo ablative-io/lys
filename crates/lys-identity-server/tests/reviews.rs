@@ -51,17 +51,29 @@ async fn service_refuses_zero_review_period_even_with_typed_configuration() -> T
         |_config| Ok(()),
     )
     .await;
-    let refused = started.err().ok_or("the service accepted a zero review period")?;
-    assert!(refused.to_string().contains("[reviews] period_days"), "{refused}");
+    let refused = started
+        .err()
+        .ok_or("the service accepted a zero review period")?;
+    assert!(
+        refused.to_string().contains("[reviews] period_days"),
+        "{refused}"
+    );
     Ok(())
 }
 
 #[tokio::test]
 async fn the_period_since_giving_or_keeping_is_shared_by_reviews_and_waiting() -> TestResult {
     let table = Table::set().await?;
-    let (_, fresh) = table.lend_at(0, 0, &table.ada, "fresh", 1_800_000_000).await?;
-    let (_, old) = table.lend_at(0, 0, &table.ada, "old", 1_800_000_000 - 31 * 86_400).await?;
-    assert_eq!(due_ids(&table.reviews(&table.ada).await?)?, BTreeSet::from([old.clone()]));
+    let (_, fresh) = table
+        .lend_at(0, 0, &table.ada, "fresh", 1_800_000_000)
+        .await?;
+    let (_, old) = table
+        .lend_at(0, 0, &table.ada, "old", 1_800_000_000 - 31 * 86_400)
+        .await?;
+    assert_eq!(
+        due_ids(&table.reviews(&table.ada).await?)?,
+        BTreeSet::from([old.clone()])
+    );
     assert_eq!(table.waiting().await?[0]["review"]["grants"][0]["id"], old);
     let body = json!({"operation": operation()?, "note": "still needed"});
     assert_eq!(table.keep(&table.ada, &old, &body).await?.0, 200);
@@ -71,7 +83,10 @@ async fn the_period_since_giving_or_keeping_is_shared_by_reviews_and_waiting() -
     assert!(due_ids(&table.reviews(&table.ada).await?)?.is_empty());
     assert!(table.waiting().await?.is_empty());
     table.clock.set(1_800_000_000 + 30 * 86_400);
-    assert_eq!(due_ids(&table.reviews(&table.ada).await?)?, BTreeSet::from([old, fresh]));
+    assert_eq!(
+        due_ids(&table.reviews(&table.ada).await?)?,
+        BTreeSet::from([old, fresh])
+    );
     assert_eq!(table.waiting().await?[0]["review"]["count"], 2);
     Ok(())
 }
@@ -96,18 +111,32 @@ mod tom_26_october {
             };
             if number != 0 {
                 let transition = if number == 2 { "reinstate" } else { "activate" };
-                let (status, active) = table.service.post(&format!("/identities/{id}/transitions"), Some(&table.ada), &json!({
-                    "operation": operation()?, "transition": transition, "reason": "replay",
-                })).await?;
+                let (status, active) = table
+                    .service
+                    .post(
+                        &format!("/identities/{id}/transitions"),
+                        Some(&table.ada),
+                        &json!({
+                            "operation": operation()?, "transition": transition, "reason": "replay",
+                        }),
+                    )
+                    .await?;
                 assert_eq!(status, 200, "{active}");
             }
             for grant in 0..90 {
-                let (status, issued) = table.service.post("/grants/roots", Some(&table.ada), &json!({
-                    "operation": operation()?, "route": "api", "holder": id,
-                    "resource": {"kind": "doc", "id": format!("replay-{number}-{grant}")},
-                    "relation": "beta", "pass_on": {"kind": "use_only"},
-                    "window": {"starts_at": 1_800_000_000 - 31 * 86_400, "ends_at": null},
-                })).await?;
+                let (status, issued) = table
+                    .service
+                    .post(
+                        "/grants/roots",
+                        Some(&table.ada),
+                        &json!({
+                            "operation": operation()?, "route": "api", "holder": id,
+                            "resource": {"kind": "doc", "id": format!("replay-{number}-{grant}")},
+                            "relation": "beta", "pass_on": {"kind": "use_only"},
+                            "window": {"starts_at": 1_800_000_000 - 31 * 86_400, "ends_at": null},
+                        }),
+                    )
+                    .await?;
                 assert_eq!(status, 200, "{issued}");
             }
             agents.push(id);
@@ -120,8 +149,19 @@ mod tom_26_october {
             assert_eq!(row["review"]["count"], 90);
             let agent = row["review"]["agent"]["id"].as_str().ok_or("agent")?;
             assert!(agents.iter().any(|id| id == agent));
-            let grants: Vec<&Value> = row["review"]["grants"].as_array().ok_or("grants")?.iter().map(|grant| &grant["id"]).collect();
-            let (status, kept) = table.keep_all(&table.ada, agent, &json!({"operation": operation()?, "grants": grants})).await?;
+            let grants: Vec<&Value> = row["review"]["grants"]
+                .as_array()
+                .ok_or("grants")?
+                .iter()
+                .map(|grant| &grant["id"])
+                .collect();
+            let (status, kept) = table
+                .keep_all(
+                    &table.ada,
+                    agent,
+                    &json!({"operation": operation()?, "grants": grants}),
+                )
+                .await?;
             assert_eq!(status, 200, "{kept}");
             remaining -= 1;
             assert_eq!(table.waiting().await?.len(), remaining);

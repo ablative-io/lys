@@ -92,4 +92,3 @@ pub(super) fn grants_and_reviews(api: &mut Api) -> Vec<Entry> {
         ),
     ]
 }
-

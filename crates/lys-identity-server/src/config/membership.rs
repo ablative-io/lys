@@ -1,8 +1,8 @@
 //! Written membership page bounds.
 use serde::Deserialize;
 
-use crate::error::ServerError;
 use super::invalid;
+use crate::error::ServerError;
 
 /// The operator's bounds on channel membership pages: the most rows and
 /// bytes any page may ask for, and how long and how many continuation
@@ -41,4 +41,3 @@ impl MembershipSettings {
         Ok(())
     }
 }
-

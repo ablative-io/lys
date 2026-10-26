@@ -8,7 +8,12 @@ async fn one_batch_keeps_120_decisions_with_one_write_and_retries_without_writin
     let agent = table.seeded.people[0].agents[0].id.to_string();
     let mut grants = Vec::new();
     for number in 0..120 {
-        grants.push(table.lend(0, &table.ada, &format!("batch-{number}")).await?.1);
+        grants.push(
+            table
+                .lend(0, &table.ada, &format!("batch-{number}"))
+                .await?
+                .1,
+        );
     }
     let shown = due_ids(&table.reviews(&table.ada).await?)?;
     assert_eq!(shown, grants.iter().cloned().collect::<BTreeSet<_>>());
@@ -22,7 +27,12 @@ async fn one_batch_keeps_120_decisions_with_one_write_and_retries_without_writin
     for decision in decisions {
         assert_eq!(decision["kept_by"], table.seeded.people[0].id.to_string());
         assert_eq!(decision["operation"], body["operation"]);
-        assert!(body["grants"].as_array().ok_or("ids")?.contains(&decision["grant"]));
+        assert!(
+            body["grants"]
+                .as_array()
+                .ok_or("ids")?
+                .contains(&decision["grant"])
+        );
     }
     let store = table.store()?;
     assert_eq!(store.decisions().len(), 120);
@@ -31,7 +41,10 @@ async fn one_batch_keeps_120_decisions_with_one_write_and_retries_without_writin
     assert_eq!(status, 200, "{retry}");
     assert_eq!(retry, answer);
     assert_eq!(table.store()?.write_count(), before + 1);
-    assert_eq!(due_ids(&table.reviews(&table.ada).await?)?, BTreeSet::from([unseen]));
+    assert_eq!(
+        due_ids(&table.reviews(&table.ada).await?)?,
+        BTreeSet::from([unseen])
+    );
     let changed = json!({"operation": body["operation"], "grants": [grants[0]]});
     let (status, refused) = table.keep_all(&table.ada, &agent, &changed).await?;
     assert_eq!(status, 409, "{refused}");
@@ -47,13 +60,41 @@ async fn each_named_refusal_keeps_none_of_the_batch() -> TestResult {
     let bea_agent = table.seeded.people[1].agents[0].id.to_string();
     let (_, ada) = table.lend(0, &table.ada, "ada").await?;
     let (_, bea) = table.lend(1, &table.bea, "bea").await?;
-    let (_, issued_to_ada) = table.lend_to(1, 0, &table.bea, "visible-but-not-mine").await?;
-    let (_, fresh) = table.lend_at(0, 0, &table.ada, "fresh", 1_800_000_000).await?;
+    let (_, issued_to_ada) = table
+        .lend_to(1, 0, &table.bea, "visible-but-not-mine")
+        .await?;
+    let (_, fresh) = table
+        .lend_at(0, 0, &table.ada, "fresh", 1_800_000_000)
+        .await?;
     for (cookie, agent, ids, status, name) in [
-        (&table.ada, &ada_agent, vec![ada.clone(), fresh.clone()], 409, "GrantNotDue"),
-        (&table.bea, &bea_agent, vec![bea.clone(), ada.clone()], 404, "GrantNotVisible"),
-        (&table.ada, &ada_agent, vec![ada.clone(), bea.clone()], 409, "AgentMismatch"),
-        (&table.bea, &ada_agent, vec![issued_to_ada.clone()], 403, "ReviewerOnly"),
+        (
+            &table.ada,
+            &ada_agent,
+            vec![ada.clone(), fresh.clone()],
+            409,
+            "GrantNotDue",
+        ),
+        (
+            &table.bea,
+            &bea_agent,
+            vec![bea.clone(), ada.clone()],
+            404,
+            "GrantNotVisible",
+        ),
+        (
+            &table.ada,
+            &ada_agent,
+            vec![ada.clone(), bea.clone()],
+            409,
+            "AgentMismatch",
+        ),
+        (
+            &table.bea,
+            &ada_agent,
+            vec![issued_to_ada.clone()],
+            403,
+            "ReviewerOnly",
+        ),
     ] {
         let before = table.store()?.write_count();
         let body = json!({"operation": operation()?, "grants": ids});
@@ -63,7 +104,11 @@ async fn each_named_refusal_keeps_none_of_the_batch() -> TestResult {
         if name == "GrantNotDue" {
             assert!(refused["reason"].as_str().ok_or("reason")?.contains(&fresh));
         }
-        assert_eq!(table.store()?.write_count(), before, "{name} writes nothing");
+        assert_eq!(
+            table.store()?.write_count(),
+            before,
+            "{name} writes nothing"
+        );
         assert!(table.store()?.decisions().is_empty(), "{name} keeps none");
     }
     Ok(())
@@ -95,15 +140,27 @@ pub(super) async fn request_and_app_action_decided_from_waiting(table: &Table) -
         "pass_on": {"kind": "use_only"}, "window": {"starts_at": 0, "ends_at": null}, "mode": "by_draft",
     })).await?)?;
     let words = "{\"stop\":\"seat-7\"}";
-    ok(post(&table.service, "/product-drafts", Auth::Cookie(&table.bea), &json!({
-        "operation": op()?, "grant": grant["grant"],
-        "target": {"kind": "fixture_notes.doc", "id": "1", "action": "write"},
-        "request_digest": lys_pass::drafts::request_digest(words), "words": words,
-    })).await?)?;
-    ok(post(&table.service, "/requests", Auth::Cookie(&table.bea), &json!({
-        "operation": op()?, "resource": {"kind": "doc", "id": "real-request"},
-        "relation": "beta", "ends_at": null, "why": "a real request after the checks",
-    })).await?)?;
+    ok(post(
+        &table.service,
+        "/product-drafts",
+        Auth::Cookie(&table.bea),
+        &json!({
+            "operation": op()?, "grant": grant["grant"],
+            "target": {"kind": "fixture_notes.doc", "id": "1", "action": "write"},
+            "request_digest": lys_pass::drafts::request_digest(words), "words": words,
+        }),
+    )
+    .await?)?;
+    ok(post(
+        &table.service,
+        "/requests",
+        Auth::Cookie(&table.bea),
+        &json!({
+            "operation": op()?, "resource": {"kind": "doc", "id": "real-request"},
+            "relation": "beta", "ends_at": null, "why": "a real request after the checks",
+        }),
+    )
+    .await?)?;
     let rows = table.waiting().await?;
     assert_eq!(rows.len(), 2, "one request and one app action: {rows:?}");
     let mut remaining = 2;
@@ -111,13 +168,19 @@ pub(super) async fn request_and_app_action_decided_from_waiting(table: &Table) -
         let id = row["id"].as_str().ok_or("row id")?;
         let (path, body) = if row["kind"] == "request" {
             assert!(row["request"].is_object());
-            (format!("/requests/{id}/decline"), json!({"note": "not needed"}))
+            (
+                format!("/requests/{id}/decline"),
+                json!({"note": "not needed"}),
+            )
         } else {
             assert_eq!(row["kind"], "product_draft");
             assert!(row["product_draft"].is_object());
-            (format!("/product-drafts/{id}/approve"), json!({
-                "operation": op()?, "request_digest": row["product_draft"]["request_digest"],
-            }))
+            (
+                format!("/product-drafts/{id}/approve"),
+                json!({
+                    "operation": op()?, "request_digest": row["product_draft"]["request_digest"],
+                }),
+            )
         };
         ok(post(&table.service, &path, Auth::Cookie(&table.ada), &body).await?)?;
         remaining -= 1;

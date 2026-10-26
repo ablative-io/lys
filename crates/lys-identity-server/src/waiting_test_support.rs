@@ -260,4 +260,3 @@ impl Table {
             .clone())
     }
 }
-

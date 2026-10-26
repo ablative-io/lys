@@ -11,7 +11,7 @@ use crate::error::ServerError;
 use crate::grants::GrantSetup;
 use crate::oidc::Oidc;
 use crate::reviews_store::ReviewStore;
-use crate::routes::{AppState, Say, Shared, door_handles, open_directory, start};
+use crate::routes::{AppState, Say, Shared, open_directory, start};
 use crate::service_accounts_store::ServiceAccountStore;
 use crate::session::Sessions;
 
@@ -44,24 +44,6 @@ pub(crate) async fn started_with_clock(
         at_stop: Some(at_stop),
         refused: None,
     })
-}
-
-/// The start route's service over the directory `state` holds. The route
-/// reads the handle record through the door's client, [`door_handles::DoorHandles`],
-/// as its `HandleRecords`. No configuration field names the door yet, so the
-/// client is built without an address and answers that no handle record
-/// exists, naming SECRETS-002, until one does. Launch records are kept in
-/// `launch-records` beside the directory log.
-fn start_service(config: &Config, state: &Shared) -> Result<Arc<start::StartService>, ServerError> {
-    let handles = door_handles::DoorHandles::unconfigured();
-    let dir = config.log_dir.with_file_name("launch-records");
-    start::directory_service(
-        state,
-        Box::new(handles),
-        door_handles::credential_id,
-        &dir,
-        load_service_key(&config.event_key_file)?,
-    )
 }
 
 struct Primary {
@@ -461,7 +443,7 @@ fn served_routes(
         .merge(crate::memory_api::routes(config))
         .merge(crate::certificates_api::routes())
         .with_state(Arc::clone(&state));
-    let start_service = start_service(config, &state)?;
+    let start_service = start::configured_service(config, &state)?;
     crate::agent_pass_recovery::at_start(&state, &start_service)?;
     // The dashboard reads the launch records an agent gave (AGENTS-016 R5).
     let launches = axum::Extension(Arc::clone(&start_service));

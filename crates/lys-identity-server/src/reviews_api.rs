@@ -200,8 +200,7 @@ fn decisions(state: &AppState) -> Result<Option<MutexGuard<'_, ReviewStore>>, Se
 
 /// The one due rule read by reviews, waiting and the batch act.
 fn due(book: &GrantBook, record: &GrantRecord, kept: Option<&Kept>, at: u64, days: u32) -> bool {
-    stands(book, record, at)
-        && period_passed(record.grant().window().starts_at(), kept, at, days)
+    stands(book, record, at) && period_passed(record.grant().window().starts_at(), kept, at, days)
 }
 
 async fn reviews(
@@ -235,9 +234,8 @@ pub(crate) fn review_view(
                 due(
                     book,
                     record,
-                    kept.as_ref().and_then(|store| {
-                        store.last_for(&record.grant().id().to_string())
-                    }),
+                    kept.as_ref()
+                        .and_then(|store| store.last_for(&record.grant().id().to_string())),
                     judged_at,
                     state.review_period_days,
                 )
@@ -371,7 +369,9 @@ async fn keep_agent(
             reason: "the configuration names no reviews_dir".to_owned(),
         })?;
         let shown: Vec<String> = grants.iter().map(ToString::to_string).collect();
-        if let Some(recorded) = store.already_batch(&operation, &agent.to_string(), &reviewer, &shown)? {
+        if let Some(recorded) =
+            store.already_batch(&operation, &agent.to_string(), &reviewer, &shown)?
+        {
             return Ok(Json(recorded));
         }
         let at = state.sessions.now()?;
@@ -388,12 +388,13 @@ async fn keep_agent(
                     agent: agent.to_string(),
                 });
             }
-            let held = answering(judged.directory, record.grant().holder(), None).ok_or_else(|| {
-                ServerError::GrantNotDue {
-                    grant: grant.to_string(),
-                    why: "the holding agent no longer answers to a person",
-                }
-            })?;
+            let held =
+                answering(judged.directory, record.grant().holder(), None).ok_or_else(|| {
+                    ServerError::GrantNotDue {
+                        grant: grant.to_string(),
+                        why: "the holding agent no longer answers to a person",
+                    }
+                })?;
             if !whole && caller != IdentityId::Person(held.person) {
                 return Err(ServerError::ReviewerOnly);
             }

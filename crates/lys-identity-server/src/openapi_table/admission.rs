@@ -141,4 +141,3 @@ fn matches(pattern: &str, path: &str) -> bool {
         })
     }) && concrete.next().is_none()
 }
-

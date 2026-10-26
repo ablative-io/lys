@@ -1,7 +1,7 @@
 #![cfg(test)]
 //! The one waiting read, grouped checks and records for decisions in place.
-use serde_json::{Value, json};
 use identity_contract::apps::{Auth, get, ok, op};
+use serde_json::{Value, json};
 #[path = "waiting_test_support.rs"]
 mod support;
 use support::{Result, Table};
@@ -156,7 +156,10 @@ async fn a_request_and_a_draft_carry_the_record_their_own_lists_answer() -> Resu
     // A request carries no draft and a draft no request.
     assert!(!carries(&entry_of(&ada, "request"), "draft"));
     assert!(!carries(&entry_of(&ada, "agent_draft"), "request"));
-    assert_eq!(entry_of(&ada, "review")["review"]["grants"][0]["id"], review);
+    assert_eq!(
+        entry_of(&ada, "review")["review"]["grants"][0]["id"],
+        review
+    );
     Ok(())
 }
 
@@ -237,9 +240,16 @@ async fn three_due_grants_are_one_agent_row_and_two_agents_are_two_rows() -> Res
         assert_eq!(grant["resource"], "doc quarter");
         assert_eq!(grant["last_check"], 0);
     }
-    let (status, active) = table.service.post(&format!("/identities/{}/transitions", table.other_agent), Some(&table.ada), &json!({
-        "operation": op()?, "transition": "activate", "reason": "second agent",
-    })).await?;
+    let (status, active) = table
+        .service
+        .post(
+            &format!("/identities/{}/transitions", table.other_agent),
+            Some(&table.ada),
+            &json!({
+                "operation": op()?, "transition": "activate", "reason": "second agent",
+            }),
+        )
+        .await?;
     assert_eq!(status, 200, "{active}");
     table.agent_holds_at(&table.other_agent, 0).await?;
     let rows = table.waiting(&table.ada).await?;
@@ -252,13 +262,22 @@ async fn giving_is_the_first_check_and_an_app_entry_carries_its_listed_draft() -
     let table = Table::set().await?;
     table.agent_holds_at(&table.agent, 1_800_000_000).await?;
     assert!(table.waiting(&table.ada).await?.is_empty());
-    let old = table.agent_holds_at(&table.agent, 1_800_000_000 - 31 * 86_400).await?;
+    let old = table
+        .agent_holds_at(&table.agent, 1_800_000_000 - 31 * 86_400)
+        .await?;
     let rows = table.waiting(&table.ada).await?;
     assert_eq!(rows.len(), 1);
     assert_eq!(rows[0]["review"]["grants"][0]["id"], old);
-    let (status, kept) = table.service.post(&format!("/reviews/{old}/keep"), Some(&table.ada), &json!({
-        "operation": op()?, "note": "still needed",
-    })).await?;
+    let (status, kept) = table
+        .service
+        .post(
+            &format!("/reviews/{old}/keep"),
+            Some(&table.ada),
+            &json!({
+                "operation": op()?, "note": "still needed",
+            }),
+        )
+        .await?;
     assert_eq!(status, 200, "{kept}");
     assert!(table.waiting(&table.ada).await?.is_empty());
     let product = table.bea_product_drafts().await?;
@@ -270,6 +289,9 @@ async fn giving_is_the_first_check_and_an_app_entry_carries_its_listed_draft() -
     table.clock.set(1_800_000_000 + 30 * 86_400 - 1);
     assert!(entry_of(&table.waiting(&table.ada).await?, "review").is_null());
     table.clock.set(1_800_000_000 + 30 * 86_400);
-    assert_eq!(entry_of(&table.waiting(&table.ada).await?, "review")["review"]["count"], 2);
+    assert_eq!(
+        entry_of(&table.waiting(&table.ada).await?, "review")["review"]["count"],
+        2
+    );
     Ok(())
 }

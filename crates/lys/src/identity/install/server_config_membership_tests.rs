@@ -33,9 +33,15 @@ fn review_period_is_written_as_30_on_install_and_upgrade_and_preserves_a_named_p
         (None, json!(30)),
         (Some(json!({})), json!(30)),
         (Some(json!({"period_days": 7})), json!(7)),
-        (Some(json!({"period_days": "malformed"})), json!("malformed")),
+        (
+            Some(json!({"period_days": "malformed"})),
+            json!("malformed"),
+        ),
     ] {
-        fresh.as_object_mut().ok_or("configuration")?.remove("reviews");
+        fresh
+            .as_object_mut()
+            .ok_or("configuration")?
+            .remove("reviews");
         if let Some(reviews) = reviews {
             fresh["reviews"] = reviews;
         }

@@ -4,8 +4,8 @@ use std::collections::BTreeSet;
 use lys_identity::grants::{Action, Model, Relation};
 use serde::Deserialize;
 
-use crate::error::ServerError;
 use super::{Config, invalid};
+use crate::error::ServerError;
 
 /// The permission model as its file writes it: a version, and each relation
 /// with the actions it carries.

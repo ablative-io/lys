@@ -14,7 +14,8 @@ pub(super) struct Table {
 
 impl Table {
     pub(super) async fn set() -> Result<Self, Box<dyn Error>> {
-        let clock = std::sync::Arc::new(identity_contract::harness::ManualClock::new(1_800_000_000));
+        let clock =
+            std::sync::Arc::new(identity_contract::harness::ManualClock::new(1_800_000_000));
         let supplied = std::sync::Arc::clone(&clock);
         let broker = identity_contract::app_custody::start().await?;
         let (service, (seeded, reviews_dir, key)) = Service::start_clock_adjusted(
@@ -22,16 +23,21 @@ impl Table {
             move |config| {
                 config.session_seconds = 100 * 86_400;
                 config.secrets = Some(lys_identity_server::secrets_api::SecretsSettings {
-                    broker, service: "identity".to_owned(), service_key_file: config.event_key_file.clone(),
+                    broker,
+                    service: "identity".to_owned(),
+                    service_key_file: config.event_key_file.clone(),
                 });
             },
             None,
-            |config| Ok((
-                seed_configured(config, [ADMINISTRATOR, BEA])?,
-                config.reviews_dir.clone().ok_or("reviews directory")?,
-                std::sync::Arc::new(lys_core::Ed25519Identity::load(&config.event_key_file)?),
-            )),
-        ).await?;
+            |config| {
+                Ok((
+                    seed_configured(config, [ADMINISTRATOR, BEA])?,
+                    config.reviews_dir.clone().ok_or("reviews directory")?,
+                    std::sync::Arc::new(lys_core::Ed25519Identity::load(&config.event_key_file)?),
+                ))
+            },
+        )
+        .await?;
         let ada = service.sign_in(login(ADMINISTRATOR)).await?;
         let bea = service.sign_in(login(BEA)).await?;
         Ok(Self {
@@ -67,7 +73,14 @@ impl Table {
         self.lend_at(person, recipient, cookie, resource, 0).await
     }
 
-    pub(super) async fn lend_at(&self, person: usize, recipient: usize, cookie: &str, resource: &str, starts_at: u64) -> Result<(String, String), Box<dyn Error>> {
+    pub(super) async fn lend_at(
+        &self,
+        person: usize,
+        recipient: usize,
+        cookie: &str,
+        resource: &str,
+        starts_at: u64,
+    ) -> Result<(String, String), Box<dyn Error>> {
         let holder = &self.seeded.people[person];
         let receiver = &self.seeded.people[recipient];
         let root = json!({
@@ -123,8 +136,13 @@ impl Table {
 }
 
 impl Table {
-    pub(super) fn store(&self) -> Result<lys_identity_server::reviews_store::ReviewStore, Box<dyn Error>> {
-        Ok(lys_identity_server::reviews_store::ReviewStore::open(&self.reviews_dir, std::sync::Arc::clone(&self.key))?)
+    pub(super) fn store(
+        &self,
+    ) -> Result<lys_identity_server::reviews_store::ReviewStore, Box<dyn Error>> {
+        Ok(lys_identity_server::reviews_store::ReviewStore::open(
+            &self.reviews_dir,
+            std::sync::Arc::clone(&self.key),
+        )?)
     }
 
     pub(super) async fn waiting(&self) -> Result<Vec<Value>, Box<dyn Error>> {
@@ -133,7 +151,14 @@ impl Table {
         Ok(view["waiting"].as_array().ok_or("waiting list")?.clone())
     }
 
-    pub(super) async fn keep_all(&self, cookie: &str, agent: &str, body: &Value) -> Result<(u16, Value), Box<dyn Error>> {
-        self.service.post(&format!("/reviews/agents/{agent}/keep"), Some(cookie), body).await
+    pub(super) async fn keep_all(
+        &self,
+        cookie: &str,
+        agent: &str,
+        body: &Value,
+    ) -> Result<(u16, Value), Box<dyn Error>> {
+        self.service
+            .post(&format!("/reviews/agents/{agent}/keep"), Some(cookie), body)
+            .await
     }
 }

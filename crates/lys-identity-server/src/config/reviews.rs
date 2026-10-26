@@ -1,8 +1,8 @@
 //! The review cadence is a written setting, never a runtime default.
 use serde::Deserialize;
 
-use crate::error::ServerError;
 use super::invalid;
+use crate::error::ServerError;
 
 /// How often a standing grant needs the person's check.
 #[derive(Debug, Clone, Copy, Deserialize)]
@@ -13,7 +13,7 @@ pub struct ReviewSettings {
 }
 
 impl ReviewSettings {
-    pub(crate) fn validate(&self) -> Result<(), ServerError> {
+    pub(crate) fn validate(self) -> Result<(), ServerError> {
         if self.period_days == 0 {
             return Err(invalid(
                 "[reviews] period_days must be a whole number of days of at least 1",
@@ -24,8 +24,8 @@ impl ReviewSettings {
 }
 
 pub(super) fn written(text: &str) -> Result<(), ServerError> {
-    let value: serde_json::Value = serde_json::from_str(text)
-        .map_err(|error| invalid(format!("configuration: {error}")))?;
+    let value: serde_json::Value =
+        serde_json::from_str(text).map_err(|error| invalid(format!("configuration: {error}")))?;
     let reviews = value
         .get("reviews")
         .ok_or_else(|| invalid("[reviews] period_days is missing"))?;

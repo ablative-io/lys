@@ -434,3 +434,24 @@ pub fn directory_service(
             .with_kept(Arc::clone(state)),
     ))
 }
+
+/// The start route's service over the directory `state` holds. The route
+/// reads the handle record through the door's client, [`crate::routes::door_handles::DoorHandles`],
+/// as its `HandleRecords`. No configuration field names the door yet, so the
+/// client is built without an address and answers that no handle record
+/// exists, naming SECRETS-002, until one does. Launch records are kept in
+/// `launch-records` beside the directory log.
+pub(crate) fn configured_service(
+    config: &crate::config::Config,
+    state: &crate::routes::Shared,
+) -> Result<Arc<StartService>, ServerError> {
+    let handles = crate::routes::door_handles::DoorHandles::unconfigured();
+    let dir = config.log_dir.with_file_name("launch-records");
+    directory_service(
+        state,
+        Box::new(handles),
+        crate::routes::door_handles::credential_id,
+        &dir,
+        lys_identity::signer::load_service_key(&config.event_key_file)?,
+    )
+}

@@ -375,7 +375,8 @@ fn reviews(state: &AppState, headers: &HeaderMap) -> Result<Vec<Dated>, ServerEr
         });
         group.count += 1;
     }
-    groups.into_values()
+    groups
+        .into_values()
         .map(|group| {
             let at = group
                 .grants
