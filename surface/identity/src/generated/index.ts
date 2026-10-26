@@ -60,6 +60,10 @@ export interface ReportingAgent extends AgentSummary {
 
 /** `person_with_agents`. */
 export interface PersonWithAgents extends PersonSummary {
+  /** Present only on the administrator's directory read. */
+  sign_in_email?: string | null;
+  admitted_email?: string | null;
+  email_recorded_at_sign_in?: boolean;
   agents: ReportingAgent[];
 }
 

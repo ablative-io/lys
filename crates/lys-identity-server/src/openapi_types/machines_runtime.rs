@@ -251,6 +251,12 @@ fn accounts(api: &mut Api) -> Vec<Entry> {
         ),
         (
             POST,
+            "/me/account/email/confirm",
+            Some(api.schema::<crate::accounts::ConfirmEmail>()),
+            None,
+        ),
+        (
+            POST,
             "/me/account/password",
             Some(api.schema::<crate::accounts::OwnPassword>()),
             None,

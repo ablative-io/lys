@@ -156,7 +156,7 @@ fn change(out: &mut Vec<u8>, value: &Change) {
             responsible_from,
             responsible_to,
         } => reporting::changed(out, *from, *to, *responsible_from, *responsible_to),
-        Change::BindLogin { binding } => {
+        Change::BindLogin { binding } | Change::UnbindLogin { binding } => {
             map(out, 2);
             uint(out, 1);
             text(out, binding.issuer());

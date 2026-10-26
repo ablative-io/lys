@@ -4,8 +4,9 @@
  * anyone's for the administrator. Lys says whether an account has a password
  * and which providers it signs in with: a person's own change is confirmed by
  * their password when they have one, and someone who signs in with Google and
- * has none sets a first password and changes their email with nothing to
- * confirm. Passwords are sent once and never shown or kept on the page.
+ * has none sets a first password without a current one. Every own email
+ * change needs a code from the new mailbox. Passwords are sent once and
+ * never shown or kept on the page.
  */
 import { useEffect, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
@@ -179,6 +180,7 @@ export function AccountSettings() {
   const { account, setAccount, unavailable } = useAccount('/me/account');
   const [changing, setChanging] = useState<'email' | 'password' | null>(null);
   const [notice, setNotice] = useState('');
+  const [confirmingEmail, setConfirmingEmail] = useState(false);
   function saved(words: string) {
     setChanging(null);
     setNotice(words);
@@ -210,20 +212,29 @@ export function AccountSettings() {
             <Change
               label="Change your email"
               action="Save email"
-              saved={saved}
+              saved={(words) => { saved(words); setConfirmingEmail(true); }}
               cancel={() => setChanging(null)}
               submit={async (form) => {
-                // An account with no password has nothing to confirm with: its session is the proof.
                 const email = text(form, 'account-email').trim();
-                const changed = await request<AccountView>('/me/account/email', account?.password === false ? { email } : { email, password: text(form, 'account-password') });
-                setAccount(changed);
-                return `You now sign in with ${changed.email ?? 'your new email'}.`;
+                const answer = await request<{ pending: boolean }>('/me/account/email', account?.password === false ? { email } : { email, password: text(form, 'account-password') });
+                if (answer.pending !== true) throw new Error('The service did not confirm that an email code was sent.');
+                return 'Check both your new email and the email you are leaving for their codes. Your sign-in email stays as it is until you confirm both.';
               }}
             >
               <Field id="account-email" label="New email" type="email" autoComplete="email" />
               {account?.password === false ? null : <Field id="account-password" label="Your password, to confirm" type="password" autoComplete="current-password" />}
             </Change>
           ) : null}
+          {confirmingEmail ? <Change label="Confirm your email" action="Confirm email"
+            saved={(words) => { saved(words); setConfirmingEmail(false); }}
+            cancel={() => setConfirmingEmail(false)} submit={async (form) => {
+              const changed = await request<AccountView>('/me/account/email/confirm', { code: text(form, 'account-email-code').trim(), held_code: text(form, 'account-held-email-code').trim() });
+              setAccount(changed);
+              return `You now sign in with ${changed.email ?? 'your new email'}.`;
+            }}>
+            <Field id="account-email-code" label="Code from your new email" autoComplete="one-time-code" />
+            <Field id="account-held-email-code" label="Code from the email you are leaving" autoComplete="one-time-code" />
+          </Change> : null}
           {account?.password === false ? (
             <>
               <div className="set-row">

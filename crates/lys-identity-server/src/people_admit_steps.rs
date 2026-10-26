@@ -137,7 +137,7 @@ pub(crate) async fn steps(
 /// The person `email` is already admitted as, with their issuer subject:
 /// an issuer account under the email whose login at `issuer` is bound to a
 /// person. An account with no bound person is not an admission.
-async fn admitted_already(
+pub(crate) async fn admitted_already(
     state: &Shared,
     api: &crate::sign_in_providers::SignInProviders,
     issuer: &str,
@@ -231,6 +231,14 @@ async fn granted_and_written(
             letter: wrote,
         });
     };
+    crate::routes::with_directory(state, |_directory| {
+        let mut held = crate::organisations_found::foundings(state)?;
+        if held.email_for(&person).is_none() {
+            held.hold_email(&person, email, false)?;
+        }
+        Ok(())
+    })
+    .map_err(at(letter))?;
     let added = Letter::Added {
         name: display_name.clone(),
         email: email.to_owned(),

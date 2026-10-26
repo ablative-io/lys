@@ -27,6 +27,14 @@ macro_rules! server_refusals {
             | ServerError::ProofRefused
             | ServerError::AlreadyAdmitted
             | ServerError::EmailHeldByAnother { .. }
+
+            | ServerError::SignedInAsAnother { .. }
+            | ServerError::EmailChangeNeedsMail
+            | ServerError::EmailChangeCodeRefused
+            | ServerError::ProviderEmailMismatch { .. }
+            | ServerError::LoginNotBound
+            | ServerError::SameTarget
+            | ServerError::NotSameOrganisation
             | ServerError::NoUnspentAdmission
             | ServerError::NoPerson
             | ServerError::ProductPassPersonRequired

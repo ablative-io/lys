@@ -24,9 +24,9 @@
 //! unknown proof is and nothing is recorded.
 
 use axum::Json;
-use axum::extract::State;
+use axum::extract::{Path, State};
 use axum::extract::rejection::JsonRejection;
-use axum::http::header;
+use axum::http::{HeaderMap, header};
 use axum::response::{IntoResponse, Response};
 use lys_identity::{
     Actor, AuthMethod, IdentityId, LifecycleState, LoginBinding, OperationId, OrganisationId,
@@ -128,6 +128,7 @@ fn checked(
 /// POST /organisations/found/prove: the eight steps, in order, as one act.
 pub(crate) async fn prove(
     State(state): State<Shared>,
+    headers: HeaderMap,
     asked: Result<Json<ProveBody>, JsonRejection>,
 ) -> Response {
     let mut receipt = FoundingReceipt::default();
@@ -135,6 +136,9 @@ pub(crate) async fn prove(
         Ok(proven) => proven,
         Err(error) => return refused(error, &receipt).await,
     };
+    if let Err(error) = same_person(&state, &headers, proven.founder) {
+        return refused(error, &receipt).await;
+    }
     receipt.operation = proven.operation.to_string();
     let answered = match proven.founding.kind {
         Kind::Founding => steps(&state, &proven, &mut receipt).await,
@@ -399,6 +403,58 @@ async fn admission_steps(
             continue_to: proven.founding.continue_to.clone(),
         },
     ))
+}
+
+/// A link read has no effects; spent and withdrawn proofs have one refusal.
+#[derive(Serialize, utoipa::ToSchema)]
+pub(crate) struct Whom {
+    /// The record this link opens.
+    display_name: String,
+    /// One letter and the domain, never the full address.
+    masked_email: String,
+}
+
+pub(crate) async fn whom(
+    State(state): State<Shared>,
+    Path(proof): Path<String>,
+) -> Result<Json<Whom>, ServerError> {
+    let proven = checked(&state, Ok(Json(ProveBody { proof })))?;
+    let name = founder_name(&state, proven.founder)?;
+    Ok(Json(Whom {
+        display_name: name,
+        masked_email: crate::people_admit_handed::masked_email(&proven.founding.email),
+    }))
+}
+
+fn same_person(
+    state: &AppState,
+    headers: &HeaderMap,
+    intended: PersonId,
+) -> Result<(), ServerError> {
+    let actor = match crate::routes::signed_in(state, headers) {
+        Ok(actor) => actor,
+        Err(ServerError::NotSignedIn) => return Ok(()),
+        Err(error) => return Err(error),
+    };
+    with_directory(state, |directory| {
+        let projection = directory.projection()?;
+        let Some(current) = projection.person_for(actor.binding()) else {
+            return Ok(());
+        };
+        if current == intended {
+            return Ok(());
+        }
+        let name = |person| {
+            projection
+                .record(IdentityId::Person(person))
+                .map(|record| record.profile().display_name().to_owned())
+                .ok_or(ServerError::ProofRefused)
+        };
+        Err(ServerError::SignedInAsAnother {
+            signed_in: name(current)?,
+            intended: name(intended)?,
+        })
+    })
 }
 
 #[cfg(test)]

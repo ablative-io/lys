@@ -15,7 +15,9 @@ async fn the_provider_round_trip_keeps_the_original_authorize_request() -> TestR
         "/oauth/authorize?client_id=cambium&state=a%26b&code_challenge=challenge&scope=openid%20profile",
         "/oauth/mcp/authorize?client_id=connector&state=original",
     ] {
-        let service = Service::start().await?;
+        let (service, _accounts) = identity_contract::fake_rauthy::FakeRauthy::service_for(&Login {
+            subject: "person".to_owned(), email: "person@example.test".to_owned(),
+        }).await?;
         service.issuer.sign_in_as(Login {
             subject: "person".to_owned(),
             email: "person@example.test".to_owned(),
@@ -174,7 +176,9 @@ async fn a_callback_with_another_browsers_cookie_never_creates_a_session() -> Te
 
 #[tokio::test]
 async fn the_bound_browser_can_finish_once_and_a_replay_cannot_sign_in() -> TestResult {
-    let service = Service::start().await?;
+    let (service, _accounts) = identity_contract::fake_rauthy::FakeRauthy::service_for(&Login {
+            subject: "person".to_owned(), email: "person@example.test".to_owned(),
+        }).await?;
     service.issuer.sign_in_as(Login {
         subject: "person".to_owned(),
         email: "person@example.test".to_owned(),

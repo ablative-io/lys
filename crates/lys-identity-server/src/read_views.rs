@@ -120,8 +120,22 @@ pub struct PersonView {
     pub display_name: String,
     /// Their lifecycle state.
     pub state: String,
+    /// Only the administrator's read includes account addresses.
+    #[serde(flatten, skip_serializing_if = "Option::is_none")]
+    pub emails: Option<PersonEmails>,
     /// Every agent that answers to them, in identifier order.
     pub agents: Vec<AgentSummary>,
+}
+
+/// Account addresses shown only in the administrator's directory read.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct PersonEmails {
+    /// The current account address at this installation's issuer, if held.
+    pub sign_in_email: Option<String>,
+    /// The address Lys recorded at admission or founding, if retained.
+    pub admitted_email: Option<String>,
+    /// This original address was first recorded at a provider sign-in.
+    pub email_recorded_at_sign_in: bool,
 }
 
 /// The answer of `GET /people` and `GET /directory/people`.

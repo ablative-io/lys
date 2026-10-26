@@ -355,7 +355,7 @@ pub(crate) struct Done {
 
 #[path = "people_admit_steps.rs"]
 mod execution;
-pub(crate) use execution::steps;
+pub(crate) use execution::{admitted_already, steps};
 
 /// Google's name at the issuer when people may sign in with it, so the
 /// added letter tells the person to choose it.

@@ -135,6 +135,12 @@ impl Projection {
                 record.profile = profile.clone();
                 record.events.push(index);
             }
+            Change::UnbindLogin { binding } => {
+                let record = self.held(identity)?;
+                record.bindings.retain(|held| held != binding);
+                record.events.push(index);
+                Arc::make_mut(&mut self.bindings).remove(binding);
+            }
             Change::BindLogin { binding } => {
                 self.apply_login_binding(identity, binding, index)?;
             }

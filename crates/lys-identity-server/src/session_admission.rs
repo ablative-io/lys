@@ -149,6 +149,60 @@ pub(crate) fn guarded(routes: axum::Router, state: Arc<AppState>) -> axum::Route
     routes.layer(axum::middleware::from_fn_with_state(state, guard))
 }
 
+/// Compare the issuer account email to Lys's held person address under the
+/// same account hold as account writes and login moves, before any session.
+pub(crate) async fn begin_provider(
+    state: &AppState,
+    login: crate::sign_in_callback::ProviderLogin,
+) -> Result<String, ServerError> {
+    let api = crate::sign_in_providers::api(state)?;
+    let binding = login.actor.binding();
+    if binding.issuer() != state.oidc.issuer() {
+        return Err(ServerError::SignInRefused);
+    }
+    let guard = api.lock_account(binding.subject()).await?;
+    let user = crate::accounts::read(api, binding.subject()).await?;
+    if user.get("enabled").and_then(serde_json::Value::as_bool) != Some(true) {
+        return Err(ServerError::SignInRefused);
+    }
+    let email = user
+        .get("email")
+        .and_then(serde_json::Value::as_str)
+        .ok_or_else(|| ServerError::SignInProvidersUnavailable {
+            reason: "the sign-in service's account answer has no email".to_owned(),
+        })?;
+    crate::accounts::check_email(email.trim())?;
+    let provider = api
+        .listed()
+        .await?
+        .into_iter()
+        .find(|provider| provider.id == login.provider)
+        .map_or(login.provider, |provider| provider.name);
+    let answer = with_directory(state, |directory| {
+        let projection = directory.projection()?;
+        let person = projection
+            .person_for(login.actor.binding())
+            .ok_or(ServerError::NoPerson)?
+            .to_string();
+        bound_caller(projection, &login.actor, true)?;
+        let mut foundings = crate::organisations_found::foundings(state)?;
+        if let Some(held) = foundings.email_for(&person) {
+            if email.trim().to_lowercase() != held.trim().to_lowercase() {
+                return Err(ServerError::ProviderEmailMismatch {
+                    provider,
+                    account: crate::people_admit_handed::masked_email(email.trim()),
+                    held: crate::people_admit_handed::masked_email(held.trim()),
+                });
+            }
+        } else {
+            foundings.hold_email(&person, email.trim(), true)?;
+        }
+        state.sessions.begin(login.actor)
+    });
+    drop(guard);
+    answer
+}
+
 #[cfg(test)]
 #[path = "session_admission_tests.rs"]
 mod tests;

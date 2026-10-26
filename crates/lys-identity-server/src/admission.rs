@@ -26,7 +26,7 @@
 use std::sync::RwLock;
 
 use lys_identity::projection::{Projection, Record};
-use lys_identity::{Actor, AgentId, IdentityId, LifecycleState, LoginBinding};
+use lys_identity::{Actor, AgentId, IdentityId, LifecycleState, LoginBinding, PersonId};
 
 use crate::error::ServerError;
 
@@ -69,11 +69,27 @@ impl Admission {
             .clone())
     }
 
+    /// The founder is an enduring person, so moving the configured login
+    /// cannot move the install's implicit administrator authority with it.
+    pub(crate) fn administrator_person(
+        directory: &Projection,
+        login: &LoginBinding,
+    ) -> Option<PersonId> {
+        let bound = directory.person_for(login)?;
+        Some(
+            directory
+                .organisation_of(IdentityId::Person(bound))
+                .and_then(|id| directory.record(IdentityId::Organisation(id)))
+                .and_then(Record::founder)
+                .unwrap_or(bound),
+        )
+    }
+
     pub(crate) fn administrator_name(
         directory: &Projection,
         login: &LoginBinding,
     ) -> Option<String> {
-        let person = directory.person_for(login)?;
+        let person = Self::administrator_person(directory, login)?;
         let record = directory.record(IdentityId::Person(person))?;
         (record.state() == LifecycleState::Active)
             .then(|| record.profile().display_name().to_owned())
@@ -124,6 +140,11 @@ impl Admission {
         let Some(person) = directory.person_for(actor.binding()) else {
             return Ok(());
         };
+        if Self::administrator_person(directory, actor.binding()) != Some(person) {
+            return Err(ServerError::NotAdmitted {
+                reason: "moving a sign-in does not move the original person's administrator authority",
+            });
+        }
         let record = directory
             .record(IdentityId::Person(person))
             .ok_or(ServerError::NoPerson)?;

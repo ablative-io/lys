@@ -77,6 +77,39 @@ macro_rules! directory_refusals {
         /// The address held by that account.
         email: String,
     },
+    /// A browser already holds another person's session.
+    #[error("SignedInAsAnother: You are signed in as {signed_in}. This link is for {intended}. Ask the person who sent it.")]
+    SignedInAsAnother {
+        /// The current person's display name.
+        signed_in: String,
+        /// The link's person's display name.
+        intended: String,
+    },
+    /// An own email change needs a letter to prove the new address.
+    #[error("EmailChangeNeedsMail: Lys has no mail settings. Ask an administrator to change the email from your Account page.")]
+    EmailChangeNeedsMail,
+    /// A code is wrong, replaced, spent, or belongs to another account.
+    #[error("EmailChangeCodeRefused: This email code is not waiting for you, or was replaced or used. Ask for a new code.")]
+    EmailChangeCodeRefused,
+    /// The issuer account does not agree with the person's held address.
+    #[error("ProviderEmailMismatch: {provider} returned the sign-in account {account}, but Lys holds {held} for this person. Ask an administrator to check your Account page.")]
+    ProviderEmailMismatch {
+        /// The provider of this login.
+        provider: String,
+        /// The address Lys holds for this person, masked.
+        held: String,
+        /// The issuer account's address, masked.
+        account: String,
+    },
+    /// The source no longer holds the chosen login.
+    #[error("LoginNotBound: This login is not bound to the source person.")]
+    LoginNotBound,
+    /// The source and target are the person already holding this login.
+    #[error("SameTarget: This sign-in is already bound to that person.")]
+    SameTarget,
+    /// Both people must belong to the administrator's organisation.
+    #[error("NotSameOrganisation: The source and target must belong to the same organisation.")]
+    NotSameOrganisation,
     /// No unspent admission link is waiting for the person.
     #[error("NoUnspentAdmission: no unspent admission link is waiting for this person")]
     NoUnspentAdmission,

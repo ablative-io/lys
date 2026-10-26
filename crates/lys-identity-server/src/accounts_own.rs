@@ -1,16 +1,6 @@
-//! A person's own account: the account read every account screen shows, and
-//! the person's own email and password. Split from `accounts.rs` so each file
-//! stays under 500 lines (ADR-111).
-//!
-//! The account read says whether the account has a password, as the issuer's
-//! account type says it (null when the issuer names a type Lys does not know,
-//! which is then confirmed as though it had one), and the providers it signs
-//! in with, by the name the sign-in page offers them under. A change to an account that has a password
-//! is confirmed by it: a sign-in carried to the issuer exactly as the sign-in
-//! page carries one. An account with no password, one that signs in through a
-//! provider, has nothing to confirm with: its signed-in session is the only
-//! proof there is, so its email is changed and a first password set with no
-//! current one. The session's age is never a condition.
+//! A person's account. An own email change requires a mailed, single-use
+//! proof for each of the new and held addresses. Password confirmation remains
+//! required when the account has one. Pending proofs are forgotten on service restart.
 
 use std::sync::Arc;
 
@@ -156,13 +146,42 @@ pub(super) async fn own_email(
     let body = body_of(body)?;
     let email = check_email(&body.email)?.to_owned();
     confirmed(&state, &extensions, &id, body.password.as_deref()).await?;
+    let mailer = state
+        .mailer
+        .as_ref()
+        .ok_or(ServerError::EmailChangeNeedsMail)?;
     let api = api(&state)?;
-    change(api, &id, |update| {
-        update["email"] = Value::String(email);
-        update["email_verified"] = Value::Bool(true);
-    })
-    .await?;
-    shown(api, &id).await
+    let mut changes = api.email_changes.lock().await;
+    let guard = api.lock_account(&id).await?;
+    let owner = super::email_changes::owner(&state, &actor)?;
+    let held = super::email_changes::held(&state, &owner)?;
+    super::email_changes::available(&state, api, &owner, &email).await?;
+    let code = crate::foundings_store::new_token()?;
+    let held_code = crate::foundings_store::new_token()?;
+    // A newer ask invalidates both predecessors even if either send fails.
+    changes.remove(&id);
+    for (address, code, leaving) in [(&email, &code, false), (&held, &held_code, true)] {
+        let letter = crate::mail_letters::Letter::EmailChange {
+            email: address.clone(),
+            code: code.clone(),
+            leaving,
+        };
+        mailer
+            .send_once(&lys_identity::OperationId::generate()?.to_string(), &letter)
+            .await?;
+    }
+    changes.insert(
+        id,
+        PendingEmail {
+            email,
+            held,
+            digest: crate::foundings_store::digest(&code),
+            held_digest: crate::foundings_store::digest(&held_code),
+            owner,
+        },
+    );
+    drop(guard);
+    Ok(Json(json!({"pending": true})))
 }
 
 /// A new password, confirmed by the current one when the account has one. Never printed.
@@ -190,9 +209,65 @@ pub(super) async fn own_password(
     let api = api(&state)?;
     change(api, &id, |update| {
         update["password"] = Value::String(body.password);
-        update["email_verified"] = Value::Bool(true);
     })
     .await?;
+    shown(api, &id).await
+}
+
+/// A pending proof belongs to the person who asked, as well as the issuer
+/// account: moving a login cannot transfer an old email proof to its target.
+pub(crate) struct PendingEmail {
+    email: String,
+    digest: String,
+    held_digest: String,
+    held: String,
+    owner: String,
+}
+
+/// Both mailbox codes, never printed or stored in clear. Missing codes
+/// receive the same named refusal as wrong, replaced or spent ones.
+#[derive(Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct ConfirmEmail {
+    #[serde(default)]
+    code: Option<String>,
+    #[serde(default)]
+    held_code: Option<String>,
+}
+
+pub(super) async fn confirm_email(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    body: Result<Json<ConfirmEmail>, JsonRejection>,
+) -> Result<Json<Value>, ServerError> {
+    let actor = signed_in(&state, &headers)?;
+    let id = own_id(&state, &actor)?;
+    let body = body_of(body)?;
+    let api = api(&state)?;
+    let mut changes = api.email_changes.lock().await;
+    let guard = api.lock_account(&id).await?;
+    let owner = super::email_changes::owner(&state, &actor)?;
+    let (Some(code), Some(held_code)) = (body.code, body.held_code) else {
+        return Err(ServerError::EmailChangeCodeRefused);
+    };
+    let pending = changes
+        .get(&id)
+        .filter(|pending| {
+            pending.owner == owner
+                && pending.digest == crate::foundings_store::digest(&code)
+                && pending.held_digest == crate::foundings_store::digest(&held_code)
+        })
+        .ok_or(ServerError::EmailChangeCodeRefused)?;
+    if super::email_changes::held(&state, &owner)? != pending.held {
+        return Err(ServerError::EmailChangeCodeRefused);
+    }
+    let email = pending.email.clone();
+    super::email_changes::available(&state, api, &owner, &email).await?;
+    // Spend both before the issuer write, including uncertain transport outcomes.
+    changes.remove(&id);
+    super::email_changes::write_email(&state, api, &id, &owner, &email).await?;
+    drop(guard);
+    drop(changes);
     shown(api, &id).await
 }
 

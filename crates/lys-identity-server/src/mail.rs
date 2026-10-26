@@ -296,6 +296,23 @@ impl Mailer {
         self.recorded(operation, letter)
     }
 
+    /// Admission addresses already recorded by Lys; a read never repairs data.
+    pub(crate) async fn added_addresses(&self) -> Result<Vec<(String, String)>, ServerError> {
+        let _one = self.record.lock().await;
+        let text = match std::fs::read_to_string(&self.sent_file) {
+            Ok(text) => text,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
+            Err(error) => return Err(record_unavailable(&self.sent_file, &error)),
+        };
+        text.lines().filter(|line| !line.trim().is_empty()).map(|line| {
+            serde_json::from_str::<Sent>(line).map_err(|error| record_unavailable(&self.sent_file, &error))
+        }).filter_map(|sent| match sent {
+            Ok(sent) if sent.letter == "added" => Some(Ok((sent.operation, sent.to))),
+            Ok(_) => None,
+            Err(error) => Some(Err(error)),
+        }).collect()
+    }
+
     /// Who the record says sent `letter` for `operation`, if anyone.
     fn recorded(&self, operation: &str, letter: &str) -> Result<Option<Sender>, ServerError> {
         let text = match std::fs::read_to_string(&self.sent_file) {

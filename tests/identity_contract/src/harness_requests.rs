@@ -83,11 +83,23 @@ impl Service {
     /// # Errors
     /// Propagates the service, transport or decoding failure for this fixture step.
     pub async fn issuer_answer(&self, login: Login) -> Result<(String, String), Box<dyn Error>> {
+        self.issuer_answer_from(login, "harness").await
+    }
+
+    /// Complete the named provider's flight through the unmodified issuer protocol.
+    ///
+    /// # Errors
+    /// Propagates fixture, transport and callback decoding failures.
+    pub async fn issuer_answer_from(
+        &self,
+        login: Login,
+        provider: &str,
+    ) -> Result<(String, String), Box<dyn Error>> {
         let timing = StageTimer::new("http.issuer_answer");
         self.issuer.sign_in_as(login)?;
         let to_issuer = self
             .client
-            .get(format!("{}/sign-in/providers/harness", self.base))
+            .get(format!("{}/sign-in/providers/{provider}", self.base))
             .send()
             .await?;
         let authorize = location(&to_issuer)?;

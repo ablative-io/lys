@@ -153,6 +153,8 @@ const PAIRING: &str = "a pairing is a person's to decide: the agent is registere
 pub const HUMAN_ONLY: &[(Method, &str, &str)] = &[
     (GET, "/me/account", CREDENTIALS),
     (POST, "/me/account/email", CREDENTIALS),
+    (POST, "/me/account/email/confirm", CREDENTIALS),
+    (POST, "/people/{id}/logins/move", CREDENTIALS),
     (POST, "/me/account/password", CREDENTIALS),
     (POST, "/directory/people/{id}/account/password", CREDENTIALS),
     (POST, "/people/{id}/logins", CREDENTIALS),
@@ -290,12 +292,14 @@ pub(crate) const TABLE: &[E] = entries! {
     GET "/identities/{id}" "One identity of the caller's organisation" G [ADMIN, &["IdentifierMalformed", "IdentityUnknown"]] scope("identity", "read", ["id"]);
     POST "/identities/{id}/profile" "Change an identity's profile" G [ADMIN_BODY, AGENT, GRANT_ASKED, UNANSWERED, &["NotHeld", "Revoked", "HoldingNotHeld", "TeamsUnavailable", "NoPerson", "IdentityUnknown", "OperationReused", "ProfileInvalid"]] scope("person", "person.profile.set", ["id"]);
     POST "/identities/{id}/transitions" "Move an identity's state; a person's app pass only activates an own registered agent" G [APP_PERSON, ADMIN_BODY, &["TransitionRefused"]] scope("identity", "identity.transition", ["id"]);
+    POST "/people/{id}/logins/move" "Move a sign-in to its rightful person in one recorded batch; grants stay on their people" S [ADMIN_BODY, &["LoginNotBound", "SameTarget", "NotSameOrganisation", "WithheldFromAgents"]] scope("person", "person.login.bind", ["id"]);
     POST "/people/{id}/logins" "Bind a login to a person" S [ADMIN_BODY, &["WithheldFromAgents"]] scope("person", "person.login.bind", ["id"]);
     GET "/people/{id}/admission" "Whether an admission link is waiting for this person" S [ADMIN, &["NoPerson", "IdentifierMalformed", "DirectoryUnavailable"]] scope("organisation", "organisation.administer", []);
     POST "/people/{id}/admission/withdraw" "Withdraw this person's unspent admission link, retaining its digest and actor" S [ADMIN, &["NoPerson", "IdentifierMalformed", "NoUnspentAdmission", "DirectoryUnavailable"]] scope("organisation", "organisation.administer", []);
     POST "/people/admit" "Admit a person in one act: register, issuer account by email, bind, activate, a first root grant only when one is asked for, and the added letter; a person's app pass admits only with a first grant on its app's own kind" G [AGENT, APP_PERSON, ADMIN_BODY, &["EmailHeldByAnother", "organisation_not_own", "RelationUnknown", "OperationReused", "mail_not_sent", "app_admit_grant_required", "not_your_app", "kind_not_registered"]] scope("organisation", "organisation.admit", []);
     POST "/organisations/found" "A stranger founds an organisation: the organisation and its founder recorded, a proving link written to the founder's email; one answer shape to everyone" P [&["RequestMalformed", "mail_not_sent"]];
-    POST "/organisations/found/prove" "The proving link: the founder's account, binding, activation, the organisation's activation, the founder's administrator grant and their first session, the proof spent last" P [&["proof_refused", "already_admitted", "AccountRefused", "RequestMalformed"]];
+    GET "/organisations/found/{proof}/whom" "Whose record a proof opens, with a masked address, without spending it" P [&["proof_refused"]];
+    POST "/organisations/found/prove" "The proving link: the founder's account, binding, activation, the organisation's activation, the founder's administrator grant and their first session, the proof spent last" P [&["proof_refused", "already_admitted", "SignedInAsAnother", "AccountRefused", "RequestMalformed"]];
     POST "/pair" "An agent with no identity asks for a pairing code over its fresh key: the four words to tell its person, the wait id and the address where the person enters them" P [&["pair_request_invalid"]];
     GET "/pair/{wait}" "The waiting agent's answer, held open until its person decides: its identity, certificate and the organisation's approved apps, or the decline; an unknown or already answered wait is refused at once" P [&["pair_unknown", "pair_declined"]];
     POST "/pair/{wait}/taken" "The agent has its answer: the decided pairing is removed, once; an undecided, unknown or already taken wait is refused at once" P [&["pair_unknown"]];
@@ -447,7 +451,8 @@ pub(crate) const TABLE: &[E] = entries! {
     POST "/setup/administrator" "Register the first administrator" P [&["SignInFailed", "SignInThrottled", "AccountRefused", "SetupClosed", "SetupCodeRefused", "SignInRefused", "IssuerChallengeExpired", "IssuerRefused", "SignInProvidersUnavailable", "SignInProvidersRefused", "SessionsUnavailable", "DirectoryUnavailable"]];
     POST "/setup/password" "Set the administrator's password without changing other sign-in factors" P [&["SignInFailed", "SignInThrottled", "SetupCodeRefused", "SetupUnavailable", "AccountRefused", "SecondFactorUnsupported", "SignInRefused", "IssuerChallengeExpired", "IssuerRefused", "SignInProvidersUnavailable", "SignInProvidersRefused", "SessionsUnavailable", "DirectoryUnavailable"]];
     GET "/me/account" "The caller's sign-in account: its email, whether it may sign in, whether it has a password and the providers it signs in with" C [SIGNED, &["AccountRefused"]];
-    POST "/me/account/email" "Change the caller's email, confirmed by their password when the account has one" C [SIGNED_BODY, &["AccountRefused"]];
+    POST "/me/account/email" "Mail codes to the new and held addresses, confirmed by the current password when held" C [SIGNED_BODY, &["AccountRefused", "EmailChangeNeedsMail", "EmailHeldByAnother", "mail_not_sent"]];
+    POST "/me/account/email/confirm" "Confirm both mailbox codes and replace the held address" C [SIGNED_BODY, &["AccountRefused", "EmailChangeCodeRefused", "EmailHeldByAnother"]];
     POST "/me/account/password" "Set or change the caller's password, confirmed by the current one when the account has one" C [SIGNED_BODY, &["AccountRefused"]];
     GET "/directory/people/{id}/account" "A person's sign-in account" G [ADMIN, AGENT, GRANT_ASKED, UNANSWERED, &["NotHeld", "Revoked", "HoldingNotHeld", "TeamsUnavailable", "NoPerson", "AccountRefused", "IdentityUnknown"]] scope("account", "read", ["id"]);
     POST "/directory/people/{id}/account/email" "Change a person's email" G [ADMIN_BODY, AGENT, GRANT_ASKED, UNANSWERED, &["NotHeld", "Revoked", "HoldingNotHeld", "TeamsUnavailable", "NoPerson", "AccountRefused", "IdentityUnknown"]] scope("account", "person.email.set", ["id"]);

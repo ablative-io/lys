@@ -44,6 +44,7 @@ use super::{
 use crate::error::ServerError;
 use crate::oidc::Oidc;
 use crate::routes::AppState;
+use crate::sign_in_callback::ProviderLogin;
 use crate::sign_in_refusal_line as refusal_line;
 
 /// Where a person lands once a provider sign-in has finished, on Lys's origin.
@@ -51,6 +52,7 @@ const SIGNED_IN: &str = "/#/me";
 
 /// A provider sign-in the service began at the issuer and has not finished.
 pub(super) struct Upstream {
+    provider: String,
     opened: Opened,
     xsrf: String,
     verifier: String,
@@ -181,6 +183,7 @@ impl IssuerSignIn {
         held.insert(
             upstream,
             Upstream {
+                provider: provider.to_owned(),
                 opened,
                 xsrf,
                 verifier,
@@ -212,7 +215,7 @@ impl IssuerSignIn {
             .finish_provider_to(oidc, code, upstream, address, browser)
             .await
         {
-            Ok((actor, _)) => Ok(actor),
+            Ok((login, _)) => Ok(login.actor),
             Err(refused) => Err(refused.error),
         }
     }
@@ -224,7 +227,7 @@ impl IssuerSignIn {
         upstream: &str,
         address: IpAddr,
         browser: [u8; 32],
-    ) -> Result<(Actor, Option<Continuation>), Box<Refused>> {
+    ) -> Result<(ProviderLogin, Option<Continuation>), Box<Refused>> {
         let held = self
             .upstream
             .lock()
@@ -258,7 +261,7 @@ impl IssuerSignIn {
         upstream: &str,
         address: IpAddr,
         held: Upstream,
-    ) -> Result<Actor, ProviderRefusal> {
+    ) -> Result<ProviderLogin, ProviderRefusal> {
         let body = json!({
             "state": upstream,
             "code": code,
@@ -285,7 +288,13 @@ impl IssuerSignIn {
         };
         match outcome {
             Ok((code, answered)) if answered == held.state => {
-                oidc.finish(code, &held.state).await.map_err(Into::into)
+                oidc.finish_provider(code, &held.state)
+                    .await
+                    .map(|actor| ProviderLogin {
+                        actor,
+                        provider: held.provider,
+                    })
+                    .map_err(Into::into)
             }
             Ok(_) => {
                 oidc.abandon(&held.state)?;
@@ -313,7 +322,8 @@ fn refused_to_sign_in(
     continuation: Option<&Continuation>,
     email: Option<&str>,
 ) -> Response {
-    // The browser is told only the refusal's name; the refusal, the route,
+    // The browser receives the named refusal and masked mismatch addresses.
+    // The refusal, the route,
     // the address tried and the refusal's sanitised words are said through
     // the WARN sink into the service's log, so whoever reads it can see who
     // and why (DIRECTORY-099 R2).
@@ -331,6 +341,23 @@ fn sent_to_sign_in(
     email: Option<&str>,
 ) -> Response {
     let mut location = format!("{SIGN_IN_SCREEN}?refused={}", error.name());
+    if let ServerError::ProviderEmailMismatch {
+        provider,
+        account,
+        held,
+    } = error
+    {
+        for (name, value) in [
+            ("provider", provider),
+            ("account_email", account),
+            ("held_email", held),
+        ] {
+            location.push('&');
+            location.push_str(name);
+            location.push('=');
+            location.push_str(&crate::provider::encoded(value));
+        }
+    }
     if let Some(email) = email {
         location.push_str("&email=");
         location.push_str(&crate::provider::encoded(email));
@@ -450,7 +477,7 @@ async fn finish(
         .sign_in
         .finish_provider_to(&state.oidc, &code, &upstream, address, browser)
         .await?;
-    match crate::session_admission::begin(state, actor).await {
+    match crate::session_admission::begin_provider(state, actor).await {
         Ok(cookie) => Ok((cookie, continuation)),
         Err(error) => Err(Refused {
             error,

@@ -91,10 +91,13 @@ fn decode_change(kind: u64, value: Value) -> Result<Change, IdentityError> {
                 profile: decode_profile(shown)?,
             })
         }
-        wire::BIND_LOGIN => {
+        wire::BIND_LOGIN | wire::UNBIND_LOGIN => {
             let [issuer, subject] = fields::<2>(value, "a login binding is a map of keys 1 and 2")?;
-            Ok(Change::BindLogin {
-                binding: LoginBinding::new(&as_text(issuer, TEXT)?, &as_text(subject, TEXT)?)?,
+            let binding = LoginBinding::new(&as_text(issuer, TEXT)?, &as_text(subject, TEXT)?)?;
+            Ok(if kind == wire::UNBIND_LOGIN {
+                Change::UnbindLogin { binding }
+            } else {
+                Change::BindLogin { binding }
             })
         }
         wire::TRANSITION => {
@@ -280,7 +283,8 @@ pub fn decode_body_before_organisations(body: &[u8]) -> Result<IdentityEvent, Id
     match event.change() {
         Change::FoundOrganisation { .. }
         | Change::AttachOrganisation { .. }
-        | Change::AdmissionWithdrawn { .. } => Err(malformed("a change kind is 1 to 10")),
+        | Change::AdmissionWithdrawn { .. }
+        | Change::UnbindLogin { .. } => Err(malformed("a change kind is 1 to 10")),
         Change::RegisterPerson {
             organisation: Some(_),
             ..

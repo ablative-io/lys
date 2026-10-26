@@ -27,6 +27,50 @@ fn token_after(link: &str, path: &str) -> Result<String, Box<dyn Error>> {
     Ok(after.to_owned())
 }
 
+#[tokio::test]
+async fn whom_names_the_person_masks_the_email_and_spends_nothing() -> TestResult {
+    let (service, _rauthy, ada, _sink) = table(false).await?;
+    let admitted = admit_bea(&service, &ada).await?;
+    let token = token_after(&handed(&admitted)?, "/#/added/")?;
+    let before = foundings(&service)?;
+    let path = format!("/organisations/found/{token}/whom");
+    let (status, whom) = service.get(&path, None).await?;
+    assert_eq!(status, 200, "{whom}");
+    assert_eq!(whom, json!({"display_name": "Bea", "masked_email": "b…@example.test"}));
+    assert_eq!(foundings(&service)?, before);
+    let (status, _, _) = prove(&service, &token).await?;
+    assert_eq!(status, 200);
+    let spent = service.get(&path, None).await?;
+    let unknown = service.get("/organisations/found/unknown/whom", None).await?;
+    assert_eq!(spent, unknown);
+    let later = admit_bea(&service, &ada).await?;
+    let token = token_after(&handed(&later)?, "/#/added/")?;
+    let person = admitted["person"].as_str().ok_or("Bea")?;
+    let (status, _) = service.post(&format!("/people/{person}/admission/withdraw"), Some(&ada), &json!({})).await?;
+    assert_eq!(status, 200);
+    assert_eq!(service.get(&format!("/organisations/found/{token}/whom"), None).await?, unknown);
+    Ok(())
+}
+
+#[tokio::test]
+async fn another_persons_session_refuses_a_proof_without_spending_or_ending_it() -> TestResult {
+    let (service, _rauthy, ada, _sink) = table(false).await?;
+    let admitted = admit_bea(&service, &ada).await?;
+    let token = token_after(&handed(&admitted)?, "/#/added/")?;
+    let before = foundings(&service)?;
+    let (status, refused) = service.post(founding::PROVE, Some(&ada), &json!({"proof": token})).await?;
+    assert_eq!(status, 409, "{refused}");
+    assert_eq!(refused["refusal"], "SignedInAsAnother");
+    let words = refused["reason"].as_str().ok_or("the refusal's words")?;
+    assert!(words.contains("Ada Lovelace") && words.contains("Bea"), "{words}");
+    assert_eq!(foundings(&service)?, before);
+    assert_eq!(service.get("/me", Some(&ada)).await?.0, 200);
+    let (status, proved, _) = prove(&service, &token).await?;
+    assert_eq!(status, 200, "{proved}");
+    assert_eq!(proved["person"], admitted["person"]);
+    Ok(())
+}
+
 /// The handed link in an answer's letter view.
 fn handed(answer: &Value) -> Result<String, Box<dyn Error>> {
     assert_eq!(answer["letter"]["sent"], false, "{answer}");

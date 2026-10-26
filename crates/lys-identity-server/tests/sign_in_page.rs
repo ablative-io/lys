@@ -250,7 +250,9 @@ async fn failed_sign_ins_from_one_address_do_not_bar_another() -> TestResult {
 
 #[tokio::test]
 async fn a_provider_sign_in_passes_through_the_provider_and_lys_only() -> TestResult {
-    let service = Service::start().await?;
+    let (service, _accounts) = identity_contract::fake_rauthy::FakeRauthy::service_for(&Login {
+        subject: "google-subject".to_owned(), email: "g@example.test".to_owned(),
+    }).await?;
     service.issuer.sign_in_as(Login {
         subject: "google-subject".to_owned(),
         email: "g@example.test".to_owned(),
@@ -300,8 +302,9 @@ async fn a_provider_sign_in_passes_through_the_provider_and_lys_only() -> TestRe
     }
     let cookie = cookie.ok_or("the provider sign-in began a session")?;
     let (status, me) = service.get("/me", Some(&cookie)).await?;
-    assert_eq!(status, 403, "signed in, bound to no person yet: {me}");
-    assert_eq!(me["refusal"], "NoPerson");
+    assert_eq!(status, 200, "signed in as the bound person: {me}");
+    assert_eq!(me["signed_in"]["subject"], "google-subject");
+    assert!(me["person"]["id"].is_string());
     Ok(())
 }
 

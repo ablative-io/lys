@@ -90,12 +90,17 @@ describe('Account changes belong in Settings', () => {
   });
 
   it('saves the email, closes the form, and reopens every field empty', async () => {
-    const posted = await open('#/settings/account', { ...SERVICE, 'POST /me/account/email': ok({ email: 'ada@lovelace.test', enabled: true }) });
+    const posted = await open('#/settings/account', { ...SERVICE, 'POST /me/account/email': ok({ pending: true }), 'POST /me/account/email/confirm': ok({ email: 'ada@lovelace.test', enabled: true }) });
     await press('Change email');
     fill({ 'account-email': ' ada@lovelace.test ', 'account-password': 'Confirmation-password' });
     await save('Change your email');
     expect(posted).toEqual([{ path: '/me/account/email', body: { email: 'ada@lovelace.test', password: 'Confirmation-password' } }]);
     expect($$('input[type="password"]')).toHaveLength(0);
+    expect(text()).toContain('You sign in with ada@example.test.');
+    expect(text()).not.toContain('You now sign in with ada@lovelace.test.');
+    fill({ 'account-email-code': 'mailed-code', 'account-held-email-code': 'held-code' });
+    await save('Confirm your email');
+    expect(posted[1]).toEqual({ path: '/me/account/email/confirm', body: { code: 'mailed-code', held_code: 'held-code' } });
     expect(text()).toContain('You now sign in with ada@lovelace.test.');
     await press('Change email');
     expect(fields().map((input) => input.value)).toEqual(['', '']);

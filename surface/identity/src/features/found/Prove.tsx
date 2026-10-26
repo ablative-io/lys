@@ -1,7 +1,7 @@
 /**
  * The proving page (DIRECTORY-111 R3), outside the signed-in shell: the
- * letter's link lands here with the proof in the address, and one button
- * posts it. Nothing is posted on load, because mail scanners open links.
+ * letter's link lands here with the proof in the address. A read names
+ * whose record it opens before either act. Nothing is posted on load.
  * On success the founder is signed in by the answer's cookie and lands on
  * their account page to set a password; a refusal is shown in words with
  * the way back to sign-in.
@@ -13,7 +13,7 @@
  * account page in the navigation's state, never the address, so no link
  * can put an address on Lys's page.
  */
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import { Refused, request } from '../../api';
 import type { OrganisationProved } from '../../generated';
@@ -35,9 +35,21 @@ export function Prove({ admission = false }: { admission?: boolean }) {
   const heading = useRef<HTMLHeadingElement>(null);
   const [busy, setBusy] = useState(false);
   const [refusal, setRefusal] = useState<{ name: string; words: string } | null>(null);
-  const act = admission ? 'Sign in' : 'Finish founding';
+  const [whom, setWhom] = useState<{ display_name: string; masked_email: string } | null>(null);
+  const [declined, setDeclined] = useState(false);
+  useEffect(() => {
+    let live = true;
+    setWhom(null); setDeclined(false); setRefusal(null);
+    request<{ display_name: string; masked_email: string }>('/organisations/found/' + encodeURIComponent(proof) + '/whom').then(
+      (answer) => { if (live) setWhom(answer); },
+      (failure: unknown) => { if (live) setRefusal({ name: failure instanceof Refused ? failure.refusal.refusal : '', words: foundingReasonOf(failure) }); },
+    );
+    return () => { live = false; };
+  }, [proof]);
+  const act = whom ? `I am ${whom.display_name}, sign me in` : 'Reading whose link this is…';
 
   async function finish() {
+    if (busy || !whom || declined) return;
     setBusy(true);
     setRefusal(null);
     try {
@@ -53,8 +65,11 @@ export function Prove({ admission = false }: { admission?: boolean }) {
   return <div className="page sign-in found">
     <LysMark />
     <h1 ref={heading} tabIndex={-1}>{admission ? 'Sign in to Lys' : 'Finish founding'}</h1>
-    <p className="sub">{admission ? 'This link signs you in to Lys once. Press the button to finish and sign in.' : 'This link proves your email address. Press the button to finish founding your organisation and sign in.'}</p>
+    <p className="sub">{whom ? `This link is for ${whom.display_name} (${whom.masked_email})` : 'Reading whose link this is…'}</p>
     {refusal ? <p role="alert" className="why-not">{refusal.words}{refusal.name === 'proof_refused' || refusal.name === 'already_admitted' ? <> <a href="#/sign-in">Go to sign in</a>.</> : null}</p> : null}
-    <Act symbol="enter" name={busy ? 'Finishing…' : act} word={busy ? 'Finishing…' : act} tone="primary" disabled={busy || !proof} onClick={finish} />
+    {declined ? <p role="status">Ask the person who sent this link to send the right one. This link has not been used.</p> : whom ? <>
+      <Act symbol="enter" name={busy ? 'Finishing…' : act} word={busy ? 'Finishing…' : act} tone="primary" disabled={busy || !proof} onClick={finish} />
+      <Act symbol="close" name="This isn't me" word="This isn't me" disabled={busy} onClick={() => setDeclined(true)} />
+    </> : null}
   </div>;
 }

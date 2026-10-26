@@ -42,7 +42,13 @@ macro_rules! unavailable_refusals {
 
 macro_rules! conflicting_refusals {
     () => {
-        ServerError::EmailHeldByAnother { .. }
+        ServerError::SignedInAsAnother { .. }
+            | ServerError::EmailChangeNeedsMail
+            | ServerError::EmailChangeCodeRefused
+            | ServerError::LoginNotBound
+            | ServerError::SameTarget
+            | ServerError::NotSameOrganisation
+            | ServerError::EmailHeldByAnother { .. }
             | ServerError::RequestDecided { .. }
             | ServerError::RequestHeld { .. }
             | ServerError::RequestReused { .. }
@@ -256,6 +262,7 @@ impl ServerError {
             Self::Inactive { .. }
             | Self::AgentHasNoPolicy { .. }
             | Self::NotAdmitted { .. }
+            | Self::ProviderEmailMismatch { .. }
             | Self::ProofRefused
             | Self::AlreadyAdmitted
             | Self::OrganisationNotOwn { .. }

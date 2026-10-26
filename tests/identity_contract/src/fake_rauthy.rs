@@ -106,6 +106,41 @@ impl FakeRauthy {
         Ok(Self { inner })
     }
 
+    /// A service with the bound account a provider round trip will open.
+    /// Existing sign-in tests keep their subject and all browser assertions.
+    ///
+    /// # Errors
+    /// Propagates fixture, service-start and account-store failures.
+    pub async fn service_for(
+        login: &crate::fake_issuer::Login,
+    ) -> Result<(crate::harness::Service, Self), Box<dyn Error>> {
+        let api = Self::start().await?;
+        held(&api.inner.users)?.push(json!({
+            "id": login.subject, "email": login.email, "email_verified": true,
+            "enabled": true, "language": "en", "roles": [], "user_values": {},
+            "account_type": "federated",
+        }));
+        let settings = lys_identity_server::sign_in_providers::SignInProvidersSettings {
+            api: api.api().to_owned(),
+            api_key_file: api.api_key_file(),
+        };
+        let (service, ()) = crate::harness::Service::start_setting(
+            crate::harness::GRANT_MODEL,
+            None,
+            None,
+            Some(settings),
+            |config| {
+                lys_identity_server::dev_seed::seed_configured(
+                    config,
+                    [login.subject.as_str(), "provider-fixture-other"],
+                )?;
+                Ok(())
+            },
+        )
+        .await?;
+        Ok((service, api))
+    }
+
     /// The API base the service is configured with.
     #[must_use]
     pub fn api(&self) -> &str {

@@ -42,6 +42,9 @@ use crate::read_views::{
 };
 use crate::routes::{AppState, signed_in, with_directory};
 
+#[path = "read_people_emails.rs"]
+mod people_emails;
+
 #[cfg(test)]
 #[path = "read_api_index_tests.rs"]
 mod index_tests;
@@ -162,6 +165,7 @@ fn person_view(id: PersonId, record: &Record, agents: Vec<AgentSummary>) -> Pers
         id: text,
         display_name,
         state,
+        emails: None,
         agents,
     }
 }
@@ -263,9 +267,10 @@ async fn every_person(
 ) -> Result<Json<PeopleView>, ServerError> {
     let actor = signed_in(&state, &headers)?;
     crate::routes::administrator(&state, &actor)?;
-    with_directory(&state, |directory| {
+    let answer = with_directory(&state, |directory| {
         people_within(&state, &actor, query, "/directory/people", directory)
-    })
+    })?;
+    people_emails::attach(&state, answer).await
 }
 
 /// Every person of the caller's organisation, paged as `route`, once the

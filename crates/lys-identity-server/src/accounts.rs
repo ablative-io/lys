@@ -8,8 +8,8 @@
 //! it is given. An incomplete account answer is refused before a write,
 //! so an unknown saved value is never replaced by a guessed default.
 //!
-//! A person changes their own email, confirmed by their password, and their
-//! own password, confirmed by the current one; the confirmation is a
+//! An own email change requires single-use codes mailed to the new and held
+//! addresses, as well as the current password when held. Password confirmation is a
 //! sign-in carried to the issuer exactly as the sign-in page carries one.
 //! The administrator changes any person's email, sets them a new password,
 //! and enables or disables their sign-in. A person's account is the login
@@ -54,7 +54,7 @@ mod own;
 #[path = "accounts_policy.rs"]
 mod policy;
 use own::shown;
-pub(crate) use own::{OwnEmail, OwnPassword};
+pub(crate) use own::{ConfirmEmail, OwnEmail, OwnPassword, PendingEmail};
 pub use policy::{PasswordPolicy, check_email, check_password};
 
 /// The name the issuer keeps for a person, when `display_name` is one the
@@ -280,6 +280,7 @@ pub fn routes() -> Router<Arc<AppState>> {
     Router::new()
         .route("/me/account", get(own::own_account))
         .route("/me/account/email", post(own::own_email))
+        .route("/me/account/email/confirm", post(own::confirm_email))
         .route("/me/account/password", post(own::own_password))
         .route("/directory/people/{id}/account", get(account_of))
         .route("/directory/people/{id}/account/email", post(set_email))
@@ -347,11 +348,9 @@ async fn set_email(
     let id = account_id(&state, &person)?;
     let email = check_email(&body_of(body)?.email)?.to_owned();
     let api = api(&state)?;
-    change(api, &id, |update| {
-        update["email"] = Value::String(email);
-        update["email_verified"] = Value::Bool(true);
-    })
-    .await?;
+    let guard = api.lock_account(&id).await?;
+    email_changes::write_email(&state, api, &id, &person, &email).await?;
+    drop(guard);
     shown(api, &id).await
 }
 
@@ -446,6 +445,9 @@ async fn set_enabled(
     drop(guard);
     shown(api, &id).await
 }
+
+#[path = "accounts_email.rs"]
+mod email_changes;
 
 #[cfg(test)]
 #[path = "accounts_tests.rs"]

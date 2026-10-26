@@ -100,7 +100,7 @@ pub(crate) struct Withdrawn {
 
 /// Require an active person holding organisation.administer in the target's
 /// organisation. Authority over a different organisation admits nothing.
-fn administrator(state: &AppState, actor: &Actor, person: PersonId) -> Result<(), ServerError> {
+pub(crate) fn administrator(state: &AppState, actor: &Actor, person: PersonId) -> Result<(), ServerError> {
     use lys_identity::grants::{Action, ExerciseRequest, GrantError, Resource, Route};
     crate::grants::with_grants(state, |mut judged| {
         let (caller, organisation) =
@@ -261,4 +261,15 @@ pub(crate) async fn begin(
     });
     drop(guard);
     answer.map_err(at(failed))
+}
+
+/// Reveal one letter and its domain, never the full address to a link holder.
+pub(crate) fn masked_email(email: &str) -> String {
+    let Some((local, domain)) = email.trim().rsplit_once('@') else {
+        return "unknown address".to_owned();
+    };
+    match local.chars().next() {
+        Some(first) => format!("{first}…@{domain}"),
+        None => "unknown address".to_owned(),
+    }
 }

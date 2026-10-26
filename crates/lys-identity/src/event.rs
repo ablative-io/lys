@@ -180,6 +180,11 @@ pub enum Change {
         /// The login.
         binding: LoginBinding,
     },
+    /// An administrator unbinds a login, before binding it to its rightful person.
+    UnbindLogin {
+        /// The exact login removed from this person.
+        binding: LoginBinding,
+    },
     /// An identity moves from one lifecycle state to another.
     Transition {
         /// The transition.
@@ -236,6 +241,7 @@ fn check_organisation_fit(change: &Change) -> Result<(), IdentityError> {
         | Change::ReportingRegistration { .. }
         | Change::ReportsToChanged { .. }
         | Change::BindLogin { .. }
+        | Change::UnbindLogin { .. }
         | Change::LinkAudit(_)
         | Change::AgentCall(_)
         | Change::AdmissionWithdrawn { .. }
@@ -305,7 +311,7 @@ fn check_fit(identity: IdentityId, change: &Change) -> Result<(), IdentityError>
         ) => Err(IdentityError::ChangeMismatch {
             reason: "an agent registration names an agent",
         }),
-        (Change::BindLogin { .. }, IdentityId::Agent(_)) => Err(IdentityError::ChangeMismatch {
+        (Change::BindLogin { .. } | Change::UnbindLogin { .. }, IdentityId::Agent(_)) => Err(IdentityError::ChangeMismatch {
             reason: "a login is bound to a person, never to an agent",
         }),
         (Change::AdmissionWithdrawn { .. }, IdentityId::Agent(_)) => {
@@ -459,6 +465,8 @@ pub(crate) mod wire {
 
     /// An administrator withdraws an admission link.
     pub(crate) const ADMISSION_WITHDRAWN: u64 = 13;
+    /// An administrator unbinds a person's login.
+    pub(crate) const UNBIND_LOGIN: u64 = 14;
 
     pub(crate) fn change(value: &Change) -> u64 {
         match value {
@@ -471,6 +479,7 @@ pub(crate) mod wire {
             Change::ReportsToChanged { .. } => REPORTS_TO_CHANGED,
             Change::ChangeProfile { .. } => CHANGE_PROFILE,
             Change::BindLogin { .. } => BIND_LOGIN,
+            Change::UnbindLogin { .. } => UNBIND_LOGIN,
             Change::Transition { .. } => TRANSITION,
             Change::LinkAudit(_) => LINK_AUDIT,
             Change::AgentCall(_) => AGENT_CALL,

@@ -253,6 +253,18 @@ fn sign_in_and_identities(api: &mut Api) -> Vec<Entry> {
         ),
         (POST, "/people/{id}/logins", Some(bound), Some(receipt)),
         (
+            POST,
+            "/people/{id}/logins/move",
+            Some(api.schema::<crate::people_logins_move::Move>()),
+            None,
+        ),
+        (
+            GET,
+            "/organisations/found/{proof}/whom",
+            None,
+            Some(api.schema::<crate::organisations_prove::Whom>()),
+        ),
+        (
             GET,
             "/people/{id}/admission",
             None,

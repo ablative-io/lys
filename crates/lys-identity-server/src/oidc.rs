@@ -213,20 +213,34 @@ impl Oidc {
     /// code exchange, a missing or invalid ID token, authentication before the
     /// epoch or an invalid issuer and subject binding.
     pub async fn finish(&self, code: String, state: &str) -> Result<Actor, ServerError> {
-        let password = self
-            .in_flight
+        self.finish_in(code, state, false).await
+    }
+
+    /// Complete only the provider pool; its callback carries independent
+    /// provider email evidence before session admission.
+    pub(crate) async fn finish_provider(
+        &self,
+        code: String,
+        state: &str,
+    ) -> Result<Actor, ServerError> {
+        self.finish_in(code, state, true).await
+    }
+
+    async fn finish_in(
+        &self,
+        code: String,
+        state: &str,
+        provider: bool,
+    ) -> Result<Actor, ServerError> {
+        let pool = if provider {
+            &self.provider_flights
+        } else {
+            &self.in_flight
+        };
+        let (verifier, nonce) = pool
             .lock()
             .map_err(|error| failed(&format!("sign-in flights unavailable: {error}")))?
-            .take(state, Instant::now());
-        let (verifier, nonce) = match password {
-            Ok(flow) => flow,
-            Err(ServerError::SignInStateUnknown) => self
-                .provider_flights
-                .lock()
-                .map_err(|error| failed(&format!("sign-in flights unavailable: {error}")))?
-                .take(state, Instant::now())?,
-            Err(error) => return Err(error),
-        };
+            .take(state, Instant::now())?;
         let client = CoreClient::from_provider_metadata(
             self.metadata.clone(),
             self.client_id.clone(),

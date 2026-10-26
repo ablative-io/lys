@@ -13,6 +13,15 @@ use lys_identity::grants::shipped::ACTION_SENTENCES;
 /// A letter to one person.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Letter {
+    /// One half of a person's own email change; both mailbox codes are needed.
+    EmailChange {
+        /// The address to be proven.
+        email: String,
+        /// The single-use proof sent only to that mailbox.
+        code: String,
+        /// Whether this proves the address being left, rather than the new one.
+        leaving: bool,
+    },
     /// They were added: where to sign in and, when Lys offers Google, that
     /// they choose it with the email Lys knows them by.
     Added {
@@ -67,6 +76,7 @@ impl Letter {
     #[must_use]
     pub fn name(&self) -> &'static str {
         match self {
+            Self::EmailChange { .. } => "email_change",
             Self::Added { .. } => "added",
             Self::AccessGiven { .. } => "access_given",
             Self::Founded { .. } => "founded",
@@ -78,6 +88,7 @@ impl Letter {
     #[must_use]
     pub fn to(&self) -> &str {
         match self {
+            Self::EmailChange { email, .. } => email,
             Self::Added { email, .. }
             | Self::AccessGiven { email, .. }
             | Self::Founded { email, .. }
@@ -90,6 +101,7 @@ impl Letter {
     #[must_use]
     pub fn recipient(&self) -> &str {
         match self {
+            Self::EmailChange { .. } => "",
             Self::Added { name, .. }
             | Self::AccessGiven { name, .. }
             | Self::Founded { name, .. } => name,
@@ -101,6 +113,7 @@ impl Letter {
     #[must_use]
     pub fn subject(&self) -> String {
         match self {
+            Self::EmailChange { .. } => "Confirm your Lys email".to_owned(),
             Self::Added { .. } => "You have been added to Lys".to_owned(),
             Self::AccessGiven { .. } => "You have been given access in Lys".to_owned(),
             Self::Founded { organisation, .. } => format!("Found {organisation} in Lys"),
@@ -112,6 +125,14 @@ impl Letter {
     #[must_use]
     pub fn body(&self) -> String {
         match self {
+            Self::EmailChange { code, leaving, .. } => {
+                let mailbox = if *leaving {
+                    "email you are leaving"
+                } else {
+                    "new email"
+                };
+                format!("Return this code for your {mailbox} on your Lys Account page, together with the code from the other mailbox. Code: {code}\nIf you did not ask for this, ignore this letter.")
+            }
             Self::Added {
                 name,
                 email,

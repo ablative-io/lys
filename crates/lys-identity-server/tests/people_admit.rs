@@ -448,3 +448,40 @@ async fn naming_the_held_person_or_their_exact_trimmed_name_records_existing() -
     assert_eq!(refused["refusal"], "EmailHeldByAnother");
     Ok(())
 }
+
+#[tokio::test]
+async fn only_an_administrators_people_read_carries_sign_in_and_admitted_email() -> TestResult {
+    let (service, _rauthy, ada) = table_with_mail(false).await?;
+    let (status, added) = service.post("/people/admit", Some(&ada), &admit(&OperationId::generate()?.to_string(), "alpha")).await?;
+    assert_eq!(status, 200, "{added}");
+    let person = added["person"].as_str().ok_or("Bea")?;
+    let bea = signed_in_as(&service, &added, BEA).await?;
+    let (status, changed) = service.post(&format!("/directory/people/{person}/account/email"), Some(&ada), &json!({"email":"annabel@example.test"})).await?;
+    assert_eq!(status, 200, "{changed}");
+    for path in ["/directory/people", "/directory/people?limit=50"] {
+        let (status, list) = service.get(path, Some(&ada)).await?;
+        assert_eq!(status, 200, "{list}");
+        let row = list["people"].as_array().ok_or("people")?.iter().find(|row| row["id"] == person).ok_or("Bea's row")?;
+        assert_eq!(row["sign_in_email"], "annabel@example.test");
+        assert_eq!(row["admitted_email"], BEA);
+    }
+    let (status, list) = service.get("/people", Some(&bea)).await?;
+    assert_eq!(status, 200, "{list}");
+    for row in list["people"].as_array().ok_or("people")? {
+        assert!(row.get("sign_in_email").is_none() && row.get("admitted_email").is_none() && row.get("email_recorded_at_sign_in").is_none(), "{row}");
+    }
+    assert_eq!(service.get("/directory/people", Some(&bea)).await?.0, 403);
+    Ok(())
+}
+
+
+#[tokio::test]
+async fn a_mailed_admission_holds_the_original_address_before_any_provider_sign_in() -> TestResult {
+    let (service, _rauthy, ada) = table().await?;
+    let (status, added) = service.post("/people/admit", Some(&ada), &admit(&OperationId::generate()?.to_string(), "alpha")).await?;
+    assert_eq!(status, 200, "{added}");
+    let person = added["person"].as_str().ok_or("Bea")?;
+    let stored: Value = serde_json::from_slice(&std::fs::read(service.dir.path().join("foundings.json"))?)?;
+    assert_eq!(stored["admitted_email"][person], BEA);
+    Ok(())
+}

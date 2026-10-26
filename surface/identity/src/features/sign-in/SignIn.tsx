@@ -50,6 +50,12 @@ export function refusedInAddress(who = 'your administrator'): string {
   const account = 'This Google account' + (email ? ' (' + email + ')' : '');
   if (name === 'NotAdmittedYet') return account + " hasn't been added to Lys yet. Ask " + who + ' to add it.';
   if (name === 'AccountDisabled') return account + ' has been disabled in Lys. Ask ' + who + ' to enable it.';
+  if (name === 'ProviderEmailMismatch') {
+    const provider = params.get('provider') ?? 'The provider';
+    const accountEmail = params.get('account_email') ?? 'an unknown address';
+    const held = params.get('held_email') ?? 'an unknown address';
+    return `${provider} returned the sign-in account ${accountEmail}, but Lys holds ${held} for this person. Ask ${who} to check your Account page.`;
+  }
   // The browser-binding cookie is kept only at the address the sign-in began on. The service sends a refused
   // return to this page, at Lys's own address, so trying again here is the act that works.
   if (name === 'SignInStateUnknown') {

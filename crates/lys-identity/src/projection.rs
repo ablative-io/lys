@@ -441,6 +441,16 @@ impl Projection {
                 *responsible_to,
             ),
             Change::ChangeProfile { .. } => held.map(|_| ()).ok_or_else(|| unknown(identity)),
+            Change::UnbindLogin { binding } => {
+                let record = held.ok_or_else(|| unknown(identity))?;
+                if record.bindings().contains(binding) {
+                    Ok(())
+                } else {
+                    Err(IdentityError::ChangeMismatch {
+                        reason: "an unbound login must be held by the event's person",
+                    })
+                }
+            }
             Change::BindLogin { binding } => {
                 held.ok_or_else(|| unknown(identity))?;
                 match self.bindings.get(binding) {

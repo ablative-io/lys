@@ -221,6 +221,7 @@ mod pass_provenance_tests;
 /// Admitting a person is judged by organisation.admit (ACCESS-009 R1).
 pub mod people_admission;
 pub mod people_admit;
+mod people_logins_move;
 pub(crate) mod people_admit_app;
 pub(crate) mod people_admit_handed;
 pub mod plugins_installed_api;

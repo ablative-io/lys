@@ -121,6 +121,16 @@ fn wants_page(headers: &HeaderMap) -> bool {
         })
 }
 
+/// The provider is the one kept in the initiating server-side flight.
+pub(crate) struct ProviderLogin {
+    pub(crate) actor: lys_identity::Actor,
+    pub(crate) provider: String,
+}
+
+#[cfg(test)]
+#[path = "sign_in_callback_tests.rs"]
+mod provider_tests;
+
 #[cfg(test)]
 mod tests {
     use super::*;

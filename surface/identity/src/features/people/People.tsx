@@ -125,7 +125,13 @@ function List({ view, teams, me, reach }: { view: PeopleView; teams: OrgTeam[]; 
   const selected = all.find((x) => '#/file/' + x.id === selectedHref) ?? null;
   const active = (kind: string) => all.filter((x) => x.kind === kind && x.state === 'active').length;
   const columns: Column<Row>[] = [
-    { head: 'Name', cell: (x) => x.display_name },
+    { head: 'Name', cell: (x) => {
+      const person = admin && x.kind === 'person' ? view.people.find((person) => person.id === x.id) : undefined;
+      const signIn = person?.sign_in_email;
+      const admitted = person?.admitted_email;
+      const differs = signIn && admitted && signIn.trim().toLowerCase() !== admitted.trim().toLowerCase();
+      return <>{x.display_name}{signIn ? <span className="sec"> {differs ? <>Signs in as {signIn}, added as {admitted} <a href={'#/file/' + x.id + '/credentials'}>Account</a></> : signIn}{person?.email_recorded_at_sign_in ? <> (recorded at sign-in)</> : null}</span> : null}</>;
+    } },
     { head: 'Role', cell: (x) => <span className="sec"><RoleSummary load={roles} id={x.id} /></span> },
     { head: 'State', cell: (x) => <span className="state-of" data-state={x.state}><span className={'dot s-' + x.state} />{stateWords(x.state)}</span> },
     // Who the agent reports to: its person, or another agent, with the person who answers for it said beside that agent.

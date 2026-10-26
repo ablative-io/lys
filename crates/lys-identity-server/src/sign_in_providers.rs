@@ -79,6 +79,8 @@ pub struct SignInProviders {
     origins: ProviderOrigins,
     probe: reqwest::Client,
     changes: account_changes::Changes,
+    pub(crate) email_changes:
+        tokio::sync::Mutex<std::collections::BTreeMap<String, crate::accounts::PendingEmail>>,
 }
 
 /// The most characters a client id or secret carries: the issuer's own limit,
@@ -228,6 +230,7 @@ impl SignInProviders {
             origins: origins.unwrap_or_default(),
             probe,
             changes: account_changes::Changes::default(),
+            email_changes: tokio::sync::Mutex::new(std::collections::BTreeMap::new()),
         })
     }
 
@@ -560,6 +563,8 @@ fn request_of(provider: Provider, body: &SetBody, found: Option<Lookup>, github:
         // admitted first (`/people/admit` makes their account), and their
         // provider login is then linked to that account by its email.
         "auto_onboarding": false,
+        // Lys checks the issuer account email against its held person address
+        // before beginning a session (DIRECTORY-122 R3).
         "auto_link": true,
         "client_id": body.client_id,
         "client_secret": body.client_secret,
