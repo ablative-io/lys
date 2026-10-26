@@ -180,6 +180,9 @@ async fn an_account_a_retired_person_still_holds_is_never_taken_by_the_repair() 
                     row["email"] = json!("bea@example.test");
                 }
             }
+            if let Some(admitted) = held["admitted_email"].as_object_mut() {
+                admitted.insert(cal_id.clone(), json!("bea@example.test"));
+            }
             std::fs::write(&foundings, serde_json::to_vec(&held)?)?;
             Ok(())
         })

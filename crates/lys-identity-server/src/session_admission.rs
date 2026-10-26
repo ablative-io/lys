@@ -136,8 +136,14 @@ fn theirs(
     Ok(())
 }
 
+/// The account a sign-in opens: the login it signed in with, when that login
+/// is at this issuer, so a person whose earlier account is gone signs in with
+/// the one they hold now (DIRECTORY-124); else the person's first login here.
 fn account_id(directory: &Projection, actor: &Actor, issuer: &str) -> Option<String> {
     let person = directory.person_for(actor.binding())?;
+    if actor.binding().issuer() == issuer {
+        return Some(actor.binding().subject().to_owned());
+    }
     directory
         .record(IdentityId::Person(person))?
         .bindings()

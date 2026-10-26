@@ -50,6 +50,7 @@
   "POST /people": ["display_name", "operation"],
   "POST /people/admit": ["display_name", "email", "operation"],
   "POST /people/{id}/logins": ["issuer", "operation", "subject"],
+  "POST /people/{id}/logins/move": ["issuer", "operation", "subject", "target"],
   "POST /product-drafts": ["grant", "operation", "request_digest", "target", "words"],
   "POST /product-drafts/{id}/approve": ["operation", "request_digest"],
   "POST /product-drafts/{id}/refuse": ["operation", "reason", "request_digest"],
