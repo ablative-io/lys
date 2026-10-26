@@ -12,7 +12,8 @@ use std::sync::Arc;
 
 #[derive(serde::Serialize, utoipa::ToSchema)]
 #[serde(transparent)]
-pub(crate) struct SessionAnswer(#[schema(value_type = Object)] Value);
+#[schema(value_type = Object)]
+pub(crate) struct SessionAnswer(Value);
 
 pub(crate) fn asked(
     state: &AppState,

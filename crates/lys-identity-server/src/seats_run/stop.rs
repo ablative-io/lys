@@ -124,7 +124,7 @@ pub(super) async fn request_end(
     (name, session, caller, operation): (&str, &str, &str, &str),
     notes: &mut Vec<String>,
 ) -> Result<bool, ServerError> {
-    let mut ended = false;
+    let ended;
     let live = live_session(state, &driven.machine, session).await?;
     match &live {
         Some(live) if live.alive && !live.ended => {
