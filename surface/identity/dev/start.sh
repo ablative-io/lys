@@ -102,7 +102,10 @@ cat >"$STATE/model.json" <<JSON
 JSON
 
 if [ ! -d "$STATE/log" ]; then
-  "$BIN/lys-identity-dev-seed" "$STATE/config.json" ada bea >"$LOGS/seed.log" 2>&1
+  if ! "$BIN/lys-identity-dev-seed" "$STATE/config.json" ada bea >"$LOGS/seed.log" 2>&1; then
+    echo "the development seed failed; see $LOGS/seed.log" >&2
+    exit 1
+  fi
 fi
 
 start_ready() {
@@ -143,7 +146,10 @@ start_ready() {
 start_ready issuer "$BIN/dev_issuer" "0.0.0.0:$ISSUER_PORT" "$ISSUER" "$STATE/issuer.key" ada ada@example.test
 start_ready service "$BIN/lys-identity-server" "$STATE/config.json"
 if [ ! -f "$STATE/grants.seeded" ]; then
-  "$SURFACE/dev/seed-grants.sh" "http://127.0.0.1:$SERVICE_PORT" "$LOGS/seed.log" >"$LOGS/seed-grants.log" 2>&1
+  if ! "$SURFACE/dev/seed-grants.sh" "http://127.0.0.1:$SERVICE_PORT" "$LOGS/seed.log" >"$LOGS/seed-grants.log" 2>&1; then
+    echo "seeding the development grants failed; see $LOGS/seed-grants.log" >&2
+    exit 1
+  fi
   touch "$STATE/grants.seeded"
 fi
 

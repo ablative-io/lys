@@ -206,10 +206,12 @@ async fn the_real_development_scripts_seed_their_named_grants_on_fresh_state() -
     let start = held.start(ports)?;
     assert!(
         start.status.success(),
-        "start.sh exited {}; its stdout: {}; its stderr: {}; seed-grants log: {}",
+        "start.sh exited {}; its stdout: {}; its stderr: {}; seed log: {}; seed-grants log: {}",
         start.status,
         String::from_utf8_lossy(&start.stdout),
         String::from_utf8_lossy(&start.stderr),
+        std::fs::read_to_string(held.logs().join("seed.log"))
+            .unwrap_or_else(|error| format!("unread: {error}")),
         std::fs::read_to_string(held.logs().join("seed-grants.log"))
             .unwrap_or_else(|error| format!("unread: {error}"))
     );
