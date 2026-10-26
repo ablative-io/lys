@@ -5,7 +5,9 @@
 use super::Outcome;
 use identity_contract::fake_rauthy::{API_KEY, FakeRauthy};
 use identity_contract::harness::{ADMINISTRATOR, GRANT_MODEL, Service};
-use lys_identity::{Actor, AuthMethod, LoginBinding, Provenance};
+use lys_identity::{
+    Actor, AuthMethod, IdentityId, LoginBinding, OperationId, Profile, Provenance, Transition,
+};
 use lys_identity_server::{routes::open_directory, session::Sessions};
 use serde_json::json;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -66,11 +68,36 @@ async fn quiet_email_change_releases_admission_and_another_persons_change() -> O
             })
         },
         |config| {
-            lys_identity_server::dev_seed::seed_configured(
-                config,
-                [ADMINISTRATOR, &subjects[0], &subjects[1]],
-            )?;
+            // The seed holds the administrator and A; B is registered beside them.
+            lys_identity_server::dev_seed::seed_configured(config, [ADMINISTRATOR, &subjects[0]])?;
             let mut directory = open_directory(config)?;
+            let administrator = Actor::new(
+                config.administrator_binding()?,
+                Provenance::new(AuthMethod::Oidc, lys_identity_server::session::now()),
+            );
+            let organisation = identity_contract::fixtures::the_organisation(&mut directory)?;
+            let (b, _) = directory.register_person(
+                administrator.clone(),
+                OperationId::generate()?,
+                Profile::new("B (test person)")?,
+                organisation,
+                lys_identity_server::session::now(),
+            )?;
+            directory.bind_login(
+                administrator.clone(),
+                OperationId::generate()?,
+                b,
+                LoginBinding::new(&config.issuer, &subjects[1])?,
+                lys_identity_server::session::now(),
+            )?;
+            directory.transition(
+                administrator,
+                OperationId::generate()?,
+                IdentityId::Person(b),
+                Transition::Activate,
+                "",
+                lys_identity_server::session::now(),
+            )?;
             let mut held = serde_json::Map::new();
             let sessions = Sessions::open(
                 config.sessions_file.clone().ok_or("no sessions")?,
