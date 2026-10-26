@@ -278,7 +278,10 @@ pub(crate) async fn admit(
     // person's app pass is (AGENTS-019 R2).
     match crate::provider::app_agent(&state, &headers) {
         Ok(Some((actor, app))) => {
-            return crate::people_admit_app::admit(&state, &headers, &actor, &app, asked).await;
+            return Box::pin(crate::people_admit_app::admit(
+                &state, &headers, &actor, &app, asked,
+            ))
+            .await;
         }
         Ok(None) => {}
         Err(error) => return refused(error, &receipt).await,
@@ -288,7 +291,10 @@ pub(crate) async fn admit(
         Err(error) => return refused(error, &receipt).await,
     };
     if let Some((actor, app)) = app {
-        return crate::people_admit_app::admit(&state, &headers, &actor, &app, asked).await;
+        return Box::pin(crate::people_admit_app::admit(
+            &state, &headers, &actor, &app, asked,
+        ))
+        .await;
     }
     let checked = signed_in(&state, &headers).and_then(|actor| checked(&state, &actor, asked));
     let (asked, operation, email, issuer, organisation) = match checked {

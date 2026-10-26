@@ -60,9 +60,10 @@ async fn cancel(
     body: Result<Json<crate::runner_api::Empty>, axum::extract::rejection::JsonRejection>,
 ) -> Result<Json<Cancelled>, ServerError> {
     let by = administrator(&state, &headers)?;
-    body.map_err(|error| ServerError::RequestMalformed {
-        reason: error.body_text(),
-    })?;
+    let Json(crate::runner_api::Empty {}) =
+        body.map_err(|error| ServerError::RequestMalformed {
+            reason: error.body_text(),
+        })?;
     crate::waits::cancel(&id, &by)?;
     Ok(Json(Cancelled { cancelled: id, by }))
 }

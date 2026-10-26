@@ -1,4 +1,4 @@
-//! A gentle stop waits for a reap. Only a person's End now asks Act::End.
+//! A gentle stop waits for a reap. Only a person's End now asks `Act::End`.
 
 use crate::error::ServerError;
 use crate::routes::AppState;
@@ -55,9 +55,10 @@ pub(super) async fn stop(
     body: Result<Json<crate::runner_api::Empty>, axum::extract::rejection::JsonRejection>,
 ) -> Result<Json<SessionAnswer>, ServerError> {
     let (driven, caller) = crate::runner_api::admitted(&state, &headers, &id, "end")?;
-    body.map_err(|error| ServerError::RequestMalformed {
-        reason: error.body_text(),
-    })?;
+    let Json(crate::runner_api::Empty {}) =
+        body.map_err(|error| ServerError::RequestMalformed {
+            reason: error.body_text(),
+        })?;
     let (ended, notes) = crate::seats_monitor::stop_session(
         &state,
         &driven,
@@ -86,9 +87,10 @@ pub(super) async fn end_now(
         });
     }
     let (driven, caller) = crate::runner_api::admitted(&state, &headers, &id, "end")?;
-    body.map_err(|error| ServerError::RequestMalformed {
-        reason: error.body_text(),
-    })?;
+    let Json(crate::runner_api::Empty {}) =
+        body.map_err(|error| ServerError::RequestMalformed {
+            reason: error.body_text(),
+        })?;
     asked(&state, &driven, &caller, "End now asked by the person")?;
     crate::runner_api::perform(
         &state,
