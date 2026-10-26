@@ -2780,6 +2780,36 @@
           "done": false
         }
       ]
+    },
+    {
+      "name": "Sign-in accounts follow the directory (DIRECTORY-124)",
+      "items": [
+        {
+          "id": "C868",
+          "text": "People says whether each person's sign-in works and what it needs, in words, with their Account link. DIRECTORY-124/R1.",
+          "done": false
+        },
+        {
+          "id": "C869",
+          "text": "Lys finds or makes each active person's missing sign-in account under their own address at start and after every directory change; a second repair changes nothing. DIRECTORY-124/R2.",
+          "done": false
+        },
+        {
+          "id": "C870",
+          "text": "An administrator sets the address of a person with no account and Lys makes it; another person's address is refused by name. DIRECTORY-124/R3.",
+          "done": false
+        },
+        {
+          "id": "C871",
+          "text": "An account Lys cannot tie to exactly one address signs in as nobody, refused by name. DIRECTORY-124/R4.",
+          "done": false
+        },
+        {
+          "id": "C872",
+          "text": "Standing bars hold for DIRECTORY-124, with the 26 October records replayed. DIRECTORY-124/R5.",
+          "done": false
+        }
+      ]
     }
   ]
 }

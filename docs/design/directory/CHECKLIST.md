@@ -757,3 +757,11 @@
 - [ ] **C859** — Home leads with Waiting on you, full width, with no table that scrolls inside the page and no sideways scroll; alarms take one line each when firing and one line when none. DIRECTORY-123/R4.
 - [ ] **C860** — The rail's Waiting on you opens Home's Waiting on you, whose count is the rail's count; the Requests and Checks pages stay one press from the section. DIRECTORY-123/R5.
 - [ ] **C861** — Standing bars hold for DIRECTORY-123, with Tom's 26 October reading replayed: hundreds of grants, one keep per agent, the count falls to what is left. DIRECTORY-123/R6.
+
+## Sign-in accounts follow the directory (DIRECTORY-124)
+
+- [ ] **C868** — People says whether each person's sign-in works and what it needs, in words, with their Account link. DIRECTORY-124/R1.
+- [ ] **C869** — Lys finds or makes each active person's missing sign-in account under their own address at start and after every directory change; a second repair changes nothing. DIRECTORY-124/R2.
+- [ ] **C870** — An administrator sets the address of a person with no account and Lys makes it; another person's address is refused by name. DIRECTORY-124/R3.
+- [ ] **C871** — An account Lys cannot tie to exactly one address signs in as nobody, refused by name. DIRECTORY-124/R4.
+- [ ] **C872** — Standing bars hold for DIRECTORY-124, with the 26 October records replayed. DIRECTORY-124/R5.

@@ -208,6 +208,10 @@
 
 **S487.** As a person signing in with Google, I want Google to open only the account whose email is the one I was added under or have since proven, so that my Google login never joins someone else's record.
 
+**S504.** As a person who signs in, I want Lys to find or make my sign-in account under my own address whenever it is missing, so that an issuer wiped or an account deleted behind Lys never locks me out or opens someone else's records.
+
+**S506.** As a person who signs in, I want an account Lys cannot tie to exactly one of my addresses to sign in as nobody, so that I never open another person's records by signing in with an account that carries their address.
+
 ## Directory administrator — Resolves a refused act
 
 **S466.** As a Directory administrator working in a product such as Cambium, I want adding a person there to make their Lys account and give them the product's access in one act, so that I never leave the product and they can get in.
@@ -235,6 +239,12 @@
 **S490.** As a directory administrator, I want the 26 October incident replayed as a failing test that passes only with this change, so that it is proven it cannot happen again.
 
 **S496.** As a directory administrator, I want Tom's 26 October reading replayed as a test, so that it is proven that hundreds of standing grants never again read as hundreds of things to do.
+
+**S503.** As a directory administrator, I want People to say for each person whether their sign-in works and, when it does not, what it needs, so that a person who cannot sign in is seen before they ask.
+
+**S505.** As a directory administrator, I want to set the address of a person who has no sign-in account and have Lys make it, refused by name when that address is another person's, so that I give access to the right person and only them.
+
+**S507.** As a directory administrator, I want the 26 October records replayed as a test, so that Annabel signing in as Dean is proven impossible and its repair proven to take one move and one address.
 
 ## Release reviewer — Decides from the record whether the release proof is complete
 
