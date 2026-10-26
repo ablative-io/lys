@@ -2240,6 +2240,151 @@
       "path": "docs/design/lys-log-store/STORES.md",
       "note": "LYSLOGSTORE-009 R1 creates it; HOME-039 R3 adds blocks/pending and the chunk manifests",
       "brief": "HOME-039"
+    },
+    {
+      "path": "docs/design/home/briefs/HOME-040.json",
+      "note": "the brief",
+      "brief": "HOME-040"
+    },
+    {
+      "path": "docs/design/home/briefs/HOME-040.md",
+      "note": "its rendered markdown",
+      "brief": "HOME-040"
+    },
+    {
+      "path": "crates/lys-identity-server/tests/quiet_peer.rs",
+      "note": "one peer that accepts and never answers, for mail, the runner, SpiceDB, the issuer and the model upstream",
+      "brief": "HOME-040"
+    },
+    {
+      "path": "crates/lys-identity-server/src/accounts_own.rs",
+      "note": "an email change records its pending codes and releases its locks before either letter is sent",
+      "brief": "HOME-040"
+    },
+    {
+      "path": "crates/lys-identity-server/src/mail.rs",
+      "note": "a letter claims its operation, sends outside the record lock, and records what went",
+      "brief": "HOME-040"
+    },
+    {
+      "path": "crates/lys-identity-server/src/setup.rs",
+      "note": "a setup step holds its turn around the record, never across the issuer",
+      "brief": "HOME-040"
+    },
+    {
+      "path": "crates/lys-identity-server/src/setup_password.rs",
+      "note": "the first password holds its turn around the record, never across the issuer",
+      "brief": "HOME-040"
+    },
+    {
+      "path": "crates/lys-identity-server/src/start/run.rs",
+      "note": "a start holds its computer's turn around the record, never across the runner",
+      "brief": "HOME-040"
+    },
+    {
+      "path": "rules/ast-grep/no-clock-on-a-peer.yml",
+      "note": "refuses a clock on a call to another service",
+      "brief": "HOME-040"
+    },
+    {
+      "path": "crates/lys-identity-server/src/runner_client/session.rs",
+      "note": "a runner ask ends on its answer or the runner's close, never a clock",
+      "brief": "HOME-040"
+    },
+    {
+      "path": "crates/lys-identity-server/src/runner_client/hub.rs",
+      "note": "a machine is present while its runner holds a bridge open",
+      "brief": "HOME-040"
+    },
+    {
+      "path": "crates/lys-identity-server/src/spicedb_http.rs",
+      "note": "a SpiceDB call ends on its answer, its close or a transport error, with keepalive",
+      "brief": "HOME-040"
+    },
+    {
+      "path": "crates/lys-identity-server/src/seat_import_monitor.rs",
+      "note": "an import asks without a clock",
+      "brief": "HOME-040"
+    },
+    {
+      "path": "crates/lys-identity-server/src/issuer_admin.rs",
+      "note": "issuer calls carry keepalive and no timeout",
+      "brief": "HOME-040"
+    },
+    {
+      "path": "crates/lys-identity-server/src/oidc.rs",
+      "note": "OIDC calls carry keepalive and no timeout",
+      "brief": "HOME-040"
+    },
+    {
+      "path": "crates/lys-identity-server/src/sign_in_providers.rs",
+      "note": "provider calls carry keepalive and no timeout",
+      "brief": "HOME-040"
+    },
+    {
+      "path": "crates/lys-identity-server/src/message_edges.rs",
+      "note": "message edge calls carry keepalive and no timeout",
+      "brief": "HOME-040"
+    },
+    {
+      "path": "crates/lys-identity-server/src/apps_connect_manifest.rs",
+      "note": "an app manifest read carries keepalive and no timeout",
+      "brief": "HOME-040"
+    },
+    {
+      "path": "crates/lys-identity-server/src/model_proxy_route.rs",
+      "note": "the model upstream call carries keepalive and closes with its caller",
+      "brief": "HOME-040"
+    },
+    {
+      "path": "crates/lys-runner/src/dial/transport.rs",
+      "note": "the runner opens its next bridge before answering on the last, with keepalive",
+      "brief": "HOME-040"
+    },
+    {
+      "path": "crates/lys-identity-server/src/stop_api/exit_tests.rs",
+      "note": "a stop that waits until End now, and a runner that closes",
+      "brief": "HOME-040"
+    },
+    {
+      "path": "crates/lys-identity-server/src/stop_api/exit.rs",
+      "note": "a stop ends on the exit or End now, with no budget",
+      "brief": "HOME-040"
+    },
+    {
+      "path": "crates/lys-identity-server/src/seats_monitor.rs",
+      "note": "no escalation on a timer",
+      "brief": "HOME-040"
+    },
+    {
+      "path": "crates/lys-identity-server/src/stop_api.rs",
+      "note": "End now as the person's act",
+      "brief": "HOME-040"
+    },
+    {
+      "path": "crates/lys-identity-server/src/waits_api.rs",
+      "note": "what Lys waits on, listed oldest first, and its cancel",
+      "brief": "HOME-040"
+    },
+    {
+      "path": "crates/lys-identity-server/src/waits_api_tests.rs",
+      "note": "the listed wait and its cancel by an administrator",
+      "brief": "HOME-040"
+    },
+    {
+      "path": "crates/lys-identity-server/src/routes.rs",
+      "note": "the waits routes and the in-flight list on the state",
+      "brief": "HOME-040"
+    },
+    {
+      "path": "crates/lys-identity-server/src/openapi_table.rs",
+      "note": "the waits routes in the published table",
+      "brief": "HOME-040"
+    },
+    {
+      "path": "surface/identity/src/generated/index.ts",
+      "note": "the waits routes' types",
+      "brief": "HOME-040"
     }
   ],
   "inventory": [

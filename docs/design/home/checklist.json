@@ -895,6 +895,41 @@
           "done": false
         }
       ]
+    },
+    {
+      "name": "Every request ends in an answer or a close (HOME-040)",
+      "items": [
+        {
+          "id": "C862",
+          "text": "No lock is held across a call to another service: an email change, a letter, a setup step or a start waits on its peer without holding what another person's act needs. HOME-040/R1.",
+          "done": false
+        },
+        {
+          "id": "C863",
+          "text": "No call Lys makes to another service ends on a clock: each ends on the peer's answer, the peer's close or a transport error, with kernel keepalive on every outbound socket. HOME-040/R2.",
+          "done": false
+        },
+        {
+          "id": "C864",
+          "text": "A stop ends on the process's exit, and a person who will not wait ends it by an act; no stop escalates on a timer. HOME-040/R3.",
+          "done": false
+        },
+        {
+          "id": "C865",
+          "text": "A caller who closes ends what was being done for them: no task, upstream call or lock outlives the request that started it. HOME-040/R4.",
+          "done": false
+        },
+        {
+          "id": "C866",
+          "text": "Every outbound call in flight is listed with whom it waits on and since when, and an administrator can cancel it by name. HOME-040/R5.",
+          "done": false
+        },
+        {
+          "id": "C867",
+          "text": "Standing bars hold for HOME-040, with a quiet peer replayed for mail, the runner, SpiceDB, the issuer and the model upstream. HOME-040/R6.",
+          "done": false
+        }
+      ]
     }
   ]
 }

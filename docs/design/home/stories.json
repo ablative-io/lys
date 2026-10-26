@@ -56,6 +56,10 @@
         {
           "id": "S77",
           "text": "As an agent whose memory view is read many times a session, I want each read to decode and scan once, so that recall stays light under everything else."
+        },
+        {
+          "id": "S500",
+          "text": "As an agent whose request was dropped, I want everything Lys was doing for me to end with it, so that a closed request never leaves work or a lock behind."
         }
       ]
     },
@@ -106,6 +110,10 @@
         {
           "id": "S80",
           "text": "As Tom, I want a session's recorded calls to cost the bytes that are new in each call, and a block that no entry names to be reclaimed while Lys runs, so that moving every seat onto Lys does not fill the disk."
+        },
+        {
+          "id": "S497",
+          "text": "As Tom, I want a stalled mail server to stall only the letter it was sending, so that nobody's sign-in waits on it."
         }
       ]
     },
@@ -244,6 +252,10 @@
         {
           "id": "S25",
           "text": "As a developer working on lys-home, I want every public path of the record module to resolve and every test to pass unchanged after the move, so that my code and tests need no edit because files moved."
+        },
+        {
+          "id": "S502",
+          "text": "As a developer, I want a peer that accepts and never answers replayed against every outbound call, so that it is proven a quiet peer stalls only its own act."
         }
       ]
     },
@@ -264,6 +276,14 @@
         {
           "id": "S76",
           "text": "As the operator of an estate where Lys runs behind every agent, I want each request, append and open to do its work once and scale with what it touches, so that Lys costs nothing it does not need to as history grows."
+        },
+        {
+          "id": "S498",
+          "text": "As an estate operator, I want every call Lys makes to end on its peer's answer or its peer's close, so that a failure always names itself and nothing is left saying it never started."
+        },
+        {
+          "id": "S501",
+          "text": "As an estate operator, I want to see what Lys is waiting on and for how long, and cancel it, so that a quiet peer is something I can see and end."
         }
       ]
     },
@@ -274,6 +294,10 @@
         {
           "id": "S78",
           "text": "As the operator who starts a seat from Lys, I want everything I set for it (its harness build, models, skills, MCP servers and permissions) to be everything Claude Code or our Codex build is given, so that a seat started from Lys is the seat I configured and nothing is silently dropped."
+        },
+        {
+          "id": "S499",
+          "text": "As a seat operator stopping a session, I want the stop to end when the process exits and to end it myself if I choose, so that no timer decides for me."
         }
       ]
     }
