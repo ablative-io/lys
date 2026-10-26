@@ -30,8 +30,9 @@ interface PendingPerson { name: string; given?: string; family?: string; email: 
 type Asking = { given: string; family: string; email: string; kind: string; id: string; relation: string };
 interface Logged { step: string; log: string; index: number }
 /** The letter the act owed: who sent it (Lys, or the sign-in service when it made the account) and where. */
-interface Letter { letter: string; to?: string; sent: boolean; by: 'lys' | 'issuer'; reason?: string; handed?: string }
-interface Admitted { person: string; logged: Logged[]; letter: Letter }
+interface Letter { letter: string; display_name?: string; to?: string; sent: boolean; by: 'lys' | 'issuer'; reason?: string; handed?: string }
+interface Existing { person: string; display_name: string }
+interface Admitted { person: string; displayName: string | null; existing: Existing | null; logged: Logged[]; letter: Letter }
 const STEPS = ['register', 'account', 'bind', 'activate', 'grant', 'letter'];
 /** Each step as the act under way, for saying where a refusal stopped. */
 const DOING: Record<string, string> = { register: 'registering them', account: 'finding or making their sign-in account', bind: 'binding their sign-in', activate: 'activating them', grant: 'giving their first access', letter: 'writing to them' };
@@ -59,9 +60,10 @@ function restored(key: string): PendingPerson | null {
 /** The letter member of an answer, when it is one: which letter, to whom, whether it went and who sent it. */
 function letterOf(value: unknown): Letter | null {
   if (!object(value) || typeof value.letter !== 'string' || typeof value.sent !== 'boolean' || (value.by !== 'lys' && value.by !== 'issuer')
+    || (value.display_name !== undefined && typeof value.display_name !== 'string')
     || (value.to !== undefined && typeof value.to !== 'string') || (value.reason !== undefined && typeof value.reason !== 'string')
     || (value.handed !== undefined && typeof value.handed !== 'string')) return null;
-  return { letter: value.letter, sent: value.sent, by: value.by as 'lys' | 'issuer', ...(typeof value.to === 'string' ? { to: value.to } : {}),
+  return { letter: value.letter, ...(typeof value.display_name === 'string' ? { display_name: value.display_name } : {}), sent: value.sent, by: value.by as 'lys' | 'issuer', ...(typeof value.to === 'string' ? { to: value.to } : {}),
     ...(typeof value.reason === 'string' ? { reason: value.reason } : {}), ...(typeof value.handed === 'string' ? { handed: value.handed } : {}) };
 }
 
@@ -78,7 +80,14 @@ function confirmed(answer: unknown, operation: string, granting: boolean): Admit
       && typeof leaf.index === 'number' && Number.isSafeInteger(leaf.index) && leaf.index >= 0)) throw unconfirmed;
   const letter = letterOf(answer.letter);
   if (!letter || (!letter.sent && letter.handed === undefined)) throw unconfirmed;
-  return { person: answer.person, logged: logged as Logged[], letter };
+  const displayName = filled(answer, 'display_name');
+  let existing: Existing | null = null;
+  if (receipt.existing !== undefined && receipt.existing !== null) {
+    if (!object(receipt.existing) || receipt.existing.person !== answer.person || !filled(receipt.existing, 'display_name')) throw unconfirmed;
+    existing = { person: answer.person, display_name: receipt.existing.display_name as string };
+    if (displayName !== null && displayName !== existing.display_name) throw unconfirmed;
+  }
+  return { person: answer.person, displayName, existing, logged: logged as Logged[], letter };
 }
 
 /** What a refused act had already written: the step that failed and each earlier step's log leaf (`AdmitReceipt`). */
@@ -126,13 +135,16 @@ function wrote(letter: Letter, name: string, email: string): string {
 
 function Receipt({ admitted, name, email }: { admitted: Admitted; name: string; email: string }) {
   const granted = admitted.logged.some((leaf) => leaf.step === 'grant');
+  const actualName = admitted.letter.display_name ?? admitted.existing?.display_name ?? admitted.displayName ?? name;
+  const reuse = admitted.existing ? `${email} was already ${actualName}; ${actualName} now holds ${granted ? 'the access just given' : 'their existing access'}.` : null;
   return <section aria-label="Receipt" className="note">
-    <p role="status">{wrote(admitted.letter, name, admitted.letter.to ?? email)}</p>
+    <p role="status">{reuse ?? wrote(admitted.letter, actualName, admitted.letter.to ?? email)}</p>
     {admitted.letter.handed !== undefined ? <div className="field">
+      <p>This link signs in as {actualName}.</p>
       <label htmlFor="add-person-handed">Their sign-in link</label>
       <input id="add-person-handed" aria-label="Their sign-in link" type="text" readOnly value={admitted.letter.handed} onFocus={(event) => event.currentTarget.select()} />
     </div> : null}
-    {granted ? null : <p>They have no access yet. Give it from Access once there is something to give.</p>}
+    {granted || admitted.existing ? null : <p>They have no access yet. Give it from Access once there is something to give.</p>}
     <p><a href={'#/file/' + encodeURIComponent(admitted.person)}>Open their file</a></p>
     <details><summary>What Lys recorded</summary><ul>
       {admitted.logged.map((leaf) => <li key={leaf.log + leaf.index}>{WORDS[leaf.step] ?? leaf.step}: {leaf.log} log, entry {leaf.index}</li>)}
@@ -146,6 +158,12 @@ function Receipt({ admitted, name, email }: { admitted: Admitted; name: string; 
 
 /** A failure said with its receipt when the refusal carries one, else by its name and words alone. */
 function Failure({ failure, operation }: { failure: unknown; operation: string | undefined }) {
+  if (failure instanceof Refused && failure.refusal.refusal === 'EmailHeldByAnother' && object(failure.answer)) {
+    const { person, display_name: displayName, email } = failure.answer;
+    if (typeof person === 'string' && typeof displayName === 'string' && typeof email === 'string') {
+      return <section className="why-not" role="alert"><p>{email} already signs in as <a href={'#/file/' + encodeURIComponent(person)}>{displayName}</a>.</p></section>;
+    }
+  }
   const stopped = stoppedAt(failure, operation);
   return stopped ? <RefusedReceipt stopped={stopped} /> : <ErrorWords problem={failure} />;
 }

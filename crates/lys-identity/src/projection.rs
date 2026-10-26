@@ -464,7 +464,9 @@ impl Projection {
                     })
                 }
             }
-            Change::AgentCall(_) => held.map(drop).ok_or_else(|| unknown(identity)),
+            Change::AgentCall(_) | Change::AdmissionWithdrawn { .. } => {
+                held.map(drop).ok_or_else(|| unknown(identity))
+            }
             Change::LinkAudit(seen) => {
                 held.ok_or_else(|| unknown(identity))?;
                 if self.link_sources.contains_key(seen.source_operation_id()) {

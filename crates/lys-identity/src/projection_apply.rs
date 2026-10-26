@@ -144,7 +144,9 @@ impl Projection {
                 record.events.push(index);
                 self.refresh_reporting_children(identity, None)?;
             }
-            Change::AgentCall(_) => self.held(identity)?.events.push(index),
+            Change::AgentCall(_) | Change::AdmissionWithdrawn { .. } => {
+                self.held(identity)?.events.push(index);
+            }
             Change::LinkAudit(seen) => {
                 self.held(identity)?.events.push(index);
                 Arc::make_mut(&mut self.link_sources)

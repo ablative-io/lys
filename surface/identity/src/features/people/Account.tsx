@@ -342,3 +342,38 @@ export function PersonAccount({ id }: { id: string }) {
     </section>
   );
 }
+
+/** Only mounted within the administrator's account view. The service also
+ * judges organisation.administer before reading or withdrawing a link. */
+export function AdmissionWaiting({ id }: { id: string }) {
+  const path = '/people/' + encodeURIComponent(id) + '/admission';
+  const [waiting, setWaiting] = useState(false);
+  const [reading, setReading] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [failure, setFailure] = useState('');
+  const [notice, setNotice] = useState('');
+  useEffect(() => {
+    let live = true;
+    setWaiting(false); setReading(''); setFailure(''); setNotice('');
+    request<{ person: string; waiting: boolean }>(path).then((answer) => {
+      if (live) setWaiting(answer.person === id && answer.waiting === true);
+    }, (error: unknown) => { if (live) setReading(reasonOf(error)); });
+    return () => { live = false; };
+  }, [id, path]);
+  async function withdraw() {
+    if (busy) return;
+    setBusy(true); setFailure('');
+    try {
+      const answer = await request<{ person: string; digest: string }>(path + '/withdraw', {});
+      if (answer.person !== id || typeof answer.digest !== 'string' || !answer.digest) throw new Error('The service did not confirm the withdrawal.');
+      setWaiting(false); setNotice('The sign-in link was withdrawn.');
+    } catch (error) { setFailure(reasonOf(error)); }
+    finally { setBusy(false); }
+  }
+  return <div className="admission-waiting">
+    {reading ? <p role="status">The waiting sign-in link could not be read: {reading}</p> : null}
+    {waiting ? <><p>A sign-in link is waiting</p><Act symbol="close" name="Withdraw sign-in link" word="Withdraw" disabled={busy} onClick={() => void withdraw()} /></> : null}
+    {failure ? <p role="alert">{failure}</p> : null}
+    {notice ? <p role="status">{notice}</p> : null}
+  </div>;
+}

@@ -67,6 +67,19 @@ macro_rules! directory_refusals {
         "app_admit_grant_required: a product admits a person only with their first grant on its own kind"
     )]
     AppAdmitGrantRequired,
+    /// An email already opens a record the caller did not name.
+    #[error("EmailHeldByAnother: {email} already signs in as {display_name} ({person})")]
+    EmailHeldByAnother {
+        /// The person the email signs in as.
+        person: String,
+        /// Their stored display name.
+        display_name: String,
+        /// The address held by that account.
+        email: String,
+    },
+    /// No unspent admission link is waiting for the person.
+    #[error("NoUnspentAdmission: no unspent admission link is waiting for this person")]
+    NoUnspentAdmission,
     /// A proving link that Lys did not issue, or one already used
     /// (DIRECTORY-111 R2): one name and one text for both, so the link's
     /// standing is never read off the refusal.

@@ -42,7 +42,8 @@ macro_rules! unavailable_refusals {
 
 macro_rules! conflicting_refusals {
     () => {
-        ServerError::RequestDecided { .. }
+        ServerError::EmailHeldByAnother { .. }
+            | ServerError::RequestDecided { .. }
             | ServerError::RequestHeld { .. }
             | ServerError::RequestReused { .. }
             | ServerError::McpServerHeld { .. }
@@ -200,6 +201,16 @@ impl IntoResponse for ServerError {
             "reason": self.to_string(),
             "fields": self.fields(),
         });
+        if let Self::EmailHeldByAnother {
+            person,
+            display_name,
+            email,
+        } = &self
+        {
+            body["person"] = serde_json::json!(person);
+            body["display_name"] = serde_json::json!(display_name);
+            body["email"] = serde_json::json!(email);
+        }
         if let Self::Identity(error) = &self {
             match error {
                 IdentityError::AnswersToCycle { chain }
@@ -257,7 +268,8 @@ impl ServerError {
             | Self::NotPermitted { .. }
             | Self::ReviewerOnly
             | Self::McpBeyondRemit { .. } => StatusCode::FORBIDDEN,
-            Self::AgentNotVisible
+            Self::NoUnspentAdmission
+            | Self::AgentNotVisible
             | Self::McpServerUnknown { .. }
             | Self::GrantNotVisible
             | Self::SessionUnknown

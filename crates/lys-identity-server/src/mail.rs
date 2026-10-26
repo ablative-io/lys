@@ -77,6 +77,9 @@ pub enum Sender {
 pub struct LetterView {
     /// The letter: `added`, `access_given` or `founded`.
     pub letter: String,
+    /// The display name of the record this admission signs in as.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub display_name: Option<String>,
     /// The address it went to, when one was known.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub to: Option<String>,
@@ -103,6 +106,8 @@ impl LetterView {
     pub fn sent(letter: &Letter, by: Sender) -> Self {
         Self {
             letter: letter.name().to_owned(),
+            display_name: matches!(letter, Letter::Added { .. })
+                .then(|| letter.recipient().to_owned()),
             to: Some(letter.to().to_owned()),
             sent: true,
             by,
@@ -116,6 +121,7 @@ impl LetterView {
     pub fn unsent(letter: &'static str, to: Option<String>, reason: impl Into<String>) -> Self {
         Self {
             letter: letter.to_owned(),
+            display_name: None,
             to,
             sent: false,
             by: Sender::Lys,

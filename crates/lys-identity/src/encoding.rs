@@ -194,6 +194,11 @@ fn change(out: &mut Vec<u8>, value: &Change) {
             uint(out, 6);
             uint(out, seen.observed_at());
         }
+        Change::AdmissionWithdrawn { digest } => {
+            map(out, 1);
+            uint(out, 1);
+            text(out, digest);
+        }
         Change::AgentCall(call) => {
             map(out, 4);
             uint(out, 1);

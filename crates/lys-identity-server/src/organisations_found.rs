@@ -279,6 +279,7 @@ async fn steps(
         }
         return Ok(LetterView {
             letter: "founded".to_owned(),
+            display_name: None,
             to: Some(asked.email.clone()),
             sent: true,
             by,
@@ -329,6 +330,8 @@ async fn steps(
         email: asked.email.clone(),
         operation: founding_operation,
         spent: false,
+        withdrawn: false,
+        withdrawal_event: None,
         handed: mailer.is_none(),
         kind: Kind::Founding,
         continue_to: None,

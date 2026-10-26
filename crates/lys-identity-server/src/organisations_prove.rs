@@ -110,7 +110,7 @@ fn checked(
     let digest = digest(&asked.proof);
     let founding = foundings(state)?
         .by_digest(&digest)
-        .filter(|founding| !founding.spent)
+        .filter(|founding| !founding.spent && !founding.withdrawn)
         .cloned()
         .ok_or(ServerError::ProofRefused)?;
     let operation = OperationId::from_str(&founding.operation)?;
@@ -384,14 +384,7 @@ async fn admission_steps(
         binding.clone(),
         Provenance::new(AuthMethod::HandedLink, crate::session::now()),
     );
-    let cookie = crate::session_admission::begin(state, own)
-        .await
-        .map_err(at(session))?;
-    receipt.done(session);
-    foundings(state)
-        .map_err(at(spend))?
-        .spend(&proven.digest)
-        .map_err(at(spend))?;
+    let cookie = crate::people_admit_handed::begin(state, &proven.digest, own, receipt).await?;
     receipt.done(spend);
     Ok((
         cookie,

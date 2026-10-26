@@ -134,7 +134,13 @@ fn decode_change(kind: u64, value: Value) -> Result<Change, IdentityError> {
                 &as_text(signature, TEXT)?,
             )?))
         }
-        _ => Err(malformed("a change kind is 1 to 12")),
+        wire::ADMISSION_WITHDRAWN => {
+            let [digest] = fields::<1>(value, "an admission withdrawal is a map of key 1")?;
+            Ok(Change::AdmissionWithdrawn {
+                digest: as_text(digest, TEXT)?,
+            })
+        }
+        _ => Err(malformed("a change kind is 1 to 13")),
     }
 }
 
@@ -272,7 +278,9 @@ pub const HIGHEST_KIND_BEFORE_ORGANISATIONS: u64 = 10;
 pub fn decode_body_before_organisations(body: &[u8]) -> Result<IdentityEvent, IdentityError> {
     let event = decode_body(body)?;
     match event.change() {
-        Change::FoundOrganisation { .. } | Change::AttachOrganisation { .. } => {
+        Change::FoundOrganisation { .. }
+        | Change::AttachOrganisation { .. }
+        | Change::AdmissionWithdrawn { .. } => {
             Err(malformed("a change kind is 1 to 10"))
         }
         Change::RegisterPerson {

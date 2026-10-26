@@ -76,7 +76,7 @@ function decode(data: Uint8Array): Cbor | null {
 const STATES: Record<number, string> = { 1: 'not turned on yet', 2: 'active', 3: 'paused', 4: 'retired' };
 const MOVES: Record<number, string> = { 1: 'Turned on', 2: 'Paused', 3: 'Turned back on', 4: 'Retired' };
 /** Change kinds the generated table does not name yet (crates/lys-identity/src/event.rs, `wire`). */
-const MORE_KINDS: Record<number, string> = { 8: 'registered, answering to', 9: 'reporting changed', 10: 'a change it made through Lys' };
+const MORE_KINDS: Record<number, string> = { 8: 'registered, answering to', 9: 'reporting changed', 10: 'a change it made through Lys', 13: 'Sign-in link withdrawn' };
 
 const hexOf = (value: Uint8Array) => [...value].map((byte) => byte.toString(16).padStart(2, '0')).join('');
 

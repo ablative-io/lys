@@ -8,174 +8,12 @@
 //! nothing twice; a failed step is answered by its name with the steps that
 //! completed before it, and every answer carries one receipt.
 
-use std::error::Error;
-use std::sync::Arc;
+#[path = "people_admit/table.rs"]
+mod table;
 
-use identity_contract::fake_issuer::Login;
-use identity_contract::fake_rauthy::FakeRauthy;
-use identity_contract::harness::{GRANT_MODEL, Service, session_cookie};
-use identity_contract::mail_sink::MailSink;
-use lys_identity::signer::load_service_key;
 use lys_identity::{OperationId, OrganisationId};
-use lys_identity_server::configuration_store::ConfigurationStore;
-use lys_identity_server::mail::{MailSettings, Tls};
-use lys_identity_server::routes::open_directory;
-use lys_identity_server::runner_acts::ActStore;
-use lys_identity_server::setup::SetupSettings;
-use lys_identity_server::sign_in_providers::SignInProvidersSettings;
 use serde_json::{Value, json};
-use sha2::{Digest, Sha256};
-
-type TestResult = Result<(), Box<dyn Error>>;
-
-const CODE: &str = "people-admit-first-run-code";
-const ADMIN_EMAIL: &str = "ada@example.test";
-const PASSWORD: &str = "Analytical-Engine-1843";
-const BEA: &str = "bea@example.test";
-const CY: &str = "cy@example.test";
-const STEPS: [&str; 6] = ["register", "account", "bind", "activate", "grant", "letter"];
-
-/// A service with a fake issuer and Ada as its first-run administrator.
-async fn table() -> Result<(Service, FakeRauthy, String), Box<dyn Error>> {
-    let rauthy = FakeRauthy::start().await?;
-    // The letters go to a sink of their own: the act is refused without
-    // mail settings (DIRECTORY-110 R4). The handle may go; the sink stays.
-    let sink = MailSink::start().await?;
-    let port = sink.port();
-    let settings = SignInProvidersSettings {
-        api: rauthy.api().to_owned(),
-        api_key_file: rauthy.api_key_file(),
-    };
-    let (service, ()) = Service::start_adjusted(
-        GRANT_MODEL,
-        None,
-        None,
-        Some(settings),
-        move |config| {
-            config.requests_dir = None;
-            config.certificates_dir = None;
-            config.network_file = None;
-            config.roles_file = None;
-            config.provisioning_file = None;
-            config.runtime_dir = None;
-            config.service_accounts_dir = None;
-            config.teams_dir = None;
-            config.stops_dir = None;
-            config.budgets_dir = None;
-            config.policies_dir = None;
-            config.goals_dir = None;
-            config.reviews_dir = None;
-            config.administrator = None;
-            config.setup = Some(SetupSettings {
-                code_file: config.log_dir.with_file_name("setup-code"),
-                administrator_file: config.log_dir.with_file_name("administrator.json"),
-                email: None,
-                organisation: "Example organisation".to_owned(),
-            });
-            config.mail = Some(MailSettings {
-                host: "127.0.0.1".to_owned(),
-                port,
-                user: None,
-                password_file: None,
-                from: "Lys <lys@example.test>".to_owned(),
-                tls: Tls::None,
-                sent_file: config.log_dir.with_file_name("letters-sent.jsonl"),
-            });
-        },
-        |config| {
-            let setup = config.setup.as_ref().ok_or("setup is configured")?;
-            let digest: Vec<String> = Sha256::digest(CODE.as_bytes())
-                .iter()
-                .map(|byte| format!("{byte:02x}"))
-                .collect();
-            let pending = json!({ "purpose": "first-run", "sha256": digest.concat() });
-            std::fs::write(&setup.code_file, pending.to_string())?;
-            let key = Arc::new(load_service_key(&config.event_key_file)?);
-            drop(open_directory(config)?);
-            drop(ConfigurationStore::open(
-                &config.log_dir.with_file_name("organisation"),
-                Arc::clone(&key),
-            )?);
-            drop(ActStore::open(
-                &config.log_dir.with_file_name("runner-acts"),
-                Arc::clone(&key),
-            )?);
-            Ok(())
-        },
-    )
-    .await?;
-    rauthy.link(service.issuer.clone())?;
-    let made = reqwest::Client::new()
-        .post(format!("{}/setup/administrator", service.base))
-        .header(reqwest::header::CONTENT_TYPE, "application/json")
-        .body(
-            json!({
-                "code": CODE,
-                "operation": OperationId::generate()?.to_string(),
-                "display_name": "Ada Lovelace",
-                "email": ADMIN_EMAIL,
-                "password": PASSWORD,
-            })
-            .to_string(),
-        )
-        .send()
-        .await?;
-    let ada = session_cookie(made).await?;
-    Ok((service, rauthy, ada))
-}
-
-/// The act admitting Bea with a first grant under `relation`.
-fn admit(operation: &str, relation: &str) -> Value {
-    json!({
-        "operation": operation,
-        "display_name": "Bea",
-        "email": BEA,
-        "grant": {
-            "route": "browser",
-            "resource": {"kind": "doc", "id": "alpha"},
-            "relation": relation,
-        },
-    })
-}
-
-/// Sign in as the person an admit answer names, at the issuer their login
-/// was bound at.
-async fn signed_in_as(
-    service: &Service,
-    admitted: &Value,
-    email: &str,
-) -> Result<String, Box<dyn Error>> {
-    let subject = admitted["subject"]
-        .as_str()
-        .ok_or("an issuer subject")?
-        .to_owned();
-    service
-        .sign_in(Login {
-            subject,
-            email: email.to_owned(),
-        })
-        .await
-}
-
-/// The accounts the issuer holds for `email`.
-fn accounts_for(rauthy: &FakeRauthy, email: &str) -> Result<usize, Box<dyn Error>> {
-    Ok(rauthy
-        .users()?
-        .iter()
-        .filter(|user| user["email"] == email)
-        .count())
-}
-
-/// The people the directory lists, as the administrator reads them.
-async fn people(service: &Service, ada: &str) -> Result<usize, Box<dyn Error>> {
-    let (status, listed) = service.get("/directory/people", Some(ada)).await?;
-    assert_eq!(status, 200, "{listed}");
-    let people = listed["people"]
-        .as_array()
-        .or_else(|| listed.as_array())
-        .ok_or("the directory lists people")?;
-    Ok(people.len())
-}
+use table::{BEA, CY, STEPS, TestResult, accounts_for, admission_files, admit, people, signed_in_as, table, table_with_mail};
 
 #[tokio::test]
 async fn one_act_registers_makes_the_account_binds_activates_and_grants() -> TestResult {
@@ -514,5 +352,79 @@ async fn the_administrator_admits_by_the_founding_grant_alone() -> TestResult {
     assert_eq!(refused["refusal"], "NotAdmitted", "{refused}");
     assert_eq!(people(&service, &ada).await?, before);
     assert_eq!(accounts_for(&rauthy, BEA)?, 0);
+    Ok(())
+}
+
+/// DIRECTORY-121 R1: an email is never silently admitted as another name.
+#[tokio::test]
+async fn an_email_held_under_another_name_is_refused_without_writing() -> TestResult {
+    for mail in [false, true] {
+        let (service, rauthy, ada) = table_with_mail(mail).await?;
+        let mut body = admit(&OperationId::generate()?.to_string(), "alpha");
+        body["display_name"] = json!("Dean Whiting");
+        body["email"] = json!("a@example.test");
+        let (status, first) = service.post("/people/admit", Some(&ada), &body).await?;
+        assert_eq!(status, 200, "{first}");
+        let person = first["person"].as_str().ok_or("the existing person")?;
+        let before_people = people(&service, &ada).await?;
+        let before_grants = service.get("/grants", Some(&ada)).await?;
+        let before_record = service.get(&format!("/identities/{person}"), Some(&ada)).await?;
+        let before_files = admission_files(service.dir.path())?;
+        body["operation"] = json!(OperationId::generate()?.to_string());
+        body["display_name"] = json!("Annabel");
+        body["grant"]["relation"] = json!("beta");
+        for explicit in [None, Some(OperationId::generate()?.to_string().replace("op-", "person-"))] {
+            if let Some(other) = explicit {
+                body["person"] = json!(other);
+            }
+            let (status, refused) = service.post("/people/admit", Some(&ada), &body).await?;
+            assert_eq!(status, 409, "{refused}");
+            assert_eq!(refused["refusal"], "EmailHeldByAnother", "{refused}");
+            assert_eq!(refused["person"], person, "{refused}");
+            assert_eq!(refused["display_name"], "Dean Whiting", "{refused}");
+            assert_eq!(refused["email"], "a@example.test", "{refused}");
+            assert_eq!(refused["receipt"]["completed"], json!([]), "{refused}");
+            assert_eq!(service.get("/grants", Some(&ada)).await?, before_grants);
+            assert_eq!(service.get(&format!("/identities/{person}"), Some(&ada)).await?, before_record);
+            assert_eq!(admission_files(service.dir.path())?, before_files);
+        }
+        assert_eq!(people(&service, &ada).await?, before_people);
+        assert_eq!(accounts_for(&rauthy, "a@example.test")?, 1);
+    }
+    Ok(())
+}
+
+#[tokio::test]
+async fn naming_the_held_person_or_their_exact_trimmed_name_records_existing() -> TestResult {
+    let (service, _rauthy, ada) = table().await?;
+    let mut body = admit(&OperationId::generate()?.to_string(), "alpha");
+    body["display_name"] = json!("Dean Whiting");
+    body["email"] = json!("a@example.test");
+    let (status, first) = service.post("/people/admit", Some(&ada), &body).await?;
+    assert_eq!(status, 200, "{first}");
+    let person = first["person"].as_str().ok_or("the existing person")?;
+    for name in ["Annabel", "Dean Whiting", "  Dean Whiting  "] {
+        body["operation"] = json!(OperationId::generate()?.to_string());
+        body["display_name"] = json!(name);
+        body["grant"]["relation"] = json!("beta");
+        if name == "Annabel" {
+            body["person"] = json!(person);
+        } else {
+            body.as_object_mut().ok_or("an object")?.remove("person");
+        }
+        let (status, answer) = service.post("/people/admit", Some(&ada), &body).await?;
+        assert_eq!(status, 200, "{answer}");
+        assert_eq!(answer["person"], person);
+        assert_eq!(answer["receipt"]["existing"], json!({"person": person, "display_name": "Dean Whiting"}));
+        assert_eq!(answer["display_name"], "Dean Whiting");
+        let (status, again) = service.post("/people/admit", Some(&ada), &body).await?;
+        assert_eq!(status, 200, "{again}");
+        assert_eq!(again["receipt"]["existing"], answer["receipt"]["existing"]);
+    }
+    body["operation"] = json!(OperationId::generate()?.to_string());
+    body["display_name"] = json!("dean whiting");
+    let (status, refused) = service.post("/people/admit", Some(&ada), &body).await?;
+    assert_eq!(status, 409, "{refused}");
+    assert_eq!(refused["refusal"], "EmailHeldByAnother");
     Ok(())
 }

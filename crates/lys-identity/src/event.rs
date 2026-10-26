@@ -193,6 +193,11 @@ pub enum Change {
     },
     /// The link-audit receiver accepted an issuer's observation.
     LinkAudit(LinkObservation),
+    /// An administrator withdrew an admission link, retaining its digest.
+    AdmissionWithdrawn {
+        /// The lowercase SHA-256 digest of the withdrawn token.
+        digest: String,
+    },
     /// An agent made a change through MCP.
     AgentCall(crate::agent_call::AgentCall),
 }
@@ -233,6 +238,7 @@ fn check_organisation_fit(change: &Change) -> Result<(), IdentityError> {
         | Change::BindLogin { .. }
         | Change::LinkAudit(_)
         | Change::AgentCall(_)
+        | Change::AdmissionWithdrawn { .. }
         | Change::AttachOrganisation { .. } => Err(IdentityError::ChangeMismatch {
             reason: "an organisation is founded, renamed and moved through its lifecycle, and nothing else",
         }),
@@ -241,6 +247,16 @@ fn check_organisation_fit(change: &Change) -> Result<(), IdentityError> {
 
 /// Refuse `change` if it does not fit `identity`.
 fn check_fit(identity: IdentityId, change: &Change) -> Result<(), IdentityError> {
+    if let Change::AdmissionWithdrawn { digest } = change
+        && (digest.len() != 64
+            || !digest
+                .bytes()
+                .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte)))
+    {
+        return Err(IdentityError::ChangeMismatch {
+            reason: "an admission withdrawal names a lowercase SHA-256 token digest",
+        });
+    }
     let invalid_target = match change {
         Change::ReportingRegistration { reports_to, .. } => !reporting_target(*reports_to),
         Change::ReportsToChanged { from, to, .. } => {
@@ -292,6 +308,11 @@ fn check_fit(identity: IdentityId, change: &Change) -> Result<(), IdentityError>
         (Change::BindLogin { .. }, IdentityId::Agent(_)) => Err(IdentityError::ChangeMismatch {
             reason: "a login is bound to a person, never to an agent",
         }),
+        (Change::AdmissionWithdrawn { .. }, IdentityId::Agent(_)) => {
+            Err(IdentityError::ChangeMismatch {
+                reason: "an admission withdrawal names a person",
+            })
+        }
         (Change::LinkAudit(_), IdentityId::Agent(_)) => Err(IdentityError::ChangeMismatch {
             reason: "a link observation names the person the login belongs to",
         }),
@@ -436,6 +457,9 @@ pub(crate) mod wire {
     /// A record written before organisations is attached to one (DIRECTORY-109 R2).
     pub(crate) const ATTACH_ORGANISATION: u64 = 12;
 
+    /// An administrator withdraws an admission link.
+    pub(crate) const ADMISSION_WITHDRAWN: u64 = 13;
+
     pub(crate) fn change(value: &Change) -> u64 {
         match value {
             Change::SetupPerson { .. } => SETUP_PERSON,
@@ -450,6 +474,7 @@ pub(crate) mod wire {
             Change::Transition { .. } => TRANSITION,
             Change::LinkAudit(_) => LINK_AUDIT,
             Change::AgentCall(_) => AGENT_CALL,
+            Change::AdmissionWithdrawn { .. } => ADMISSION_WITHDRAWN,
         }
     }
 

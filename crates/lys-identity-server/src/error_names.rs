@@ -98,6 +98,8 @@ fn server(error: &ServerError) -> &str {
         ServerError::Grant(error) => grant(error),
         ServerError::App(error) => app(error),
         ServerError::Inactive { .. } => "inactive",
+        ServerError::EmailHeldByAnother { .. } => "EmailHeldByAnother",
+        ServerError::NoUnspentAdmission => "NoUnspentAdmission",
         ServerError::NotSignedIn => "NotSignedIn",
         ServerError::NotAdmitted { .. } => "NotAdmitted",
         ServerError::OrganisationNotOwn { .. } => "organisation_not_own",

@@ -118,7 +118,7 @@ impl Letter {
                 address,
                 google: Some(google),
             } => format!(
-                "Hello {name}, you have been added to Lys. Open {address} and choose Sign in with {google}, using {email}."
+                "Hello {name}, you have been added to Lys. This sign-in opens your record and signs you in as {name}. Open {address} and choose Sign in with {google}, using {email}."
             ),
             Self::Added {
                 name,
@@ -126,7 +126,7 @@ impl Letter {
                 address,
                 google: None,
             } => format!(
-                "Hello {name}, you have been added to Lys. Sign in at {address} with {email}."
+                "Hello {name}, you have been added to Lys. This sign-in opens your record and signs you in as {name}. Sign in at {address} with {email}."
             ),
             Self::AccessGiven {
                 name,
@@ -210,11 +210,11 @@ mod tests {
         assert_eq!(added(None).subject(), "You have been added to Lys");
         assert_eq!(
             added(None).body(),
-            "Hello Care Helper, you have been added to Lys. Sign in at https://lys.example.test with helper@example.test."
+            "Hello Care Helper, you have been added to Lys. This sign-in opens your record and signs you in as Care Helper. Sign in at https://lys.example.test with helper@example.test."
         );
         assert_eq!(
             added(Some("Google")).body(),
-            "Hello Care Helper, you have been added to Lys. Open https://lys.example.test and choose Sign in with Google, using helper@example.test."
+            "Hello Care Helper, you have been added to Lys. This sign-in opens your record and signs you in as Care Helper. Open https://lys.example.test and choose Sign in with Google, using helper@example.test."
         );
         assert_eq!(added(None).name(), "added");
         assert_eq!(added(None).to(), "helper@example.test");

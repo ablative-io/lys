@@ -37,6 +37,13 @@ pub struct Founding {
     pub operation: String,
     /// Whether the proof was used.
     pub spent: bool,
+    /// An administrator withdrew this admission; the digest remains held.
+    #[serde(default)]
+    pub withdrawn: bool,
+    /// The canonical withdrawal event, kept in the same durable write so a
+    /// refused directory append can be finished by the next read or act.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub withdrawal_event: Option<Vec<u8>>,
     /// Whether the link was handed on the screen because the install has no
     /// mail settings, not sent in a letter (DIRECTORY-112 R1).
     #[serde(default)]
@@ -161,7 +168,10 @@ impl Foundings {
             .foundings
             .iter()
             .find(|(_, founding)| {
-                !founding.spent && founding.kind == Kind::Founding && founding.email == email
+                !founding.spent
+                    && !founding.withdrawn
+                    && founding.kind == Kind::Founding
+                    && founding.email == email
             })
             .map(|(digest, founding)| (digest.as_str(), founding))
     }
@@ -174,7 +184,10 @@ impl Foundings {
             .foundings
             .iter()
             .find(|(_, founding)| {
-                !founding.spent && founding.kind == Kind::Admission && founding.founder == person
+                !founding.spent
+                    && !founding.withdrawn
+                    && founding.kind == Kind::Admission
+                    && founding.founder == person
             })
             .map(|(digest, _)| digest.as_str())
     }
@@ -206,6 +219,32 @@ impl Foundings {
         Ok(())
     }
 
+    /// Keep the withdrawal and its event in one write, retaining the digest.
+    ///
+    /// # Errors
+    /// Refuses an absent, spent or withdrawn admission, or a failed save;
+    /// on a failed save memory and disk keep the whole previous record.
+    pub fn withdraw(&mut self, digest: &str, event: Vec<u8>) -> Result<(), ServerError> {
+        let mut admission = self
+            .by_digest(digest)
+            .filter(|held| held.kind == Kind::Admission && !held.spent && !held.withdrawn)
+            .cloned()
+            .ok_or(ServerError::NoUnspentAdmission)?;
+        admission.withdrawn = true;
+        admission.withdrawal_event = Some(event);
+        self.record(digest.to_owned(), admission, None)
+    }
+
+    /// Withdrawal events kept for this person, including ones whose
+    /// directory append must be retried. Replaying an event appends nothing.
+    pub(crate) fn withdrawals_for<'a>(&'a self, person: &'a str) -> impl Iterator<Item = &'a [u8]> {
+        self.stored
+            .foundings
+            .values()
+            .filter(move |held| held.founder == person && held.withdrawn)
+            .filter_map(|held| held.withdrawal_event.as_deref())
+    }
+
     /// Mark `digest` spent, durably, as the last step of its proof.
     ///
     /// # Errors
@@ -215,6 +254,9 @@ impl Foundings {
         let Some(founding) = self.stored.foundings.get_mut(digest) else {
             return Err(ServerError::ProofRefused);
         };
+        if founding.spent || founding.withdrawn {
+            return Err(ServerError::ProofRefused);
+        }
         founding.spent = true;
         if let Err(error) = self.save() {
             if let Some(founding) = self.stored.foundings.get_mut(digest) {
@@ -266,6 +308,8 @@ mod tests {
             email: email.to_owned(),
             operation: operation.to_owned(),
             spent: false,
+            withdrawn: false,
+            withdrawal_event: None,
             handed: false,
             kind: Kind::Founding,
             continue_to: None,
@@ -342,5 +386,62 @@ mod tests {
             Foundings::open(file),
             Err(ServerError::DirectoryUnavailable { .. })
         ));
+    }
+
+    #[test]
+    fn withdrawing_an_admission_keeps_its_record_and_a_later_link_works() -> Result<(), ServerError> {
+        let dir = tempfile::tempdir().map_err(|e| unusable(Path::new("tmp"), &e))?;
+        let file = dir.path().join("foundings.json");
+        let mut held = Foundings::open(file.clone())?;
+        let mut admission = founding("ada@example.test", "op-1");
+        admission.kind = Kind::Admission;
+        held.record("d1".to_owned(), admission.clone(), None)?;
+        held.withdraw("d1", vec![1, 2, 3])?;
+        assert!(held.unspent_admission_for("person-1").is_none());
+        assert!(held.by_digest("d1").is_some_and(|f| f.withdrawn));
+        assert_eq!(
+            held.by_digest("d1").and_then(|f| f.withdrawal_event.as_deref()),
+            Some([1, 2, 3].as_slice())
+        );
+        let mut held = Foundings::open(file)?;
+        assert!(held.by_digest("d1").is_some_and(|f| f.withdrawn));
+        held.record("d2".to_owned(), admission, None)?;
+        assert_eq!(held.unspent_admission_for("person-1"), Some("d2"));
+        assert!(held.by_digest("d1").is_some_and(|f| f.withdrawn));
+        assert!(matches!(
+            held.withdraw("d1", vec![1, 2, 3]),
+            Err(ServerError::NoUnspentAdmission)
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn a_refused_withdrawal_save_leaves_memory_and_disk_whole() -> Result<(), ServerError> {
+        let dir = tempfile::tempdir().map_err(|e| unusable(Path::new("tmp"), &e))?;
+        let file = dir.path().join("foundings.json");
+        let mut held = Foundings::open(file.clone())?;
+        let mut admission = founding("ada@example.test", "op-1");
+        admission.kind = Kind::Admission;
+        held.record("d1".to_owned(), admission, None)?;
+        let before = std::fs::read(&file).map_err(|e| unusable(&file, &e))?;
+        let writable = held.file.clone();
+        held.file = file.join("refused");
+        assert!(matches!(
+            held.withdraw("d1", vec![1, 2, 3]),
+            Err(ServerError::DirectoryUnavailable { .. })
+        ));
+        assert_eq!(held.unspent_admission_for("person-1"), Some("d1"));
+        assert!(held
+            .by_digest("d1")
+            .is_some_and(|f| !f.withdrawn && f.withdrawal_event.is_none()));
+        assert_eq!(
+            std::fs::read(&writable).map_err(|e| unusable(&writable, &e))?,
+            before
+        );
+        assert_eq!(
+            Foundings::open(writable)?.unspent_admission_for("person-1"),
+            Some("d1")
+        );
+        Ok(())
     }
 }

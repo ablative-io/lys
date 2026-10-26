@@ -265,6 +265,10 @@ pub(crate) async fn read(
         if scope.is_none() || projection.organisation_of(id) != scope {
             return Err(unknown().into());
         }
+        if matches!(id, IdentityId::Person(_)) {
+            let held = crate::organisations_found::foundings(&state)?;
+            crate::people_admit_handed::record_withdrawals(directory, &held, &id.to_string())?;
+        }
         let record = directory.record(id)?.ok_or_else(unknown)?;
         Ok(Json(record_view(id, &record)))
     })

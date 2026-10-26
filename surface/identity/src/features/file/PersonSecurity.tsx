@@ -4,7 +4,7 @@ import { api, useLoad } from '../../api';
 import { SessionList } from '../sessions/Sessions';
 import { DirectoryGate as Gate } from '../people/Words';
 import { RecordedForm } from '../people/RecordedForm';
-import { PersonAccount } from '../people/Account';
+import { AdmissionWaiting, PersonAccount } from '../people/Account';
 
 export function PersonCredentials({ id }: { id: string }) {
   const [revision, setRevision] = useState(0);
@@ -18,6 +18,7 @@ export function PersonCredentials({ id }: { id: string }) {
       {logins.length ? <table><thead><tr><th>Sign-in provider</th><th>Account identifier</th></tr></thead><tbody>{logins.map((login) => <tr key={JSON.stringify([login.issuer, login.subject])}><td>{login.issuer}</td><td>{login.subject}</td></tr>)}</tbody></table> : <p>No sign-in account is bound to this person.</p>}
       {own ? <p className="note">Your own email and password are in <a href="#/settings/account">Settings › Your account</a>.</p> : null}
       {directory ? <>
+        <AdmissionWaiting id={id} />
         <RecordedForm name="bind-login" title="Bind a sign-in identity" heading="Connect a sign-in account" description="Connect this person's directory record to their account with a sign-in provider." submitLabel="Connect sign-in" drawn={{ symbol: 'add', word: 'Connect' }} done={() => setRevision((value) => value + 1)}
           change={(form) => ({ path: '/people/' + encodeURIComponent(id) + '/logins', body: { issuer: String(form.get('issuer') ?? '').trim(), subject: String(form.get('subject') ?? '').trim() } })}>
           <div className="form-grid">

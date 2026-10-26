@@ -27,6 +27,14 @@ pub fn router(state: Shared) -> Router {
         .route("/identities/{id}/transitions", post(transition))
         .route("/people/{id}/logins", post(bind_login))
         .route("/people/admit", post(crate::people_admit::admit))
+        .route(
+            "/people/{id}/admission",
+            get(crate::people_admit_handed::waiting),
+        )
+        .route(
+            "/people/{id}/admission/withdraw",
+            post(crate::people_admit_handed::withdraw),
+        )
         .merge(crate::organisations_found::routes())
         .merge(crate::sign_in::routes())
         .merge(crate::setup::routes())
