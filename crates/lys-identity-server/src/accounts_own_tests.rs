@@ -92,7 +92,7 @@ async fn table_with_mail(
                 config,
                 [ADMINISTRATOR, subject.as_str()],
             )?;
-            let directory = server::routes::open_directory(config)?;
+            let mut directory = server::routes::open_directory(config)?;
             let binding = LoginBinding::new(&config.issuer, &subject)?;
             let person = directory
                 .projection()?

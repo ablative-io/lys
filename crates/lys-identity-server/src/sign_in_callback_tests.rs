@@ -45,7 +45,7 @@ async fn table(
     };
     let (service, person) = Service::start_setting(GRANT_MODEL, None, None, Some(settings), |config| {
         server::dev_seed::seed_configured(config, [ADMINISTRATOR, subject.as_str()])?;
-        let directory = server::routes::open_directory(config)?;
+        let mut directory = server::routes::open_directory(config)?;
         let person = directory.projection()?.person_for(&LoginBinding::new(&config.issuer, &subject)?)
             .ok_or("the bound person")?.to_string();
         if let Some(held) = held {
