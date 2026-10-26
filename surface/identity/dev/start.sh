@@ -78,6 +78,7 @@ cat >"$STATE/config.json" <<JSON
   "administrator": { "issuer": "$ISSUER", "subject": "ada" },
   "link_audit_source": { "issuer": "$ISSUER", "subject": "link-audit" },
   "session_seconds": 2592000,
+  "reviews": { "period_days": 30 },
   "secure_cookie": false,
   "grant_log_dir": "$STATE/grant-log",
   "grant_log_origin": "dev.lys/grants",
