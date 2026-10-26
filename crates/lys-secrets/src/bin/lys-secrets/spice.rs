@@ -63,7 +63,7 @@ impl SpiceGrants {
             .grant_model()
             .map_err(|error| refused(error.to_string()))?;
         let engine =
-            SpiceDb::open(&settings, &model).map_err(|error| refused(error.to_string()))?;
+            lys_identity_server::spicedb_outbound::open(&settings, &model).map_err(|error| refused(error.to_string()))?;
         let action = Action::new(action).map_err(|error| refused(error.to_string()))?;
         let read_action = Action::new(read_action).map_err(|error| refused(error.to_string()))?;
         let lend_action = Action::new(lend_action).map_err(|error| refused(error.to_string()))?;

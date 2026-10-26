@@ -142,9 +142,13 @@ async fn caller_close_reaches_a_synchronous_gateway_call_and_withdraws_its_entry
             axum::routing::get(move || {
                 let gateway = gateway.clone();
                 async move {
-                    match crate::spicedb_http::Client::default()
-                        .post_json(&gateway, "/read", "fixture", "{}")
-                    {
+                    match crate::spicedb_outbound::post_json(
+                        &crate::spicedb_http::Client::default(),
+                        &gateway,
+                        "/read",
+                        "fixture",
+                        "{}",
+                    ) {
                         Ok(answer) => answer.body,
                         Err(error) => error,
                     }

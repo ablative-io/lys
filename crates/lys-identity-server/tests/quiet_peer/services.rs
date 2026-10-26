@@ -49,7 +49,8 @@ async fn a_quiet_spicedb_is_waited_for_until_its_socket_closes() -> Outcome {
     let address = listener.local_addr()?.to_string();
     let asked_address = address.clone();
     let asking = tokio::task::spawn_blocking(move || {
-        lys_identity_server::spicedb_http::Client::default().post_json(
+        lys_identity_server::spicedb_outbound::post_json(
+            &lys_identity_server::spicedb_http::Client::default(),
             &asked_address,
             "/v1/schema/read",
             "fixture",
@@ -58,6 +59,10 @@ async fn a_quiet_spicedb_is_waited_for_until_its_socket_closes() -> Outcome {
     });
     let (mut socket, _) = listener.accept().await?;
     assert!(socket.read(&mut [0; 4096]).await? > 0);
+    let waiting = lys_identity_server::waits::snapshot()?
+        .into_iter()
+        .find(|call| call.service == "SpiceDB" && call.peer == address)
+        .ok_or("the quiet SpiceDB call was not listed")?;
     drop(socket);
     let error = asking.await?.err().ok_or("closed SpiceDB succeeded")?;
     assert!(error.contains(&address));
@@ -72,6 +77,43 @@ async fn a_quiet_spicedb_is_waited_for_until_its_socket_closes() -> Outcome {
     let body = axum::body::to_bytes(response.into_body(), usize::MAX).await?;
     let body: serde_json::Value = serde_json::from_slice(&body)?;
     assert_eq!(body["refusal"], "PermissionEngineUnavailable");
+    assert!(
+        !lys_identity_server::waits::snapshot()?
+            .iter()
+            .any(|call| call.id == waiting.id)
+    );
+    Ok(())
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_quiet_spicedb_cancel_closes_its_socket_and_names_the_administrator() -> Outcome {
+    let listener = TcpListener::bind("127.0.0.1:0").await?;
+    let address = listener.local_addr()?.to_string();
+    let asked_address = address.clone();
+    let asking = tokio::task::spawn_blocking(move || {
+        lys_identity_server::spicedb_outbound::post_json(
+            &lys_identity_server::spicedb_http::Client::default(),
+            &asked_address,
+            "/v1/schema/read",
+            "fixture",
+            "{}",
+        )
+    });
+    let (mut socket, _) = listener.accept().await?;
+    assert!(socket.read(&mut [0; 4096]).await? > 0);
+    let waiting = lys_identity_server::waits::snapshot()?
+        .into_iter()
+        .find(|call| call.service == "SpiceDB" && call.peer == address)
+        .ok_or("the quiet SpiceDB call was not listed")?;
+    lys_identity_server::waits::cancel(&waiting.id, "administrator Ada")?;
+    let error = asking.await?.err().ok_or("cancelled SpiceDB succeeded")?;
+    assert!(error.contains("cancelled by administrator Ada"));
+    assert_eq!(socket.read(&mut [0; 1]).await?, 0);
+    assert!(
+        !lys_identity_server::waits::snapshot()?
+            .iter()
+            .any(|call| call.id == waiting.id)
+    );
     Ok(())
 }
 

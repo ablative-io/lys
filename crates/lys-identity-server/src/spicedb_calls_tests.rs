@@ -73,6 +73,7 @@ fn at(endpoint: String, scope: Option<&str>) -> SpiceDb {
         app_kinds: Mutex::new(BTreeMap::new()),
         scope: scope.map(str::to_owned),
         client: Arc::default(),
+        post_json: super::plain_post_json,
         tokens: Arc::default(),
         confirmed: Arc::default(),
     }

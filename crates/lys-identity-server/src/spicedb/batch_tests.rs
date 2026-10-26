@@ -127,6 +127,7 @@ async fn exercise_given(
         app_kinds: Mutex::default(),
         scope: scope.map(str::to_owned),
         client: Arc::default(),
+        post_json: super::super::plain_post_json,
         tokens: Arc::default(),
         confirmed: Arc::default(),
     };

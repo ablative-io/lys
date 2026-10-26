@@ -1,7 +1,7 @@
 //! Where the permission engine is, and its credential: read once, on the
 //! first call that needs it, and never printed.
 
-use super::{KEY_LINE, engine_name, unavailable};
+use super::{KEY_LINE, PostJson, engine_name, plain_post_json, unavailable};
 use lys_identity::grants::GrantError;
 use serde::Deserialize;
 use std::path::PathBuf;
@@ -31,6 +31,7 @@ pub struct SpiceDbConnection {
     pub(super) endpoint: String,
     pub(super) key: Arc<str>,
     pub(super) mirror: String,
+    pub(super) post_json: PostJson,
 }
 
 impl std::fmt::Debug for SpiceDbConnection {
@@ -71,6 +72,7 @@ impl SpiceDbConnection {
             endpoint: settings.endpoint.clone(),
             key: Arc::from(key),
             mirror: settings.mirror.clone(),
+            post_json: plain_post_json,
         })
     }
 }
@@ -82,15 +84,23 @@ impl SpiceDbConnection {
 pub struct SpiceDbEngine {
     settings: SpiceDbSettings,
     loaded: Mutex<Option<SpiceDbConnection>>,
+    post_json: PostJson,
 }
 
 impl SpiceDbEngine {
     /// The engine `settings` names, its credential not read yet.
     #[must_use]
     pub fn new(settings: SpiceDbSettings) -> Self {
+        Self::using(settings, plain_post_json)
+    }
+
+    /// The engine with its caller's HTTP policy, shared by every loaded scope.
+    #[must_use]
+    pub(crate) fn using(settings: SpiceDbSettings, post_json: PostJson) -> Self {
         Self {
             settings,
             loaded: Mutex::new(None),
+            post_json,
         }
     }
 
@@ -112,7 +122,8 @@ impl SpiceDbEngine {
         if let Some(connection) = loaded.as_ref() {
             return Ok(connection.clone());
         }
-        let connection = SpiceDbConnection::load(&self.settings)?;
+        let mut connection = SpiceDbConnection::load(&self.settings)?;
+        connection.post_json = self.post_json;
         *loaded = Some(connection.clone());
         drop(loaded);
         Ok(connection)

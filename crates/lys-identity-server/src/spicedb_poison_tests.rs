@@ -14,6 +14,7 @@ fn poisoned_app_kinds_cannot_produce_or_replace_a_permission_schema() -> Result<
         app_kinds: Mutex::default(),
         scope: None,
         client: Arc::default(),
+        post_json: super::plain_post_json,
         tokens: Arc::default(),
         confirmed: Arc::default(),
     };

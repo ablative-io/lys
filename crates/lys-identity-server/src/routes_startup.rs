@@ -226,7 +226,7 @@ async fn make_state(
     let spicedb = config
         .spicedb
         .clone()
-        .map(crate::spicedb::SpiceDbEngine::new);
+        .map(crate::spicedb_outbound::engine);
     // The provider reads its kept tokens on the sessions' clock, the
     // service's own (DIRECTORY-099 R1).
     let sessions = sessions(config, clock)?;

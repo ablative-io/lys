@@ -1,6 +1,6 @@
 //! One JSON request to the `SpiceDB` gateway and its answer, over a plain
-//! kept HTTP/1.1 client. Bytes, a close, a kernel error or a caller's cancel
-//! end each wait; a checked-out connection holds no pool lock over I/O.
+//! kept HTTP/1.1 client. Bytes, a close or a kernel error end each read.
+//! Socket ownership belongs to the caller; no pool lock is held over I/O.
 
 use std::io::{Read, Write};
 use std::net::{TcpStream, ToSocketAddrs};
@@ -23,17 +23,25 @@ pub struct Client {
 impl Client {
     /// Post one request, reusing a connection and reconnecting a closed read connection once.
     ///
+    /// `hold` receives each fresh, checked-out or replacement socket before any
+    /// request bytes are written. Its returned release callback runs after that
+    /// exchange, before pooling the socket or opening a replacement. Refusing
+    /// either callback ends the call without reconnecting or pooling its socket.
+    /// The caller configures socket policy and owns any cloned close handle.
+    ///
     /// # Errors
-    /// Names an unavailable peer, malformed answer, unavailable pool or explicit cancel.
-    pub fn post_json(
+    /// Names an unavailable peer, malformed answer, unavailable pool or a caller hook's refusal.
+    pub fn post_json<Release>(
         &self,
         authority: &str,
         path: &str,
         bearer: &str,
         body: &str,
-    ) -> Result<Answer, String> {
-        let call = crate::waits::Call::begin("SpiceDB", authority, "POST", path)
-            .map_err(|error| error.to_string())?;
+        hold: impl Fn(&TcpStream) -> Result<Release, String>,
+    ) -> Result<Answer, String>
+    where
+        Release: FnOnce() -> Result<(), String>,
+    {
         if path
             .bytes()
             .chain(bearer.bytes())
@@ -57,20 +65,20 @@ impl Client {
             Some(stream) => stream,
             None => connect(authority)?,
         };
-        hold(&call, stream.get_ref())?;
+        let release = hold(stream.get_ref())?;
         let mut result = exchange(&mut stream, authority, path, bearer, body);
+        release()?;
         if reused
-            && !call.closer().left()
             && result.as_ref().is_err_and(|error| error.reconnect)
             && !path.ends_with("/write")
             && !path.ends_with("/delete")
         {
             stream = connect(authority)?;
-            hold(&call, stream.get_ref())?;
+            let release = hold(stream.get_ref())?;
             result = exchange(&mut stream, authority, path, bearer, body);
+            release()?;
         }
-        let (answer, keep) = result.map_err(|error| call.reason().unwrap_or(error.words))?;
-        call.closer().done().map_err(|error| error.to_string())?;
+        let (answer, keep) = result.map_err(|error| error.words)?;
         if keep {
             self.idle
                 .lock()
@@ -90,23 +98,7 @@ fn connect(authority: &str) -> Result<std::io::BufReader<TcpStream>, String> {
         .ok_or_else(|| format!("{authority} names no address"))?;
     let stream = TcpStream::connect(address).map_err(unreachable)?;
     stream.set_nodelay(true).map_err(unreachable)?;
-    crate::outbound::keepalive(&stream).map_err(unreachable)?;
     Ok(std::io::BufReader::new(stream))
-}
-
-fn hold(call: &crate::waits::Call, stream: &TcpStream) -> Result<(), String> {
-    let close = stream.try_clone().map_err(|error| error.to_string())?;
-    call.closer()
-        .hold(Box::new(move || {
-            match close.shutdown(std::net::Shutdown::Both) {
-                Ok(()) => {}
-                Err(error) if error.kind() == std::io::ErrorKind::NotConnected => {
-                    tracing::debug!("spicedb_already_closed: {error}");
-                }
-                Err(error) => tracing::error!("spicedb_close_failed: {error}"),
-            }
-        }))
-        .map_err(|error| error.to_string())
 }
 
 struct Failure {

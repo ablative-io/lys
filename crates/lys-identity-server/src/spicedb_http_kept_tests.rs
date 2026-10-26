@@ -61,14 +61,23 @@ fn two_answers_use_one_accepted_connection() -> Result<(), Box<dyn Error>> {
         Ok(())
     });
     let client = Client::default();
-    for _ in 0..2 {
+    let released = AtomicUsize::new(0);
+    for previous in 0..2 {
+        let release_count = &released;
         assert_eq!(
             client
-                .post_json(&endpoint, "/read", "fixture-bearer", "{}")?
+                .post_json(&endpoint, "/read", "fixture-bearer", "{}", |_socket| {
+                    assert_eq!(release_count.load(Ordering::Relaxed), previous);
+                    Ok(move || {
+                        release_count.fetch_add(1, Ordering::Relaxed);
+                        Ok(())
+                    })
+                })?
                 .body,
             "{}"
         );
     }
+    assert_eq!(released.load(Ordering::Relaxed), 2);
     drop(client);
     worker
         .join()
@@ -99,7 +108,9 @@ fn a_closed_connection_is_replaced() -> Result<(), Box<dyn Error>> {
     });
     let client = Client::default();
     for _ in 0..2 {
-        client.post_json(&endpoint, "/read", "fixture-bearer", "{}")?;
+        client.post_json(&endpoint, "/read", "fixture-bearer", "{}", |_| {
+            Ok(|| Ok(()))
+        })?;
     }
     worker
         .join()
@@ -120,7 +131,9 @@ fn a_non_http_answer_names_the_authority_without_the_bearer() -> Result<(), Box<
         Ok(())
     });
     let error = Client::default()
-        .post_json(&endpoint, "/read", "fixture-bearer", "{}")
+        .post_json(&endpoint, "/read", "fixture-bearer", "{}", |_| {
+            Ok(|| Ok(()))
+        })
         .expect_err("malformed answer must refuse");
     assert!(error.contains(&endpoint));
     assert!(error.contains("not HTTP"));
@@ -143,7 +156,9 @@ fn an_unresponsive_authority_closes_by_name_without_the_bearer() -> Result<(), B
         Ok(())
     });
     let error = Client::default()
-        .post_json(&endpoint, "/read", "fixture-bearer", "{}")
+        .post_json(&endpoint, "/read", "fixture-bearer", "{}", |_| {
+            Ok(|| Ok(()))
+        })
         .expect_err("the authority did not answer");
     worker
         .join()
@@ -152,5 +167,27 @@ fn an_unresponsive_authority_closes_by_name_without_the_bearer() -> Result<(), B
     assert!(error.contains(&endpoint));
     assert!(error.contains("could not be reached"));
     assert!(!error.contains("fixture-bearer"));
+    Ok(())
+}
+
+#[test]
+fn a_refused_connection_holder_writes_no_request() -> Result<(), Box<dyn Error>> {
+    let listener = TcpListener::bind("127.0.0.1:0")?;
+    let endpoint = listener.local_addr()?.to_string();
+    let worker = std::thread::spawn(move || -> std::io::Result<()> {
+        let (mut socket, _) = listener.accept()?;
+        assert_eq!(socket.read(&mut [0; 1])?, 0);
+        Ok(())
+    });
+    let held = AtomicUsize::new(0);
+    let error = Client::default()
+        .post_json(&endpoint, "/read", "fixture-bearer", "{}", |_socket| {
+            held.fetch_add(1, Ordering::Relaxed);
+            Err::<fn() -> Result<(), String>, _>("the caller left".to_owned())
+        })
+        .expect_err("the refused holder must end the request before writing");
+    assert_eq!(error, "the caller left");
+    assert_eq!(held.load(Ordering::Relaxed), 1);
+    worker.join().expect("transport peer did not panic")?;
     Ok(())
 }

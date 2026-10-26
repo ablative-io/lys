@@ -309,6 +309,7 @@ pub mod skills_api;
 pub mod spicedb;
 mod spicedb_apps;
 pub mod spicedb_http;
+pub mod spicedb_outbound;
 mod start_budget;
 pub mod start_checks;
 pub mod stop_api;

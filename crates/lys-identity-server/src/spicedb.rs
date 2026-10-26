@@ -65,6 +65,25 @@ const KEY_LINE: &str = "SPICEDB_GRPC_PRESHARED_KEY=";
 /// The definitions the mirror's revision is kept in.
 const MIRROR_SCHEMA: &str = "\ndefinition lys_revision {}\n\ndefinition lys_mirror {\n  relation revision: lys_revision\n}\n";
 
+/// A caller-owned HTTP policy for the engine's transport, including each retry.
+pub(crate) type PostJson = fn(
+    &crate::spicedb_http::Client,
+    &str,
+    &str,
+    &str,
+    &str,
+) -> Result<crate::spicedb_http::Answer, String>;
+
+pub(crate) fn plain_post_json(
+    client: &crate::spicedb_http::Client,
+    authority: &str,
+    path: &str,
+    bearer: &str,
+    body: &str,
+) -> Result<crate::spicedb_http::Answer, String> {
+    client.post_json(authority, path, bearer, body, |_| Ok(|| Ok(())))
+}
+
 /// The permission engine, reached over its gateway.
 pub struct SpiceDb {
     endpoint: String,
@@ -74,6 +93,7 @@ pub struct SpiceDb {
     app_kinds: Mutex<BTreeMap<String, KindModel>>,
     scope: Option<String>,
     client: Arc<crate::spicedb_http::Client>,
+    post_json: PostJson,
     tokens: Arc<Mutex<BTreeMap<u64, String>>>,
     confirmed: Arc<Mutex<Option<u64>>>,
 }
@@ -179,6 +199,7 @@ impl SpiceDb {
             app_kinds: Mutex::new(model.kinds().clone()),
             scope,
             client: Arc::default(),
+            post_json: connection.post_json,
             tokens: Arc::default(),
             confirmed: Arc::default(),
         };

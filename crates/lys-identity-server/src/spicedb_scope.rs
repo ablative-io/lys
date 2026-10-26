@@ -213,9 +213,7 @@ fn text_of(body: &str) -> Result<String, GrantError> {
 
 impl SpiceDb {
     pub(super) fn raw(&self, path: &str, body: &Value) -> Result<(u16, String), GrantError> {
-        let answer = self
-            .client
-            .post_json(&self.endpoint, path, &self.key, &body.to_string())
+        let answer = (self.post_json)(&self.client, &self.endpoint, path, &self.key, &body.to_string())
             .map_err(unavailable)?;
         let body = answer.body.replace(self.key.as_ref(), "[redacted]");
         Ok((answer.status, body))
@@ -279,6 +277,7 @@ impl SpiceDb {
             app_kinds: Mutex::new(BTreeMap::new()),
             scope: Some(scope.to_owned()),
             client: Arc::default(),
+            post_json: connection.post_json,
             tokens: Arc::default(),
             confirmed: Arc::default(),
         };
@@ -323,6 +322,7 @@ impl SpiceDb {
             app_kinds: Mutex::new(BTreeMap::new()),
             scope: None,
             client: Arc::default(),
+            post_json: connection.post_json,
             tokens: Arc::default(),
             confirmed: Arc::default(),
         };
