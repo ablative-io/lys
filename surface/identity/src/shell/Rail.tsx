@@ -50,8 +50,9 @@ export function Rail() {
   const shell = useShell();
   const verdictOf = useNavigationVerdict();
   const { me, waiting } = useWaiting();
-  const { pathname } = useLocation();
-  const on = railView(pathname);
+  const { pathname, search } = useLocation();
+  // Home's Waiting on you section is the rail's Waiting on you (DIRECTORY-123 R5), so it lights that entry.
+  const on = new URLSearchParams(search).get('section') === 'waiting-on-you' ? 'waiting' : railView(pathname);
   // On a phone the rail is a bar with a Menu button; the menu opens the same rail over the page.
   const [drawer, setDrawer] = useState(false);
   useEffect(() => setDrawer(false), [pathname]);

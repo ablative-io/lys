@@ -6,7 +6,7 @@ import { useNavigationAccess } from './NavigationAccess';
 
 /** g then a letter goes to a screen, as the mock-up's key registry has it. */
 export const GO: Record<string, string> = {
-  p: '/people', o: '/roles', r: '/resources', a: '/access', q: '/requests', w: '/reviews', v: '/secrets',
+  p: '/people', o: '/roles', r: '/resources', a: '/access', q: '/?section=waiting-on-you', w: '/reviews', v: '/secrets',
   n: '/apps', m: '/model', s: '/settings/account', h: '/graph', t: '/network', u: '/me', c: '/canvas', d: '/dashboard',
 };
 

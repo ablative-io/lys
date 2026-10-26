@@ -271,10 +271,10 @@ describe('The Dashboard is the front page', () => {
     ] }) });
     const rows = $$('section[aria-label="Waiting on you"] tbody tr');
     expect(rows.map((tr) => [tr.querySelector('td')?.textContent, actsOf(tr), tr.querySelector('a')?.getAttribute('href') ?? null])).toEqual([
-      ['Check the access Scribe holds: reader on store s-1', 'Open', '#/reviews'],
+      ['Check the access Scribe holds: reader on store s-1This Lys did not send the grants with it, so they are checked on their page.', 'Open', '#/reviews'],
       ['Scribe asks for reader access to store s-1', 'Approve access / Decline request', null],
       ['Scribe prepared something for you to approve', 'Approve / Decline', null],
-      ['Scribe asks to write notes 1 through notes', 'Open', '#/access/drafts'],
+      ['Scribe asks to write notes 1 through notesThis Lys did not send the app action with it, so it is decided on its page.', 'Open', '#/access/drafts'],
     ]);
     // The word Decide is nowhere on the page.
     expect($('.page.dash-page')?.textContent).not.toMatch(/Decide/);

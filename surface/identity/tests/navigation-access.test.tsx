@@ -81,13 +81,16 @@ describe('navigation follows the answering API', () => {
     expect(offered('/secrets')).toBe(true);
   });
 
-  it('decides Waiting on you by the requests read alone', async () => {
+  it('opens Waiting on you on Home whatever the requests read answers, and decides Access by its own read', async () => {
     await mount('#/me', { ...ANSWERS, '/grants': refused(403, 'NotAdmitted', 'grants are not admitted') });
     expect(shut('access')).toBe('refused');
     expect(shut('waiting')).toBeUndefined();
     unmountAll();
+    // Waiting on you is Home's section (DIRECTORY-123 R5): a refused requests read is said in the section, never by
+    // shutting the rail's way to it.
     await mount('#/me', { ...ANSWERS, '/requests': refused(403, 'NotAdmitted', 'requests are not admitted') });
-    expect(shut('waiting')).toBe('refused');
+    expect(shut('waiting')).toBeUndefined();
+    expect($('#rail a[data-nav="waiting"]')?.getAttribute('href')).toBe('#/?section=waiting-on-you');
     expect(shut('access')).toBeUndefined();
   });
 

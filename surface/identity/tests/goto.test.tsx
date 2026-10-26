@@ -7,7 +7,7 @@ import { $, $$, click, mount, press, type } from './harness';
 // agents is the canvas.
 
 const LETTERS: Record<string, [string, string]> = {
-  p: ['#/people', 'people'], o: ['#/roles', 'access'], r: ['#/resources', 'access'], a: ['#/access', 'access'], q: ['#/requests', 'waiting'], w: ['#/reviews', 'waiting'],
+  p: ['#/people', 'people'], o: ['#/roles', 'access'], r: ['#/resources', 'access'], a: ['#/access', 'access'], q: ['#/?section=waiting-on-you', 'waiting'], w: ['#/reviews', 'waiting'],
   v: ['#/secrets', 'secrets'], n: ['#/apps', 'apps'], m: ['#/model', 'access'], s: ['#/settings/account', 'settings'],
   h: ['#/graph', 'access'], t: ['#/network', 'network'], u: ['#/me', 'me'], c: ['#/canvas', 'canvas'], d: ['#/dashboard', 'dashboard'],
 };
@@ -15,7 +15,7 @@ const RAIL_ITEMS = ['dashboard', 'waiting', 'people', 'canvas', 'access', 'netwo
 
 /** Every page Search names, written out here rather than read from the palette's own table. */
 const PAGE_NAMES: [string, string][] = [
-  ['Dashboard', '#/dashboard'], ['Waiting on you', '#/requests'], ['People and agents', '#/people'], ['Running agents', '#/canvas'],
+  ['Dashboard', '#/dashboard'], ['Waiting on you', '#/?section=waiting-on-you'], ['Requests', '#/requests'], ['People and agents', '#/people'], ['Running agents', '#/canvas'],
   ['Access', '#/access'], ['Access: ask', '#/access/can'], ['Access: drafts', '#/access/drafts'], ['Access: reviews', '#/reviews'],
   ['Access: resources', '#/resources'], ['Access: model', '#/model'], ['Access map', '#/graph'], ['Jobs', '#/roles'],
   ['Computers', '#/network'], ['Apps', '#/apps'], ['Secrets', '#/secrets'], ['Settings', '#/settings/account'], ['Settings: this service', '#/settings'],
@@ -39,7 +39,7 @@ describe('go-to keys and palette (conformance 9.1)', () => {
   it('palette, with nothing typed, offers what can be done, then the rail\'s pages in the rail\'s order', async () => {
     await mount('#/people');
     await press('k', { metaKey: true }, document.body);
-    expect(goToRows().map(({ hash }) => hash)).toEqual(['#/dashboard', '#/requests', '#/people', '#/canvas', '#/access', '#/network', '#/apps', '#/secrets', '#/settings/account', '#/me']);
+    expect(goToRows().map(({ hash }) => hash)).toEqual(['#/dashboard', '#/?section=waiting-on-you', '#/people', '#/canvas', '#/access', '#/network', '#/apps', '#/secrets', '#/settings/account', '#/me']);
     expect($$('#palList .grp').map((group) => group.textContent)).toEqual(['Do', 'Go to']);
   });
 
