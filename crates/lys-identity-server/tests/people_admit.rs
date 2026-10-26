@@ -13,7 +13,10 @@ mod table;
 
 use lys_identity::{OperationId, OrganisationId};
 use serde_json::{Value, json};
-use table::{BEA, CY, STEPS, TestResult, accounts_for, admission_files, admit, people, signed_in_as, table, table_with_mail};
+use table::{
+    BEA, CY, STEPS, TestResult, accounts_for, admission_files, admit, people, signed_in_as, table,
+    table_with_mail,
+};
 
 #[tokio::test]
 async fn one_act_registers_makes_the_account_binds_activates_and_grants() -> TestResult {
@@ -368,12 +371,21 @@ async fn an_email_held_under_another_name_is_refused_without_writing() -> TestRe
         let person = first["person"].as_str().ok_or("the existing person")?;
         let before_people = people(&service, &ada).await?;
         let before_grants = service.get("/grants", Some(&ada)).await?;
-        let before_record = service.get(&format!("/identities/{person}"), Some(&ada)).await?;
+        let before_record = service
+            .get(&format!("/identities/{person}"), Some(&ada))
+            .await?;
         let before_files = admission_files(service.dir.path())?;
         body["operation"] = json!(OperationId::generate()?.to_string());
         body["display_name"] = json!("Annabel");
         body["grant"]["relation"] = json!("beta");
-        for explicit in [None, Some(OperationId::generate()?.to_string().replace("op-", "person-"))] {
+        for explicit in [
+            None,
+            Some(
+                OperationId::generate()?
+                    .to_string()
+                    .replace("op-", "person-"),
+            ),
+        ] {
             if let Some(other) = explicit {
                 body["person"] = json!(other);
             }
@@ -385,7 +397,12 @@ async fn an_email_held_under_another_name_is_refused_without_writing() -> TestRe
             assert_eq!(refused["email"], "a@example.test", "{refused}");
             assert_eq!(refused["receipt"]["completed"], json!([]), "{refused}");
             assert_eq!(service.get("/grants", Some(&ada)).await?, before_grants);
-            assert_eq!(service.get(&format!("/identities/{person}"), Some(&ada)).await?, before_record);
+            assert_eq!(
+                service
+                    .get(&format!("/identities/{person}"), Some(&ada))
+                    .await?,
+                before_record
+            );
             assert_eq!(admission_files(service.dir.path())?, before_files);
         }
         assert_eq!(people(&service, &ada).await?, before_people);
@@ -415,7 +432,10 @@ async fn naming_the_held_person_or_their_exact_trimmed_name_records_existing() -
         let (status, answer) = service.post("/people/admit", Some(&ada), &body).await?;
         assert_eq!(status, 200, "{answer}");
         assert_eq!(answer["person"], person);
-        assert_eq!(answer["receipt"]["existing"], json!({"person": person, "display_name": "Dean Whiting"}));
+        assert_eq!(
+            answer["receipt"]["existing"],
+            json!({"person": person, "display_name": "Dean Whiting"})
+        );
         assert_eq!(answer["display_name"], "Dean Whiting");
         let (status, again) = service.post("/people/admit", Some(&ada), &body).await?;
         assert_eq!(status, 200, "{again}");

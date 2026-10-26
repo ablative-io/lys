@@ -389,7 +389,8 @@ mod tests {
     }
 
     #[test]
-    fn withdrawing_an_admission_keeps_its_record_and_a_later_link_works() -> Result<(), ServerError> {
+    fn withdrawing_an_admission_keeps_its_record_and_a_later_link_works() -> Result<(), ServerError>
+    {
         let dir = tempfile::tempdir().map_err(|e| unusable(Path::new("tmp"), &e))?;
         let file = dir.path().join("foundings.json");
         let mut held = Foundings::open(file.clone())?;
@@ -400,7 +401,8 @@ mod tests {
         assert!(held.unspent_admission_for("person-1").is_none());
         assert!(held.by_digest("d1").is_some_and(|f| f.withdrawn));
         assert_eq!(
-            held.by_digest("d1").and_then(|f| f.withdrawal_event.as_deref()),
+            held.by_digest("d1")
+                .and_then(|f| f.withdrawal_event.as_deref()),
             Some([1, 2, 3].as_slice())
         );
         let mut held = Foundings::open(file)?;
@@ -431,9 +433,10 @@ mod tests {
             Err(ServerError::DirectoryUnavailable { .. })
         ));
         assert_eq!(held.unspent_admission_for("person-1"), Some("d1"));
-        assert!(held
-            .by_digest("d1")
-            .is_some_and(|f| !f.withdrawn && f.withdrawal_event.is_none()));
+        assert!(
+            held.by_digest("d1")
+                .is_some_and(|f| !f.withdrawn && f.withdrawal_event.is_none())
+        );
         assert_eq!(
             std::fs::read(&writable).map_err(|e| unusable(&writable, &e))?,
             before

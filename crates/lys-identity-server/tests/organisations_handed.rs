@@ -306,7 +306,8 @@ async fn with_mail_the_letter_carries_the_link_and_no_answer_hands_it() -> TestR
 }
 
 #[tokio::test]
-async fn an_administrator_withdraws_a_link_by_digest_and_the_persons_events_name_the_actor() -> TestResult {
+async fn an_administrator_withdraws_a_link_by_digest_and_the_persons_events_name_the_actor()
+-> TestResult {
     let (service, _rauthy, ada, _sink) = table(false).await?;
     let admitted = admit_bea(&service, &ada).await?;
     let person = admitted["person"].as_str().ok_or("the person")?;
@@ -318,42 +319,70 @@ async fn an_administrator_withdraws_a_link_by_digest_and_the_persons_events_name
     let (status, waiting) = service.get(&path, Some(&ada)).await?;
     assert_eq!(status, 200, "{waiting}");
     assert_eq!(waiting["waiting"], true);
-    let (status, answer) = service.post(&format!("{path}/withdraw"), Some(&ada), &json!({})).await?;
+    let (status, answer) = service
+        .post(&format!("{path}/withdraw"), Some(&ada), &json!({}))
+        .await?;
     assert_eq!(status, 200, "{answer}");
     assert_eq!(answer["person"], person);
     assert_eq!(answer["digest"], digest);
-    let (status, record) = service.get(&format!("/identities/{person}"), Some(&ada)).await?;
+    let (status, record) = service
+        .get(&format!("/identities/{person}"), Some(&ada))
+        .await?;
     assert_eq!(status, 200, "{record}");
-    let index = record["events"].as_array().and_then(|events| events.last()).ok_or("the withdrawal event")?;
-    let (status, event) = service.get(&format!("/receipts/{index}"), Some(&ada)).await?;
+    let index = record["events"]
+        .as_array()
+        .and_then(|events| events.last())
+        .ok_or("the withdrawal event")?;
+    let (status, event) = service
+        .get(&format!("/receipts/{index}"), Some(&ada))
+        .await?;
     assert_eq!(status, 200, "{event}");
     assert_eq!(event["receipt"]["change_kind"], 13);
     let (status, key) = service.get("/service-key", None).await?;
     assert_eq!(status, 200, "{key}");
     let key: [u8; 32] = unhex(key["ed25519"].as_str().ok_or("the public key")?)?
-        .try_into().map_err(|_| "a 32-byte key")?;
+        .try_into()
+        .map_err(|_| "a 32-byte key")?;
     let signed = lys_identity::verify_event(
-        &unhex(event["message"].as_str().ok_or("the signed event")?)?, &key,
+        &unhex(event["message"].as_str().ok_or("the signed event")?)?,
+        &key,
     )?;
-    assert_eq!(signed.event()?.change(), &lys_identity::Change::AdmissionWithdrawn { digest: digest.clone() });
+    assert_eq!(
+        signed.event()?.change(),
+        &lys_identity::Change::AdmissionWithdrawn {
+            digest: digest.clone()
+        }
+    );
     let (_, me) = service.get("/me", Some(&ada)).await?;
-    assert_eq!(event["receipt"]["actor"]["subject"], me["signed_in"]["subject"]);
-    assert!(entries(&service)?.iter().any(|entry| entry["withdrawn"] == true));
+    assert_eq!(
+        event["receipt"]["actor"]["subject"],
+        me["signed_in"]["subject"]
+    );
+    assert!(
+        entries(&service)?
+            .iter()
+            .any(|entry| entry["withdrawn"] == true)
+    );
     let (status, refused, cookie) = prove(&service, &token).await?;
     assert_eq!(status, 403, "{refused}");
     assert_eq!(refused["refusal"], "proof_refused");
     assert!(cookie.is_none());
-    let (status, refused) = service.post(&format!("{path}/withdraw"), Some(&ada), &json!({})).await?;
+    let (status, refused) = service
+        .post(&format!("{path}/withdraw"), Some(&ada), &json!({}))
+        .await?;
     assert_eq!(status, 404, "{refused}");
     assert_eq!(refused["refusal"], "NoUnspentAdmission");
     let (_, waiting) = service.get(&path, Some(&ada)).await?;
     assert_eq!(waiting["waiting"], false);
     let later = admit_bea(&service, &ada).await?;
-    let (status, proved, cookie) = prove(&service, &token_after(&handed(&later)?, "/#/added/")?).await?;
+    let (status, proved, cookie) =
+        prove(&service, &token_after(&handed(&later)?, "/#/added/")?).await?;
     assert_eq!(status, 200, "{proved}");
     assert!(cookie.is_some());
     assert_eq!(proved["person"], person);
-    let (status, refused) = service.post(&format!("{path}/withdraw"), Some(&ada), &json!({})).await?;
+    let (status, refused) = service
+        .post(&format!("{path}/withdraw"), Some(&ada), &json!({}))
+        .await?;
     assert_eq!(status, 404, "{refused}");
     assert_eq!(refused["refusal"], "NoUnspentAdmission");
     Ok(())
@@ -369,7 +398,9 @@ async fn a_non_administrator_cannot_read_or_withdraw_an_admission() -> TestResul
     let person = admitted["person"].as_str().ok_or("the person")?;
     let before = foundings(&service)?;
     let path = format!("/people/{person}/admission");
-    let (status, refused) = service.post(&format!("{path}/withdraw"), Some(&bea), &json!({})).await?;
+    let (status, refused) = service
+        .post(&format!("{path}/withdraw"), Some(&bea), &json!({}))
+        .await?;
     assert_eq!(status, 403, "{refused}");
     assert_eq!(refused["refusal"], "NotAdmitted");
     let (status, refused) = service.get(&path, Some(&bea)).await?;
@@ -386,27 +417,45 @@ async fn a_reused_persons_mailed_admission_names_the_record_it_opens() -> TestRe
     let (service, _rauthy, ada, mut sink) = table(true).await?;
     let first = admit_bea(&service, &ada).await?;
     // The first account's letter belongs to the issuer; Lys writes on reuse.
-    let (status, reused) = service.post("/people/admit", Some(&ada), &json!({
-        "operation": OperationId::generate()?.to_string(),
-        "person": first["person"], "display_name": "Annabel", "email": BEA,
-    })).await?;
+    let (status, reused) = service
+        .post(
+            "/people/admit",
+            Some(&ada),
+            &json!({
+                "operation": OperationId::generate()?.to_string(),
+                "person": first["person"], "display_name": "Annabel", "email": BEA,
+            }),
+        )
+        .await?;
     assert_eq!(status, 200, "{reused}");
     let letter = sink.next().await.ok_or("the added letter")?;
-    assert!(letter.body.contains("signs you in as Bea"), "{}", letter.body);
+    assert!(
+        letter.body.contains("signs you in as Bea"),
+        "{}",
+        letter.body
+    );
     assert!(!letter.body.contains("Annabel"), "{}", letter.body);
     Ok(())
 }
 
 fn unhex(value: &str) -> Result<Vec<u8>, Box<dyn Error>> {
-    (0..value.len()).step_by(2).map(|at| {
-        Ok(u8::from_str_radix(value.get(at..at + 2).ok_or("a hex byte")?, 16)?)
-    }).collect()
+    (0..value.len())
+        .step_by(2)
+        .map(|at| {
+            Ok(u8::from_str_radix(
+                value.get(at..at + 2).ok_or("a hex byte")?,
+                16,
+            )?)
+        })
+        .collect()
 }
 
 #[tokio::test]
 async fn an_administrator_of_another_organisation_cannot_withdraw_the_link() -> TestResult {
     let (service, _rauthy, ada, _sink) = table(false).await?;
-    let (status, founded) = service.post(FOUND, None, &found(&OperationId::generate()?.to_string())).await?;
+    let (status, founded) = service
+        .post(FOUND, None, &found(&OperationId::generate()?.to_string()))
+        .await?;
     assert_eq!(status, 200, "{founded}");
     let (_, proved, bea) = prove(&service, &token_after(&handed(&founded)?, "/#/found/")?).await?;
     let bea = bea.ok_or("the other administrator")?;
@@ -416,7 +465,13 @@ async fn an_administrator_of_another_organisation_cannot_withdraw_the_link() -> 
     assert_eq!(status, 200, "{admitted}; {proved}");
     let person = admitted["person"].as_str().ok_or("Cy")?;
     let before = foundings(&service)?;
-    let (status, refused) = service.post(&format!("/people/{person}/admission/withdraw"), Some(&ada), &json!({})).await?;
+    let (status, refused) = service
+        .post(
+            &format!("/people/{person}/admission/withdraw"),
+            Some(&ada),
+            &json!({}),
+        )
+        .await?;
     assert_eq!(status, 403, "{refused}");
     assert_eq!(refused["refusal"], "NotAdmitted");
     assert_eq!(foundings(&service)?, before);

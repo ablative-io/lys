@@ -13,7 +13,9 @@ use std::str::FromStr;
 use axum::Json;
 use axum::extract::{Path, State};
 use axum::http::HeaderMap;
-use lys_identity::{Actor, Change, IdentityEvent, IdentityId, OperationId, OrganisationId, PersonId};
+use lys_identity::{
+    Actor, Change, IdentityEvent, IdentityId, OperationId, OrganisationId, PersonId,
+};
 use serde::Serialize;
 
 use crate::error::ServerError;
@@ -126,7 +128,9 @@ fn administrator(state: &AppState, actor: &Actor, person: PersonId) -> Result<()
         ) {
             Ok(_) => Ok(()),
             Err(
-                GrantError::NotHeld { .. } | GrantError::Revoked { .. } | GrantError::Expired { .. },
+                GrantError::NotHeld { .. }
+                | GrantError::Revoked { .. }
+                | GrantError::Expired { .. },
             ) => Err(refused()),
             Err(error) => Err(error.into()),
         }
@@ -216,10 +220,7 @@ pub(crate) async fn begin(
         let account = crate::accounts::read(api, binding.subject())
             .await
             .map_err(at(session))?;
-        match account
-            .get("enabled")
-            .and_then(serde_json::Value::as_bool)
-        {
+        match account.get("enabled").and_then(serde_json::Value::as_bool) {
             Some(true) => {}
             Some(false) => return Err((session, ServerError::SignInRefused)),
             None => {

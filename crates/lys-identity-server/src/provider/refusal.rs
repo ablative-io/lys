@@ -26,6 +26,8 @@ macro_rules! server_refusals {
             | ServerError::MailNotSent { .. }
             | ServerError::ProofRefused
             | ServerError::AlreadyAdmitted
+            | ServerError::EmailHeldByAnother { .. }
+            | ServerError::NoUnspentAdmission
             | ServerError::NoPerson
             | ServerError::ProductPassPersonRequired
             | ServerError::SetupRequired

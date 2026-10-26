@@ -280,9 +280,7 @@ pub fn decode_body_before_organisations(body: &[u8]) -> Result<IdentityEvent, Id
     match event.change() {
         Change::FoundOrganisation { .. }
         | Change::AttachOrganisation { .. }
-        | Change::AdmissionWithdrawn { .. } => {
-            Err(malformed("a change kind is 1 to 10"))
-        }
+        | Change::AdmissionWithdrawn { .. } => Err(malformed("a change kind is 1 to 10")),
         Change::RegisterPerson {
             organisation: Some(_),
             ..
