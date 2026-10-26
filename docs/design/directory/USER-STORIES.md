@@ -148,6 +148,10 @@
 
 **S483.** As an administrator who handed a sign-in link that should not be used, I want to withdraw it before it is opened, so that a mistake in a letter is never a way into someone's account.
 
+**S488.** As an administrator reading People, I want each person's sign-in email beside their name and a mismatch with the email they were added under called out, so that I see a mix-up the day it happens.
+
+**S489.** As an administrator, I want to move a sign-in that landed on the wrong person to the right person in one recorded act, so that a mix-up is repaired in Lys and never by hand.
+
 ## Certificate verifier — Checks an agent's certificate and its record against the certificate log without the issuer's cooperation
 
 **S31.** As a certificate verifier, I want a revoked certificate to fail verification against the log with its revocation leaf named, so that revocation rests on the log and not on the issuer's word.
@@ -190,6 +194,12 @@
 
 **S461.** As a Person who signs in, I want the link in my founding letter to sign me in once and lead me to set a password or connect Google, so that I can come back tomorrow without a second letter.
 
+**S485.** As a person opening a sign-in link, I want to be told whose account it opens before it signs me in, and to stop without using it up if it is not mine, so that I never become someone else by clicking the wrong link.
+
+**S486.** As a person, I want my account's email to change only once I have proved I hold the new address, so that nobody, me included, can quietly put an address on an account that isn't theirs.
+
+**S487.** As a person signing in with Google, I want Google to open only the account whose proven email is mine, so that my Google login never joins someone else's record.
+
 ## Directory administrator — Resolves a refused act
 
 **S466.** As a Directory administrator working in a product such as Cambium, I want adding a person there to make their Lys account and give them the product's access in one act, so that I never leave the product and they can get in.
@@ -213,6 +223,8 @@
 **S481.** As a directory administrator, I want this change held to every standing bar with the screens' tests red first, so that the default and the ask are proven on the real routes and nothing is assumed.
 
 **S484.** As a directory administrator, I want this change held to every standing bar with its tests red first, so that the refusal and the withdrawal are proven on the real routes and nothing is assumed.
+
+**S490.** As a directory administrator, I want the 26 October incident replayed as a failing test that passes only with this change, so that it is proven it cannot happen again.
 
 ## Release reviewer — Decides from the record whether the release proof is complete
 

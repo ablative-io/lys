@@ -306,6 +306,14 @@
         {
           "id": "S483",
           "text": "As an administrator who handed a sign-in link that should not be used, I want to withdraw it before it is opened, so that a mistake in a letter is never a way into someone's account."
+        },
+        {
+          "id": "S488",
+          "text": "As an administrator reading People, I want each person's sign-in email beside their name and a mismatch with the email they were added under called out, so that I see a mix-up the day it happens."
+        },
+        {
+          "id": "S489",
+          "text": "As an administrator, I want to move a sign-in that landed on the wrong person to the right person in one recorded act, so that a mix-up is repaired in Lys and never by hand."
         }
       ]
     },
@@ -394,6 +402,18 @@
         {
           "id": "S461",
           "text": "As a Person who signs in, I want the link in my founding letter to sign me in once and lead me to set a password or connect Google, so that I can come back tomorrow without a second letter."
+        },
+        {
+          "id": "S485",
+          "text": "As a person opening a sign-in link, I want to be told whose account it opens before it signs me in, and to stop without using it up if it is not mine, so that I never become someone else by clicking the wrong link."
+        },
+        {
+          "id": "S486",
+          "text": "As a person, I want my account's email to change only once I have proved I hold the new address, so that nobody, me included, can quietly put an address on an account that isn't theirs."
+        },
+        {
+          "id": "S487",
+          "text": "As a person signing in with Google, I want Google to open only the account whose proven email is mine, so that my Google login never joins someone else's record."
         }
       ]
     },
@@ -444,6 +464,10 @@
         {
           "id": "S484",
           "text": "As a directory administrator, I want this change held to every standing bar with its tests red first, so that the refusal and the withdrawal are proven on the real routes and nothing is assumed."
+        },
+        {
+          "id": "S490",
+          "text": "As a directory administrator, I want the 26 October incident replayed as a failing test that passes only with this change, so that it is proven it cannot happen again."
         }
       ]
     },
