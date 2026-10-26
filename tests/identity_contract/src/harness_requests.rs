@@ -54,6 +54,10 @@ impl Service {
         self.base = format!("http://{listen}");
         self.config.listen = listen;
         self.config.redirect_url = format!("{}/callback", self.base);
+        // The issuer sends a provider sign-in back to Lys's own address, which
+        // moved with the listener.
+        self.issuer
+            .set_public_callback(&format!("{}/auth/v1/providers/callback", self.base))?;
         drop(stage);
         let (server, client, at_stop) = serve(listener, &self.config, say, &self.clock).await?;
         self.server = server;
