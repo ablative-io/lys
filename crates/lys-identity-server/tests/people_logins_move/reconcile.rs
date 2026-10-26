@@ -217,6 +217,8 @@ async fn the_administrator_with_two_addresses_held_still_signs_in() -> TestResul
         .as_str()
         .ok_or("their login")?
         .to_owned();
+    // An admission writes the foundings file whose row the two addresses copy.
+    add(&service, &ada, "Bea", "bea@example.test").await?;
     let foundings = service.dir.path().join("foundings.json");
     let founder = administrator.clone();
     service

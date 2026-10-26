@@ -106,7 +106,12 @@ impl Service {
         let binding = to_issuer
             .headers()
             .get(reqwest::header::SET_COOKIE)
-            .ok_or("the provider start did not bind the browser")?
+            .ok_or_else(|| {
+                format!(
+                    "the provider start did not bind the browser: {} to {authorize}",
+                    to_issuer.status()
+                )
+            })?
             .to_str()?
             .split(';')
             .next()
