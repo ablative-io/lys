@@ -12,8 +12,10 @@ const machine: Machine = { id: 'own', name: 'Own laptop', kind: 'computer', runt
 it('shows the named refusal schedule and Reconnect asks Lys to end the runner wait', async () => {
   const lost = new Date(2026, 9, 16, 3, 52, 10).getTime();
   const now = lost + 8000;
-  const clock = vi.spyOn(Date, 'now').mockReturnValue(now);
+  // Fake timers first: they put back the real Date the shared setup pins,
+  // and this test drives Date.now itself.
   vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+  const clock = vi.spyOn(Date, 'now').mockReturnValue(now);
   vi.stubGlobal('IntersectionObserver', class {
     constructor(private readonly observed: IntersectionObserverCallback) {}
     observe(target: Element) { this.observed([{ target, isIntersecting: true } as IntersectionObserverEntry], this as unknown as IntersectionObserver); }
