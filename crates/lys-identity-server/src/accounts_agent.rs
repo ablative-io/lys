@@ -6,12 +6,14 @@
 //! `routes::administrator` admits a relayed agent on the understanding that
 //! its grant was judged. Here it is: the route's declared act on
 //! `account:<person>` is exercised through the agent's own grants and its
-//! use recorded, naming the act, before anything is read or changed. A run
+//! use recorded, naming the act, before anything is read or changed: by
+//! the agent's own grant on the account, else by its standing in its own
+//! organisation (24 October 2026), as the door asks. A run
 //! pass's call was judged at the door already (`route_actions::admit`), and
 //! a person's session holds the administrator's standing; neither is judged
 //! again.
 
-use lys_identity::grants::{Action, ExerciseRequest, GrantError, Resource, Route};
+use lys_identity::grants::{Action, ExerciseRequest, GrantError, Permit, Resource, Route};
 use lys_identity::{Actor, AuthMethod, IdentityId};
 
 use crate::error::ServerError;
@@ -47,12 +49,29 @@ pub(super) fn exercised(
         state,
         None,
         now(),
-        |_| Ok(vec![request.clone()]),
+        |judged| {
+            let mut asked = vec![request.clone()];
+            asked.extend(crate::organisation_standing::behind(
+                judged.directory,
+                agent,
+                &request.resource,
+                &request.action,
+            )?);
+            Ok(asked)
+        },
         |mut judged| {
             crate::caller_admission::active_caller(judged.directory, actor)?;
             judged.apps.admit_kind(None, "account")?;
             judged.apps.admit_action("account", action)?;
-            let (permit, _) = decide(&mut judged, &request, now(), None, Decision::Exercise)?;
+            let permit = match decide(&mut judged, &request, now(), None, Decision::Exercise) {
+                Ok((permit, _)) => permit,
+                Err(
+                    error @ (GrantError::NotHeld { .. }
+                    | GrantError::Revoked { .. }
+                    | GrantError::Expired { .. }),
+                ) => standing(&mut judged, agent, &request)?.ok_or(error)?,
+                Err(error) => return Err(error.into()),
+            };
             match permit.use_event {
                 Some(Ok(_)) => Ok(()),
                 Some(Err(error)) => Err(GrantError::LogUnavailable {
@@ -66,4 +85,35 @@ pub(super) fn exercised(
             }
         },
     )
+}
+
+/// The agent's standing behind `request`, its use recorded: none when its
+/// standing does not reach the account or admits no such act.
+///
+/// # Errors
+/// Propagates a refusal that is not the standing's absence.
+fn standing(
+    judged: &mut crate::grants::Judged<'_>,
+    agent: lys_identity::AgentId,
+    request: &ExerciseRequest,
+) -> Result<Option<Permit>, ServerError> {
+    let Some(standing) = crate::organisation_standing::behind(
+        judged.directory,
+        agent,
+        &request.resource,
+        &request.action,
+    )?
+    else {
+        return Ok(None);
+    };
+    judged
+        .apps
+        .admit_action(standing.resource.kind(), standing.action.as_str())?;
+    match decide(judged, &standing, now(), None, Decision::Exercise) {
+        Ok((permit, _)) => Ok(Some(permit)),
+        Err(
+            GrantError::NotHeld { .. } | GrantError::Revoked { .. } | GrantError::Expired { .. },
+        ) => Ok(None),
+        Err(error) => Err(error.into()),
+    }
 }

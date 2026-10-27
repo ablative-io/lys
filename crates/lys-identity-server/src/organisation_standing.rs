@@ -15,7 +15,7 @@
 
 use std::str::FromStr;
 
-use lys_identity::grants::shipped::standing_for;
+use lys_identity::grants::shipped::{WITHHELD_FROM_AGENTS, standing_for};
 use lys_identity::grants::{Action, ExerciseRequest, Resource, Route};
 use lys_identity::projection::Projection;
 use lys_identity::{AgentId, IdentityId, PersonId};
@@ -31,8 +31,9 @@ pub(crate) fn covers(kind: &str) -> bool {
 
 /// The standing question behind `action` on `resource` for `agent`: the
 /// standing act on the agent's own organisation. None when standing does
-/// not reach the kind, the agent is of no organisation, or the resource is
-/// a person or agent of another.
+/// not reach the kind, the act is one no agent may be given, the agent is
+/// of no organisation, or the resource is a person, a person's account or
+/// an agent of another.
 ///
 /// # Errors
 /// Refuses an organisation id or standing act that is not a well-formed
@@ -43,7 +44,7 @@ pub(crate) fn behind(
     resource: &Resource,
     action: &Action,
 ) -> Result<Option<ExerciseRequest>, ServerError> {
-    if !covers(resource.kind()) {
+    if !covers(resource.kind()) || WITHHELD_FROM_AGENTS.contains(&action.as_str()) {
         return Ok(None);
     }
     let Some(organisation) = directory.organisation_of(IdentityId::Agent(agent)) else {
@@ -62,10 +63,11 @@ pub(crate) fn behind(
     }))
 }
 
-/// The person or agent `resource` names, when its id is one.
+/// The person or agent `resource` names, when its id is one: an account is
+/// its person's.
 fn named(resource: &Resource) -> Option<IdentityId> {
     match resource.kind() {
-        "person" => PersonId::from_str(resource.id())
+        "person" | "account" => PersonId::from_str(resource.id())
             .ok()
             .map(IdentityId::Person),
         "agent" => AgentId::from_str(resource.id()).ok().map(IdentityId::Agent),
@@ -75,7 +77,22 @@ fn named(resource: &Resource) -> Option<IdentityId> {
 
 #[cfg(test)]
 mod tests {
-    use super::covers;
+    use lys_identity::grants::Resource;
+    use lys_identity::{IdentityId, PersonId};
+
+    use super::{covers, named};
+
+    #[test]
+    fn an_account_is_its_persons_so_another_organisations_is_never_reached()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let person = PersonId::generate()?;
+        for kind in ["person", "account"] {
+            let resource = Resource::new(kind, &person.to_string())?;
+            assert_eq!(named(&resource), Some(IdentityId::Person(person)), "{kind}");
+        }
+        assert_eq!(named(&Resource::new("machine", &person.to_string())?), None);
+        Ok(())
+    }
 
     #[test]
     fn standing_reaches_lys_kinds_and_neither_an_apps_nor_the_organisation() {

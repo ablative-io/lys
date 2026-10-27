@@ -360,3 +360,29 @@ async fn administrator_standing_registers_an_agent_and_holds_its_rights() -> Tes
     }
     Ok(())
 }
+
+#[tokio::test]
+async fn administrator_standing_changes_a_persons_email_and_reading_standing_does_not() -> TestResult
+{
+    let world = World::new().await?;
+    let path = format!("/directory/people/{}/account/email", world.bea_person);
+    standing(&world, &world.reviewer, "only.organisation.read").await?;
+    let asked = json!({"email": "bea.reader@example.test"});
+    let (status, refused) = change(&world, &world.reviewer, &path, &asked).await?;
+    assert_eq!(status, 403, "{refused}");
+    assert_eq!(refused["refusal"], "NotHeld", "{refused}");
+    assert_eq!(refused["fields"]["action"], "person.email.set", "{refused}");
+    let grant = standing(&world, &world.stranger, "administrator").await?;
+    let asked = json!({"email": "bea.standing@example.test"});
+    // Admitted by its standing, the act reaches the sign-in service, which
+    // this world has none of: the refusal is the service's, not the act's.
+    let (status, changed) = change(&world, &world.stranger, &path, &asked).await?;
+    assert_eq!(
+        (status, changed["refusal"].as_str()),
+        (503, Some("SignInProvidersUnavailable")),
+        "{changed}"
+    );
+    let held = listed(&world, &grant).await?;
+    assert_eq!(held["last_use"]["seen"], true, "{held}");
+    Ok(())
+}

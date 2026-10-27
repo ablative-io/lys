@@ -267,13 +267,17 @@ async fn what_an_agent_did_for_its_person_is_on_their_dashboard_and_no_one_elses
     let bea_person = admitted["person"].as_str().ok_or("a person")?.to_owned();
     let bea_subject = admitted["subject"].as_str().ok_or("a subject")?.to_owned();
 
-    // Without a grant on Bea's account, the agent's own signed MCP call to
-    // change her email is refused and changes nothing.
+    // An agent that may only admit, holding no grant on Bea's account, is
+    // refused her email change by its own signed MCP call, and nothing
+    // changes.
+    let admitter = agent_of(&service, &ada).await?;
+    give(&service, &ada, &admitter, "only.organisation.admit").await?;
+    let admitter_key = certified(&service, &ada, &admitter).await?;
     let key = certified(&service, &ada, &agent).await?;
     let email_path = format!("/directory/people/{bea_person}/account/email");
     let refused = change_as(
         &service,
-        (agent.as_str(), key.as_ref()),
+        (admitter.as_str(), admitter_key.as_ref()),
         &email_path,
         &json!({"email": "bea.new@example.test"}),
     )
@@ -285,8 +289,8 @@ async fn what_an_agent_did_for_its_person_is_on_their_dashboard_and_no_one_elses
         "{refused}"
     );
 
-    // Ada passes the agent the change of Bea's email, from a root of her own,
-    // and the agent changes it through its own signed MCP call.
+    // Ada passes the admitter the change of Bea's email, from a root of her
+    // own, and it changes it through its own signed MCP call.
     let (status, me) = service.get("/me", Some(&ada)).await?;
     assert_eq!(status, 200, "{me}");
     let account = json!({"kind": "account", "id": bea_person});
@@ -308,7 +312,7 @@ async fn what_an_agent_did_for_its_person_is_on_their_dashboard_and_no_one_elses
             Some(&ada),
             &json!({
             "operation": OperationId::generate()?.to_string(), "route": "api",
-            "source": root["grant"], "recipient": agent, "responsible": me["person"]["id"],
+            "source": root["grant"], "recipient": admitter, "responsible": me["person"]["id"],
             "resource": account, "relation": "only.person.email.set",
             "pass_on": {"kind": "use_only"}, "window": {"starts_at": 0, "ends_at": null}}),
         )
@@ -316,13 +320,27 @@ async fn what_an_agent_did_for_its_person_is_on_their_dashboard_and_no_one_elses
     assert_eq!(status, 200, "{passed}");
     let reply = change_as(
         &service,
-        (agent.as_str(), key.as_ref()),
+        (admitter.as_str(), admitter_key.as_ref()),
         &email_path,
         &json!({"email": "bea.new@example.test"}),
     )
     .await?;
     assert!(reply["error"].is_null(), "{reply}");
     assert_eq!(accounts_for(&rauthy, "bea.new@example.test")?, 1, "{reply}");
+    // The administrator agent changes it again by its standing alone.
+    let reply = change_as(
+        &service,
+        (agent.as_str(), key.as_ref()),
+        &email_path,
+        &json!({"email": "bea.later@example.test"}),
+    )
+    .await?;
+    assert!(reply["error"].is_null(), "{reply}");
+    assert_eq!(
+        accounts_for(&rauthy, "bea.later@example.test")?,
+        1,
+        "{reply}"
+    );
 
     // Ada's dashboard lists both acts, newest first, each naming the agent,
     // which her dashboard names Helper.
@@ -335,14 +353,20 @@ async fn what_an_agent_did_for_its_person_is_on_their_dashboard_and_no_one_elses
             })),
         "{agents}"
     );
-    let line = |kind: &str| {
+    let line = |kind: &str, by: &str| {
         lines
             .iter()
-            .position(|line| line["kind"] == kind && line["acting_agent"] == agent.as_str())
-            .ok_or_else(|| format!("no {kind} line by the agent: {lines:?}"))
+            .position(|line| line["kind"] == kind && line["acting_agent"] == by)
+            .ok_or_else(|| format!("no {kind} line by {by}: {lines:?}"))
     };
-    let (admission, email) = (line("organisation.admit")?, line("person.email.set")?);
-    assert!(email < admission, "newest first: {lines:?}");
+    let admission = line("organisation.admit", &agent)?;
+    let email = line("person.email.set", &admitter)?;
+    // The change by standing is recorded against the standing it used.
+    let standing = line("organisation.administer", &agent)?;
+    assert!(
+        standing < email && email < admission,
+        "newest first: {lines:?}"
+    );
     let admission = &lines[admission];
     assert_eq!(admission["agent"], agent.as_str(), "{admission}");
     assert_eq!(admission["subject"]["kind"], "organisation", "{admission}");
@@ -369,14 +393,15 @@ async fn what_an_agent_did_for_its_person_is_on_their_dashboard_and_no_one_elses
     let bea_cookie = service
         .sign_in(Login {
             subject: bea_subject,
-            email: "bea.new@example.test".to_owned(),
+            email: "bea.later@example.test".to_owned(),
         })
         .await?;
     let (_, theirs) = dashboard(&service, &bea_cookie).await?;
     assert!(
         theirs
             .iter()
-            .all(|line| line["acting_agent"] != agent.as_str()),
+            .all(|line| line["acting_agent"] != agent.as_str()
+                && line["acting_agent"] != admitter.as_str()),
         "{theirs:?}"
     );
     Ok(())
