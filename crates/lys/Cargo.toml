@@ -6,7 +6,7 @@ edition.workspace = true
 license.workspace = true
 repository.workspace = true
 authors.workspace = true
-rust-version.workspace = true
+rust-version = "1.87" # process-wrap, the new session the login shell read starts in
 readme = "../../README.md"
 keywords = ["cryptography", "transparency", "agents", "audit", "cli"]
 categories = ["cryptography", "command-line-utilities"]
@@ -64,6 +64,8 @@ rustls-native-certs = "=0.8.4"
 [target.'cfg(unix)'.dependencies]
 mio.workspace = true
 rustix = { workspace = true, features = ["termios"] }
+# The login shell `lys identity install` reads PATH from runs in a new session.
+process-wrap.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true

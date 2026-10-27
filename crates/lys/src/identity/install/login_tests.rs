@@ -193,3 +193,139 @@ fn service_path_is_the_interactive_login_path_including_user_programmes()
     assert_eq!(environment.record().path, "/fixture/bun:/usr/bin:/bin");
     Ok(())
 }
+
+/// Which part of the terminal regression a re-invoked test binary plays; unset
+/// in an ordinary run, where the helper does nothing.
+const TERMINAL_PART: &str = "LYS_TEST_LOGIN_TERMINAL_PART";
+/// What the foreground part prints before the PATH its background part read.
+const TERMINAL_ANSWER: &str = "LYS_TEST_LOGIN_TERMINAL_ANSWER:";
+/// The helper's full name, as the re-invoked test binary is asked for it.
+const TERMINAL_HELPER: &str = "identity::install::login::tests::login_terminal_helper";
+
+/// The test binary asked to run [`login_terminal_helper`] as `part`.
+fn terminal_helper(part: &str) -> Result<std::process::Command, Box<dyn Error>> {
+    let mut helper = std::process::Command::new(std::env::current_exe()?);
+    helper
+        .args(["--exact", TERMINAL_HELPER, "--ignored", "--nocapture"])
+        .env(TERMINAL_PART, part);
+    Ok(helper)
+}
+
+/// A login read from outside the foreground process group of the terminal
+/// that controls it, as a test runner that gives each test a group of its own
+/// does, or a background job. The system's `script` gives the helper a
+/// terminal of its own; the helper's foreground part starts its background
+/// part in a new process group on that terminal, and the background part
+/// reads the login. An interactive login shell that kept the terminal would
+/// be stopped by `SIGTTIN` and never answer; the foreground part sees the stop
+/// and says so.
+#[cfg(any(target_os = "linux", target_os = "macos"))]
+#[test]
+fn a_login_read_outside_the_terminal_s_foreground_group_still_answers() -> Result<(), Box<dyn Error>>
+{
+    let foreground = terminal_helper("foreground")?;
+    let mut script = std::process::Command::new("script");
+    #[cfg(target_os = "linux")]
+    {
+        let mut line = String::new();
+        for word in std::iter::once(foreground.get_program()).chain(foreground.get_args()) {
+            let word = word.to_str().ok_or("a helper word in text")?;
+            line.push_str(&format!(" '{}'", word.replace('\'', r"'\''")));
+        }
+        script.args(["-q", "-e", "-c", &line, "/dev/null"]);
+    }
+    #[cfg(target_os = "macos")]
+    script
+        .args(["-q", "/dev/null"])
+        .arg(foreground.get_program())
+        .args(foreground.get_args());
+    let output = script
+        .env(TERMINAL_PART, "foreground")
+        .stdin(std::process::Stdio::null())
+        .output()?;
+    let said = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        said.contains(&format!("{TERMINAL_ANSWER}{}", fixture::PATH)),
+        "the login read from a background group did not answer: {said}{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    Ok(())
+}
+
+/// The test login, with a shell that asks for the terminal when it is
+/// started interactive from outside the terminal's foreground group. On Linux
+/// that is the test login's own shell, which runs `/bin/sh`. On macOS
+/// `/bin/sh` is a bash that gives up job control there, and so does `zsh`
+/// when it does not lead its process group, so the shell runs `/bin/dash`,
+/// which the system carries and which stops its group with `SIGTTIN` there as
+/// Linux's shells do. It reads no profile, so it answers the test login's
+/// `PATH`.
+fn terminal_login(
+    dir: &std::path::Path,
+) -> Result<Vec<(std::ffi::OsString, std::ffi::OsString)>, Box<dyn Error>> {
+    let mut process = fixture::variables()?;
+    if cfg!(target_os = "macos") {
+        let shell = dir.join("dash-login");
+        std::fs::write(
+            &shell,
+            format!(
+                "#!/bin/sh\nPATH='{}'\nexport PATH\nif [ \"$1\" = -l ]; then shift; fi\nexec /bin/dash \"$@\"\n",
+                fixture::PATH
+            ),
+        )?;
+        std::fs::set_permissions(&shell, std::fs::Permissions::from_mode(0o700))?;
+        process.retain(|(name, _)| name != "SHELL");
+        process.push(("SHELL".into(), shell.into()));
+    }
+    Ok(process)
+}
+
+/// The two parts of the terminal regression, chosen by [`TERMINAL_PART`].
+#[test]
+#[ignore = "started under a terminal of its own by the terminal regression"]
+fn login_terminal_helper() -> Result<(), Box<dyn Error>> {
+    use std::io::Read;
+    use std::os::unix::process::CommandExt;
+
+    use rustix::process::{Pid, WaitOptions, waitpid};
+
+    match std::env::var(TERMINAL_PART).as_deref() {
+        Ok("background") => {
+            let dir = tempfile::TempDir::new()?;
+            let environment = login_from(terminal_login(dir.path())?)?;
+            println!("{TERMINAL_ANSWER}{}", environment.record().path);
+            Ok(())
+        }
+        Ok("foreground") => {
+            let mut background = terminal_helper("background")?
+                .process_group(0)
+                .stdin(std::process::Stdio::null())
+                .stdout(std::process::Stdio::piped())
+                .spawn()?;
+            let mut stdout = background.stdout.take().ok_or("background stdout")?;
+            let reading = std::thread::spawn(move || {
+                let mut said = String::new();
+                stdout.read_to_string(&mut said).map(|_| said)
+            });
+            let pid = Pid::from_child(&background);
+            let (_, status) =
+                waitpid(Some(pid), WaitOptions::UNTRACED)?.ok_or("the background part's wait")?;
+            if let Some(signal) = status.stopping_signal() {
+                background.kill()?;
+                background.wait()?;
+                return Err(format!("the background part was stopped by signal {signal}").into());
+            }
+            let said = reading
+                .join()
+                .map_err(|panic| format!("the background reader panicked: {panic:?}"))??;
+            assert_eq!(status.exit_status(), Some(0), "{said}");
+            let answer = said
+                .lines()
+                .find(|line| line.starts_with(TERMINAL_ANSWER))
+                .ok_or_else(|| format!("the background part did not answer: {said}"))?;
+            println!("{answer}");
+            Ok(())
+        }
+        _ => Ok(()),
+    }
+}

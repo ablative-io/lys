@@ -4,9 +4,11 @@
 
 use std::collections::BTreeMap;
 use std::ffi::OsString;
+use std::io::Read;
 use std::process::{Command, Stdio};
 use std::sync::OnceLock;
 
+use process_wrap::std::{CommandWrap, ProcessSession};
 use serde::Serialize;
 
 use super::super::error::{ErrorKind, IdentityError, IdentityResult};
@@ -219,11 +221,27 @@ pub mod fixture;
 #[path = "login_tests.rs"]
 mod tests;
 
+/// Runs the login shell and collects its answer. The shell stays interactive
+/// (`-i`), because many setups put `PATH` only in `.bashrc` or `.zshrc`, which
+/// only an interactive shell reads. It starts in a session of its own: an
+/// interactive shell that shares the caller's controlling terminal while
+/// outside that terminal's foreground process group (a test runner's own
+/// group, a background job) asks the terminal for itself and is stopped by
+/// `SIGTTIN`, and never answers. With no controlling terminal it can neither
+/// take one nor be stopped by one, and it still reads its profile and rc file.
 fn shell_output(
     kept: &BTreeMap<String, String>,
     shell: &str,
 ) -> IdentityResult<std::process::Output> {
-    Command::new(shell)
+    let could_not_run = |error: std::io::Error| {
+        refuse(
+            "read login",
+            "environment",
+            format!("login shell {shell} could not run: {error}"),
+        )
+    };
+    let mut command = Command::new(shell);
+    command
         .env_clear()
         .envs(kept)
         .args([
@@ -235,12 +253,35 @@ fn shell_output(
             ),
         ])
         .stdin(Stdio::null())
-        .output()
-        .map_err(|error| {
-            refuse(
-                "read login",
-                "environment",
-                format!("login shell {shell} could not run: {error}"),
-            )
-        })
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+    let mut command = CommandWrap::from(command);
+    command.wrap(ProcessSession);
+    let mut child = command.spawn().map_err(could_not_run)?;
+    // Both pipes are drained at once, so a shell that fills one while the
+    // other is being read never blocks on it.
+    let stderr = child.stderr().take();
+    let reading_stderr = std::thread::spawn(move || {
+        let mut answer = Vec::new();
+        stderr.map_or(Ok(0), |mut stderr| stderr.read_to_end(&mut answer))?;
+        Ok::<_, std::io::Error>(answer)
+    });
+    let mut stdout = Vec::new();
+    let read_stdout = child
+        .stdout()
+        .take()
+        .map_or(Ok(0), |mut out| out.read_to_end(&mut stdout));
+    let stderr = reading_stderr
+        .join()
+        .unwrap_or_else(|_| Err(std::io::Error::other("the stderr reader panicked")));
+    // The shell is waited on whatever the reads answered, so none is left
+    // unreaped.
+    let status = child.wait().map_err(could_not_run)?;
+    read_stdout.map_err(could_not_run)?;
+    let stderr = stderr.map_err(could_not_run)?;
+    Ok(std::process::Output {
+        status,
+        stdout,
+        stderr,
+    })
 }
