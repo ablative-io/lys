@@ -4,7 +4,7 @@ use super::{
     A, ADMIN, ADMIN_BODY, APP_READ, APP_SELF, Api, AppApprovalBody, AppSignInBody, Approval,
     CHANGE, CHANGE_DECIDE, CHECK, CREDENTIAL, ChangeBody, ChangeDecision, CheckBody, ConnectorBody,
     DECIDE, GET, POST, PUT, REGISTER, RETIRE, RegisterBody, RegistrarBody, RegistrarIssued, S,
-    SchemaCheck, SchemaVersionView, VERSION, route,
+    SchemaCheck, route,
 };
 use crate::openapi_table::P;
 
@@ -313,17 +313,6 @@ pub(super) fn schemas(
     changed: std::borrow::Cow<'static, str>,
 ) -> Vec<lys_openapi::Route> {
     vec![
-        route(
-            (
-                GET,
-                "/apps/{app}/schema",
-                "A schema version, the current one unless `version` names one",
-            ),
-            A,
-            None,
-            Some(api.schema::<SchemaVersionView>()),
-            &[VERSION, &["NotSignedIn"]],
-        ),
         route(
             (
                 PUT,

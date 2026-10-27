@@ -10,7 +10,7 @@ use lys_runner::console_stop::PATH as CONSOLE_PATH;
 use crate::openapi_refusals::{
     ADMIN, ADMIN_BODY, AGENT, APP_PERSON, BUDGET_READ, BUDGET_SET, GRANT_ASKED, GRANT_MADE,
     GRANT_READ, MACHINE_AGENTS, PERSON, PROFILE_REVIEW, RECORDED, REPORTING, RESTART, SIGNED,
-    SIGNED_BODY, START_BUDGET, START_RUNNER, UNANSWERED,
+    SIGNED_BODY, START_BUDGET, START_RUNNER, UNANSWERED, VERSION,
 };
 
 pub(crate) const GET: Method = Method::Get;
@@ -370,6 +370,7 @@ pub(crate) const TABLE: &[E] = entries! {
     POST "/teams/{id}/nesting" "Replace a team parent and lead" G [SIGNED_BODY, &["NotAdmitted", "team_parent_cycle", "team_lead_not_member", "TeamsUnavailable"]] scope("team", "team.parent.set", ["id"]);
     POST "/teams/{id}/retire" "Retire a team" G [SIGNED_BODY] scope("team", "team.retire", ["id"]);
     GET "/resources" "The resources grants are on" G [SIGNED, &["NotAdmitted"]] scope("resource", "read", []);
+    GET "/apps/{app}/schema" "A schema version, the current one unless `version` names one" G [VERSION] scope("app", "read", ["app"]);
     GET "/apps/{app}/placements" "An app's recorded placements: each child resource under its parent, in the order they were placed" G [SIGNED, &["NotAdmitted", "app_unknown"]] scope("resource", "read", []);
     GET "/secrets" "The secrets" G [SIGNED, &["NoPerson", "SecretsUnavailable"]] scope("secret", "read", []);
     GET "/secrets/grants" "The secrets' grants" G [SIGNED] scope("secret", "read", []);

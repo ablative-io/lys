@@ -6,7 +6,7 @@ use lys_openapi::Api;
 use crate::openapi::route;
 use crate::openapi_refusals::{
     ADMIN, ADMIN_BODY, APP_READ, APP_SELF, BATCH, CHANGE, CHANGE_DECIDE, CHECK, CREDENTIAL, DECIDE,
-    PLACE, REGISTER, RETIRE, VERSION, WHICH,
+    PLACE, REGISTER, RETIRE, WHICH,
 };
 use crate::openapi_table::{A, GET, POST, PUT, S};
 
@@ -17,8 +17,7 @@ use crate::apps_bench::{AskBody, BENCH, BenchAnswer, OpenBody};
 use crate::apps_connector_give::ConnectorBody;
 use crate::apps_schema_api::{ChangeBody, ChangeDecision, CheckBody, PlaceBody};
 use crate::apps_sign_in::AppSignInBody;
-use crate::apps_views::{AppView, Approval, AppsView, RegistrarIssued, SchemaChanged};
-use crate::apps_views::{SchemaCheck, SchemaVersionView};
+use crate::apps_views::{AppView, Approval, AppsView, RegistrarIssued, SchemaChanged, SchemaCheck};
 use crate::grants_batch::{BatchAnswer, BatchBody, WhichBody, WhichPage};
 
 /// The grant log's recorded identity could not be read (DIRECTORY-089 R1).

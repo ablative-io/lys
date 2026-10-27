@@ -6,7 +6,8 @@
 //! organisation.admit by its responsible person, the agent admits; without
 //! it, the act is refused by name before any step and nothing is recorded.
 //! What the agent did is on its person's dashboard, and on no one else's
-//! (AGENTS-019 R5).
+//! (AGENTS-019 R5). An administrator's agent reads which schema each
+//! approved app registered, and nothing more of the apps (27 October 2026).
 
 use std::error::Error;
 use std::sync::Arc;
@@ -26,6 +27,9 @@ use serde_json::{Value, json};
 
 #[path = "people_admit_app/table.rs"]
 mod table;
+
+#[path = "../src/mcp_test_answer.rs"]
+mod mcp_answer;
 use table::{APP, BEA, STEPS, accounts_for, admit_with, bea, member_of, people, table, table_on};
 
 type TestResult = Result<(), Box<dyn Error>>;
@@ -216,12 +220,39 @@ async fn certified(
 /// with `body` through the change tool, answered as JSON-RPC.
 async fn change_as(
     service: &Service,
-    (agent, key): (&str, &Ed25519Identity),
+    agent: (&str, &Ed25519Identity),
     path: &str,
     body: &Value,
 ) -> Result<Value, Box<dyn Error>> {
+    let arguments = json!({"method": "POST", "path": path, "body": body});
+    call_as(service, agent, "change", &arguments).await
+}
+
+/// `agent`'s own signed MCP read of `path`: the relayed route's status and
+/// answer.
+async fn read_as(
+    service: &Service,
+    agent: (&str, &Ed25519Identity),
+    path: &str,
+) -> Result<(u64, Value), Box<dyn Error>> {
+    let answer = call_as(service, agent, "read", &json!({"path": path})).await?;
+    let relayed = mcp_answer::body(&answer["result"]);
+    let status = relayed["status"]
+        .as_u64()
+        .ok_or_else(|| format!("no status: {answer}"))?;
+    Ok((status, relayed["body"].clone()))
+}
+
+/// `agent`'s own signed MCP call, by its certified `key`, of `tool` with
+/// `arguments`, answered as JSON-RPC.
+async fn call_as(
+    service: &Service,
+    (agent, key): (&str, &Ed25519Identity),
+    tool: &str,
+    arguments: &Value,
+) -> Result<Value, Box<dyn Error>> {
     let message = json!({"jsonrpc": "2.0", "id": 1, "method": "tools/call",
-        "params": {"name": "change", "arguments": {"method": "POST", "path": path, "body": body}}});
+        "params": {"name": tool, "arguments": arguments}});
     let bytes = serde_json::to_vec(&message)?;
     let at = u64::try_from(SystemTime::now().duration_since(UNIX_EPOCH)?.as_millis())?;
     let nonce = hex(OperationId::generate()?.as_bytes());
@@ -304,6 +335,137 @@ async fn an_agent_given_organisation_administer_moves_a_sign_in_to_its_person() 
         .get(&format!("/identities/{person}"), Some(&ada))
         .await?;
     assert!(!source["logins"].to_string().contains(subject), "{source}");
+    Ok(())
+}
+
+/// The grant `id` as Ada lists it.
+async fn listed(service: &Service, ada: &str, id: &str) -> Result<Value, Box<dyn Error>> {
+    let (status, grants) = service.get("/grants", Some(ada)).await?;
+    assert_eq!(status, 200, "{grants}");
+    grants["grants"]
+        .as_array()
+        .ok_or("no grants")?
+        .iter()
+        .find(|each| each["id"] == id)
+        .cloned()
+        .ok_or_else(|| "the grant is not listed".into())
+}
+
+#[tokio::test]
+async fn an_administrator_agent_reads_an_approved_apps_schema_and_a_lesser_one_is_refused()
+-> TestResult {
+    let (service, _rauthy, ada) = table_on(&shipped_model(), true).await?;
+    let path = format!("/apps/{APP}/schema");
+
+    // An agent that may admit people, and holds no reading standing, is
+    // refused the read by the act's name.
+    let only_admits = agent_of(&service, &ada).await?;
+    give(&service, &ada, &only_admits, "only.organisation.admit").await?;
+    let only_admits_key = certified(&service, &ada, &only_admits).await?;
+    let lesser = (only_admits.as_str(), only_admits_key.as_ref());
+    let (status, refused) = read_as(&service, lesser, &path).await?;
+    assert_eq!(status, 403, "{refused}");
+    assert_eq!(refused["refusal"], "NotHeld", "{refused}");
+    assert_eq!(refused["fields"]["action"], "read", "{refused}");
+    assert_eq!(refused["fields"]["resource_kind"], "app", "{refused}");
+
+    // The administrator agent reads the schema the app registered, by its
+    // standing, and the use is recorded against the standing grant.
+    let agent = agent_of(&service, &ada).await?;
+    let grant = give(&service, &ada, &agent, "administrator").await?;
+    let key = certified(&service, &ada, &agent).await?;
+    let administrator = (agent.as_str(), key.as_ref());
+    let (status, schema) = read_as(&service, administrator, &path).await?;
+    assert_eq!(status, 200, "{schema}");
+    assert_eq!(schema["app"], APP, "{schema}");
+    assert_eq!(schema["version"], 1, "{schema}");
+    let kinds = schema["schema"]["kinds"]
+        .as_object()
+        .ok_or_else(|| format!("no kinds: {schema}"))?;
+    for kind in ["workspace", "channel", "doc"] {
+        assert!(kinds.contains_key(&format!("{APP}.{kind}")), "{schema}");
+    }
+    let held = listed(&service, &ada, &grant).await?;
+    assert_eq!(held["last_use"]["seen"], true, "{held}");
+
+    // Reading opens no write: checking a change stays the administrator's
+    // and the app's, refused at the door for want of a declared scope.
+    let check = json!({"schema": schema["schema"]});
+    let reply = change_as(&service, administrator, &format!("{path}/check"), &check).await?;
+    let relayed = mcp_answer::body(&reply["result"]);
+    assert_eq!(relayed["status"], 403, "{relayed}");
+    assert_eq!(
+        relayed["body"]["refusal"], "TokenScopeUndeclared",
+        "{relayed}"
+    );
+    Ok(())
+}
+
+#[tokio::test]
+async fn an_agent_given_reading_on_one_app_reads_its_schema_and_never_a_waiting_registration()
+-> TestResult {
+    let (service, _rauthy, ada) = table_on(&shipped_model(), true).await?;
+    let waiting = "fixture_waiting";
+    identity_contract::apps::register(&service, &ada, waiting).await?;
+    // The administrator is told the registration is there, with no version
+    // approved yet.
+    let (status, own) = service
+        .get(&format!("/apps/{waiting}/schema"), Some(&ada))
+        .await?;
+    assert_eq!(status, 404, "{own}");
+    assert_eq!(own["refusal"], "schema_version_unknown", "{own}");
+
+    // Ada gives a new agent reading on the approved app alone, from a root
+    // of her own.
+    let agent = agent_of(&service, &ada).await?;
+    let (status, me) = service.get("/me", Some(&ada)).await?;
+    assert_eq!(status, 200, "{me}");
+    let app = json!({"kind": "app", "id": APP});
+    let (status, root) = service
+        .post(
+            "/grants/roots",
+            Some(&ada),
+            &json!({
+            "operation": OperationId::generate()?.to_string(), "route": "api",
+            "holder": me["person"]["id"], "resource": app, "relation": "reader",
+            "pass_on": {"kind": "to", "actions": ["read"], "recipients": ["agent"]},
+            "window": {"starts_at": 0, "ends_at": null}}),
+        )
+        .await?;
+    assert_eq!(status, 200, "{root}");
+    let (status, passed) = service
+        .post(
+            "/grants",
+            Some(&ada),
+            &json!({
+            "operation": OperationId::generate()?.to_string(), "route": "api",
+            "source": root["grant"], "recipient": agent, "responsible": me["person"]["id"],
+            "resource": app, "relation": "reader",
+            "pass_on": {"kind": "use_only"}, "window": {"starts_at": 0, "ends_at": null}}),
+        )
+        .await?;
+    assert_eq!(status, 200, "{passed}");
+    let key = certified(&service, &ada, &agent).await?;
+    let reader = (agent.as_str(), key.as_ref());
+    let (status, schema) = read_as(&service, reader, &format!("/apps/{APP}/schema")).await?;
+    assert_eq!(status, 200, "{schema}");
+    assert_eq!(schema["app"], APP, "{schema}");
+    let grant = passed["grant"].as_str().ok_or("a grant")?;
+    let held = listed(&service, &ada, grant).await?;
+    assert_eq!(held["last_use"]["seen"], true, "{held}");
+
+    // The grant reaches that app alone.
+    let (status, refused) = read_as(&service, reader, &format!("/apps/{waiting}/schema")).await?;
+    assert_eq!(status, 403, "{refused}");
+    assert_eq!(refused["refusal"], "NotHeld", "{refused}");
+
+    // A registration still waiting is the install administrator's to know
+    // of: even an agent with administrator standing is answered as if it
+    // were not there.
+    give(&service, &ada, &agent, "administrator").await?;
+    let (status, hidden) = read_as(&service, reader, &format!("/apps/{waiting}/schema")).await?;
+    assert_eq!(status, 404, "{hidden}");
+    assert_eq!(hidden["refusal"], "app_unknown", "{hidden}");
     Ok(())
 }
 

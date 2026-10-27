@@ -124,6 +124,12 @@ pub(crate) fn types(api: &mut Api) -> BTreeMap<(Method, &'static str), (Schema, 
     ));
     entries.push((
         GET,
+        "/apps/{app}/schema",
+        None,
+        Some(api.schema::<crate::apps_views::SchemaVersionView>()),
+    ));
+    entries.push((
+        GET,
         "/apps/{app}/placements",
         None,
         Some(api.schema::<crate::apps_schema_api::PlacementsView>()),

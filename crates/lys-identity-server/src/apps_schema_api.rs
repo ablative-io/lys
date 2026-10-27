@@ -20,6 +20,18 @@
 //! removes a role is refused `schema_change_strands_grants` while a standing
 //! grant names that role.
 //!
+//! `GET /apps/{app}/schema` is read by the administrator, by any signed-in
+//! person for an approved app, and by an app or registrar for its own. An
+//! agent is judged at the door by its declared scope, `read` on the app:
+//! its own grant of it, or its organisation's reading standing, which the
+//! administrator relation carries (27 October 2026). Admitted, it reads what
+//! a person who is not the administrator reads, an approved app's schema;
+//! a registration still waiting is the install administrator's to see, and
+//! no organisation's standing reaches it. Apps belong to the install, not
+//! to an organisation, so an approved app's schema names nothing of any
+//! organisation. Changing, checking, approving and declining a schema stay
+//! the administrator's and the app's.
+//!
 //! `GET /apps/{app}/placements` answers an app's recorded placements to any
 //! admitted caller, so a product or an administrator's agent can read what a
 //! pass will reach without holding a grant on each child (24 October 2026).
@@ -367,6 +379,39 @@ async fn decline(
     .map(Json)
 }
 
+/// Who reads a schema.
+enum Reader {
+    /// An agent, through its relayed signed message or its run pass, already
+    /// admitted at the door by its grant or standing for `read` on the app.
+    Agent,
+    /// Anyone else, as they act on the apps.
+    Acting(Acting),
+}
+
+/// Who reads, for `GET /apps/{app}/schema`. An agent is told apart before
+/// [`acting`], which knows only people, apps and registrars; a request
+/// carrying an app's or registrar's credential is judged by [`acting`] alone,
+/// so that credential is never passed over for the session.
+///
+/// # Errors
+/// The refusals of [`acting`] and of the sign-in it reads.
+fn reader(
+    state: &AppState,
+    held: &crate::apps_state::Held,
+    headers: &HeaderMap,
+    projection: &lys_identity::projection::Projection,
+) -> Result<Reader, ServerError> {
+    if !headers.contains_key(axum::http::header::AUTHORIZATION)
+        && crate::routes::signed_in(state, headers)?
+            .provenance()
+            .agent()
+            .is_some()
+    {
+        return Ok(Reader::Agent);
+    }
+    acting(state, held, headers, projection).map(Reader::Acting)
+}
+
 async fn version(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
@@ -374,19 +419,21 @@ async fn version(
     Query(query): Query<VersionQuery>,
 ) -> Result<Json<SchemaVersionView>, ServerError> {
     crate::apps_api::with_apps(&state, |apps, projection| {
-        let who = acting(&state, apps.held(), &headers, projection)?;
+        let who = reader(&state, apps.held(), &headers, projection)?;
         let unknown = || AppError::AppUnknown { app: id.clone() };
         let app = apps.app(&id).ok_or_else(unknown)?;
         let visible = match &who {
-            Acting::Administrator(_) => true,
-            Acting::App { app: own, .. } => *own == id,
-            Acting::Registrar { service_account } => {
+            Reader::Acting(Acting::Administrator(_)) => true,
+            Reader::Acting(Acting::App { app: own, .. }) => *own == id,
+            Reader::Acting(Acting::Registrar { service_account }) => {
                 app.registered.by
                     == By::ServiceAccount {
                         id: service_account.clone(),
                     }
             }
-            Acting::Person(_) => app.standing() == Standing::Approved,
+            Reader::Acting(Acting::Person(_)) | Reader::Agent => {
+                app.standing() == Standing::Approved
+            }
         };
         if !visible {
             return Err(unknown().into());
