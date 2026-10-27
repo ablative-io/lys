@@ -156,7 +156,10 @@ pub fn prepare_clients(
             let name = entry.file_name().into_string().map_err(|name| {
                 client_error(
                     source,
-                    format!("client_platform_invalid: a platform is not UTF-8: {name:?}"),
+                    format!(
+                        "client_platform_invalid: a platform is not UTF-8: {}",
+                        name.display()
+                    ),
                 )
             })?;
             if !entry

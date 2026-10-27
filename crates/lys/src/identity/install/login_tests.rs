@@ -206,7 +206,7 @@ const TERMINAL_HELPER: &str = "identity::install::login::tests::login_terminal_h
 fn terminal_helper(part: &str) -> Result<std::process::Command, Box<dyn Error>> {
     let mut helper = std::process::Command::new(std::env::current_exe()?);
     helper
-        .args(["--exact", TERMINAL_HELPER, "--ignored", "--nocapture"])
+        .args(["--exact", TERMINAL_HELPER, "--nocapture"])
         .env(TERMINAL_PART, part);
     Ok(helper)
 }
@@ -282,7 +282,6 @@ fn terminal_login(
 
 /// The two parts of the terminal regression, chosen by [`TERMINAL_PART`].
 #[test]
-#[ignore = "started under a terminal of its own by the terminal regression"]
 fn login_terminal_helper() -> Result<(), Box<dyn Error>> {
     use std::io::Read;
     use std::os::unix::process::CommandExt;
