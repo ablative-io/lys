@@ -12,12 +12,14 @@ use axum::http::{HeaderMap, header};
 use lys_identity::IdentityId;
 use lys_identity::grants::GrantError;
 
-pub(super) fn delegate(
+/// The caller giving from standing: the signed-in administrator, or an
+/// agent through its own signed message. Anyone else, and any pass holder,
+/// is refused by name.
+pub(crate) fn giver(
     state: &AppState,
     headers: &HeaderMap,
-    body: &DelegateBody,
-    judged: &mut Judged<'_>,
-) -> Result<RecordedView, ServerError> {
+    judged: &Judged<'_>,
+) -> Result<IdentityId, ServerError> {
     // A pass authenticates its holder for its audience, never a standing gift.
     if headers.contains_key(header::AUTHORIZATION) || headers.contains_key("lys-agent-pass") {
         return Err(GrantError::RootAuthorityRefused {
@@ -37,6 +39,16 @@ pub(super) fn delegate(
         }
         .into());
     }
+    Ok(caller)
+}
+
+pub(super) fn delegate(
+    state: &AppState,
+    headers: &HeaderMap,
+    body: &DelegateBody,
+    judged: &mut Judged<'_>,
+) -> Result<RecordedView, ServerError> {
+    let caller = giver(state, headers, judged)?;
     let request = body.standing_request(caller)?;
     judged.apps.admit_kind(None, request.resource.kind())?;
     super::handlers::refuse_held_on_hot(judged, &request.resource, &request.relation, body.mode())?;

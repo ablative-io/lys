@@ -64,11 +64,12 @@ pub struct RequestView {
     pub approvers: Vec<PersonSummary>,
     /// The grants the caller holds that the access could be lent from, as the grants stand now.
     pub sources: Vec<String>,
-    /// Whether the caller could approve it with no source, by issuing the access directly: the
-    /// caller is the root authority and a person asks.
+    /// Whether the caller could approve it with no source, by giving the access directly: the
+    /// caller may issue the person who asks a root, or give the agent who asks the access from
+    /// the administrator's standing, as Give access gives it.
     pub can_issue_root: bool,
     /// Whether the caller may approve or decline it: a person who could give the access, or
-    /// the root authority.
+    /// the root authority, which decides any request it is shown.
     pub can_decide: bool,
     /// The person whose approval is being settled, null when none is. While it is not null
     /// only that person's same approval is taken.

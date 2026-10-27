@@ -6,8 +6,8 @@ use super::{
     GrantChange, GrantError, GrantEvent, GrantId, Grants, Mode, PassOn, Recorded,
     RelationshipStore, Source,
 };
-use crate::IdentityId;
 use crate::projection::Projection;
+use crate::{IdentityId, PersonId};
 use lys_log_store::LeafStore;
 
 impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
@@ -32,17 +32,7 @@ impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
     ) -> Result<Recorded, GrantError> {
         self.standing_of(directory, request, at)?;
         active(directory, request.caller)?;
-        // Standing is passed on within the administrator's organisation
-        // (ACCESS-009 R3); an administrator of none passes it to anyone.
-        if let Some(organisation) = directory.organisation_of(request.caller)
-            && directory.organisation_of(request.recipient) != Some(organisation)
-        {
-            return Err(GrantError::OrganisationOutside {
-                grant: "the administrator's standing".to_owned(),
-                organisation: organisation.to_string(),
-                recipient: request.recipient.to_string(),
-            });
-        }
+        within_standing(directory, request.caller, request.recipient)?;
         self.settle_for_change()?;
         if let Some((event, receipt)) = self.answered(request.operation)? {
             return match event.change() {
@@ -102,6 +92,21 @@ impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
         )?)
     }
 
+    /// The people who may give `recipient` access from standing, read from
+    /// the directory alone: the install's root person, while `recipient` is
+    /// within the root person's organisation or the root person is of none.
+    /// A hint for a surface: the gift itself is judged by
+    /// [`Grants::delegate_administrator`].
+    #[must_use]
+    pub fn standing_givers(&self, directory: &Projection, recipient: IdentityId) -> Vec<PersonId> {
+        let root = IdentityId::Person(self.root_authority);
+        if within_standing(directory, root, recipient).is_ok() {
+            vec![self.root_authority]
+        } else {
+            Vec::new()
+        }
+    }
+
     /// Whose standing `request.caller` gives from: the install's, as its
     /// root person; or its organisation's, as an agent holding a live grant
     /// carrying organisation.grant on it. Anyone else is refused by name.
@@ -143,4 +148,23 @@ impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
             | IdentityId::Organisation(_) => Err(refused()),
         }
     }
+}
+
+/// Standing is passed on within the giver's organisation (ACCESS-009 R3); a
+/// giver of no organisation passes it to anyone.
+fn within_standing(
+    directory: &Projection,
+    giver: IdentityId,
+    recipient: IdentityId,
+) -> Result<(), GrantError> {
+    if let Some(organisation) = directory.organisation_of(giver)
+        && directory.organisation_of(recipient) != Some(organisation)
+    {
+        return Err(GrantError::OrganisationOutside {
+            grant: "the administrator's standing".to_owned(),
+            organisation: organisation.to_string(),
+            recipient: recipient.to_string(),
+        });
+    }
+    Ok(())
 }

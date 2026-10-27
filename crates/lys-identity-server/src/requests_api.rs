@@ -10,10 +10,15 @@
 //!
 //! The people who could approve a request are the people holding a standing
 //! grant on the resource that may be passed on to the one who asks for every action
-//! of the relation asked, and the root authority when a person asks. A
-//! request is shown to the one who asks, to the person who answers for them, to
-//! those people and to the root authority, and to anyone else it is refused
-//! exactly as a request that is not kept.
+//! of the relation asked, and the people who may give it with no source, by
+//! the grants' own rules for that gift: a root issued to a person who asks,
+//! or the administrator's standing given to an agent who asks, as Give access
+//! gives it. An agent asking for a relation no agent may hold is refused when
+//! it asks, in Give access's words, and nothing is kept. The root authority
+//! decides any request it is shown. A request is shown to the one who asks,
+//! to the person who answers for them, to those people and to the root
+//! authority, and to anyone else it is refused exactly as a request that is
+//! not kept.
 //!
 //! A request asked again with the operation id it was kept under is answered
 //! as it was kept, whatever the time is by then: the end it asks for is
@@ -31,7 +36,8 @@ use axum::extract::rejection::JsonRejection;
 use axum::http::HeaderMap;
 use axum::routing::{get, post};
 use axum::{Json, Router};
-use lys_identity::grants::{GrantError, GrantId, RecipientKind, Relation, Resource};
+use lys_identity::grants::admission::refuse_withheld;
+use lys_identity::grants::{Action, GrantError, GrantId, RecipientKind, Relation, Resource};
 use lys_identity::{IdentityId, OperationId, PersonId};
 use serde::Deserialize;
 
@@ -173,10 +179,11 @@ pub(crate) struct Weighed {
     pub(crate) resource: Resource,
     pub(crate) relation: Relation,
     /// The actions the relation resolves to now; none when it is unknown.
-    actions: BTreeSet<lys_identity::grants::Action>,
+    actions: BTreeSet<Action>,
     pub(crate) standing: Standing,
     approvers: Vec<PersonId>,
-    /// The people who may issue the root asked for (ACCESS-009 R2).
+    /// The people who may give the access with no source: a root to a
+    /// person (ACCESS-009 R2), the administrator's standing to an agent.
     rooters: Vec<PersonId>,
     lenders: Vec<(PersonId, GrantId)>,
 }
@@ -200,14 +207,9 @@ impl Weighed {
         };
         let kind = RecipientKind::of(seeker);
         let book = judged.grants.book();
-        let mut approvers = Vec::new();
         let mut lenders = Vec::new();
-        let mut rooters = Vec::new();
-        if kind == RecipientKind::Person {
-            let organisation = judged.directory.organisation_of(seeker);
-            rooters = judged.grants.rooters(organisation, &resource, at)?;
-            approvers.extend(rooters.iter().copied());
-        }
+        let rooters = issuers(judged, seeker, (&resource, &relation, &actions), at)?;
+        let mut approvers = rooters.clone();
         // Nothing lends a relation the model no longer defines: an empty set
         // of needed actions would be within every pass-on.
         if standing == Standing::Grantable {
@@ -253,6 +255,22 @@ impl Weighed {
             }
             .into()),
         }
+    }
+
+    /// The refusal of an agent asking for what no agent may be given, in the
+    /// words Give access refuses it with, or nothing to refuse.
+    fn givable(&self, judged: &Judged<'_>) -> Result<(), ServerError> {
+        Ok(withheld(
+            judged,
+            self.seeker,
+            (&self.resource, &self.relation, &self.actions),
+        )?)
+    }
+
+    /// Whether `caller` may decide the request: a person who could give the
+    /// access, or the root authority, which decides any request it is shown.
+    fn decided_by(&self, caller: IdentityId, root: PersonId) -> bool {
+        matches!(caller, IdentityId::Person(_)) && (self.decides(caller) || is_root(caller, root))
     }
 
     fn decides(&self, caller: IdentityId) -> bool {
@@ -319,13 +337,56 @@ impl Weighed {
             can_issue_root: self
                 .rooters
                 .iter()
-                .any(|person| IdentityId::Person(*person) == caller)
-                && matches!(self.seeker, IdentityId::Person(_)),
-            can_decide: self.decides(caller),
+                .any(|person| IdentityId::Person(*person) == caller),
+            can_decide: self.decided_by(caller, judged.root),
             held_by: held_by.map(str::to_owned),
             decision: decided.map(DecisionView::from),
         })
     }
+}
+
+/// What a request asks for: the resource, the relation and the actions the
+/// relation resolves to.
+type Asks<'a> = (&'a Resource, &'a Relation, &'a BTreeSet<Action>);
+
+/// The refusal of `seeker`, when it is an agent, being given what `asks`
+/// carries that no agent may hold: the rule, and the words, every gift to an
+/// agent is judged by.
+fn withheld(judged: &Judged<'_>, seeker: IdentityId, asks: Asks<'_>) -> Result<(), GrantError> {
+    let (resource, relation, actions) = asks;
+    if RecipientKind::of(seeker) == RecipientKind::Agent {
+        refuse_withheld(judged.grants.model(), relation, resource.kind(), actions)
+    } else {
+        Ok(())
+    }
+}
+
+/// The people who may give `seeker` what `asks` carries with no source, by
+/// the grants' own rules for that gift: whoever may issue a person the root
+/// (ACCESS-009 R2); for an agent, whoever may give it from the
+/// administrator's standing, as Give access gives it, and nobody while it
+/// carries what no agent may hold. Anyone else is lent access from a grant a
+/// person holds.
+fn issuers(
+    judged: &Judged<'_>,
+    seeker: IdentityId,
+    asks: Asks<'_>,
+    at: u64,
+) -> Result<Vec<PersonId>, ServerError> {
+    Ok(match seeker {
+        IdentityId::Person(_) => {
+            let organisation = judged.directory.organisation_of(seeker);
+            judged.grants.rooters(organisation, asks.0, at)?
+        }
+        IdentityId::Agent(_) if withheld(judged, seeker, asks).is_ok() => {
+            judged.grants.standing_givers(judged.directory, seeker)
+        }
+        IdentityId::Agent(_)
+        | IdentityId::ServiceAccount(_)
+        | IdentityId::Connector(_)
+        | IdentityId::Machine(_)
+        | IdentityId::Organisation(_) => Vec::new(),
+    })
 }
 
 /// The request `id` as `caller` may see it, refused as unknown when it is not kept or not theirs to see.
@@ -352,9 +413,7 @@ pub(crate) fn decider(
     weighed: &Weighed,
 ) -> Result<PersonId, ServerError> {
     match caller {
-        IdentityId::Person(person) if weighed.decides(caller) || is_root(caller, judged.root) => {
-            Ok(person)
-        }
+        IdentityId::Person(person) if weighed.decided_by(caller, judged.root) => Ok(person),
         _ => Err(ServerError::NotAdmitted {
             reason: "only a person who could give this access, or the root authority, decides the request",
         }),
@@ -496,6 +555,9 @@ async fn ask(
         // only a request the model later outlives is kept and listed as
         // not grantable (ACCESS-011).
         weighed.approvable()?;
+        // An agent asking for what no agent may be given is refused now, by
+        // name and in Give access's words, and nothing is kept.
+        weighed.givable(&judged)?;
         with_requests(&state, |store| {
             let fresh = store.request(&asked.id).is_none();
             if fresh && asked.ends_at.is_some_and(|ends_at| ends_at <= at) {

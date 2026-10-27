@@ -20,7 +20,7 @@ pub(super) fn register(apps: &mut crate::apps_store::AppStore, app: &str) -> Tes
         app: app.to_owned(),
         name: app.to_owned(),
         redirects: vec!["https://app.test/callback".to_owned()],
-        schema: json!({"kinds": {format!("{app}.agent"): {"actions": ["read"], "relations": {"viewer": ["read"]}}}}),
+        schema: json!({"kinds": {format!("{app}.agent"): {"actions": ["read"], "relations": {"viewer": ["read"]}, "agents": ["read"]}}}),
         service_account: None,
         by: By::Start,
         at: 1,

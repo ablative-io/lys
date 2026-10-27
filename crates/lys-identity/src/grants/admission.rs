@@ -375,8 +375,13 @@ pub fn judge_root(
 }
 
 /// Refuse, by name, `relation` when any of `actions` on an object of `kind`
-/// is one no agent may hold.
-fn refuse_withheld<'a>(
+/// is one no agent may hold: the one rule every gift to an agent is judged
+/// by, and an agent's request for access when it is asked.
+///
+/// # Errors
+/// `GrantError::WithheldFromAgents`, naming the relation and every act it
+/// carries that no agent may hold.
+pub fn refuse_withheld<'a>(
     model: &Model,
     relation: &Relation,
     kind: &str,

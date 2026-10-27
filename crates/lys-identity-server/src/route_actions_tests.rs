@@ -455,6 +455,8 @@ async fn an_unknown_kept_route_refuses_service_startup() -> TestResult {
     Ok(())
 }
 
+#[path = "requests_agent_tests.rs"]
+mod requests_agent_tests;
 #[path = "requests_app_kind_tests.rs"]
 mod requests_app_kind_tests;
 #[path = "requests_outlived_tests.rs"]

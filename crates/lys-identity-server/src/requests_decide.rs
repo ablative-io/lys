@@ -19,7 +19,9 @@ use axum::Json;
 use axum::extract::rejection::JsonRejection;
 use axum::extract::{Path, State};
 use axum::http::HeaderMap;
-use lys_identity::grants::{DelegateRequest, GrantId, PassOn, RootRequest, Source, Window};
+use lys_identity::grants::{
+    DelegateRequest, GrantId, Mode, PassOn, PassOnRequest, RootRequest, Source, Window,
+};
 use lys_identity::{IdentityId, OperationId, PersonId};
 use serde::Deserialize;
 
@@ -34,11 +36,13 @@ use crate::requests_store::{Answer, Asked, Decided, Intended, RequestStore};
 use crate::requests_views::RequestView;
 use crate::routes::AppState;
 
-/// The refusal of an approval naming no source for anyone but a person.
-const NAME_THE_SOURCE: &str = "only a person is given access from the root authority; an agent's, a service account's or a connector's access is lent from a grant a person holds: name the source";
+/// The refusal of an approval naming no source for anyone but a person or
+/// an agent.
+const NAME_THE_SOURCE: &str = "only a person or an agent is given access with no source; a service account's or a connector's access is lent from a grant a person holds: name the source";
 
-/// An approval. `source` is the grant the access is lent from, or null for
-/// the root authority to issue it to a person.
+/// An approval. `source` is the grant the access is lent from, or null to
+/// give it with no source: a root issued to a person, or the administrator's
+/// standing given to an agent, as Give access gives it.
 #[derive(Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct ApproveBody {
@@ -70,6 +74,7 @@ fn issued(
     let issuer = IdentityId::Person(PersonId::from_str(&intent.by)?);
     let source = match &intent.source {
         Some(source) => Source::Grant(grant_id(source)?),
+        None if matches!(weighed.seeker, IdentityId::Agent(_)) => Source::Administrator,
         None => Source::Root,
     };
     let window = Window::new(asked.asked_at, intent.answer.ends_at(asked.ends_at))?;
@@ -168,10 +173,20 @@ pub(crate) async fn approve(
                     "a one-time answer lends from a grant the approver holds: name the source",
                 ));
             }
-            // Only a person holds root authority; anyone else asking is lent
-            // from a grant, refused here before the intent is kept.
-            if source.is_none() && !matches!(weighed.seeker, IdentityId::Person(_)) {
+            // Only a person or an agent is given access with no source;
+            // anyone else asking is lent from a grant, refused here before
+            // the intent is kept.
+            if source.is_none()
+                && !matches!(weighed.seeker, IdentityId::Person(_) | IdentityId::Agent(_))
+            {
                 return Err(malformed(NAME_THE_SOURCE));
+            }
+            // An agent is given access with no source from the
+            // administrator's standing, by the giver and the kind Give access
+            // admits, refused here before the intent is kept.
+            if source.is_none() && matches!(weighed.seeker, IdentityId::Agent(_)) {
+                crate::grants::administrator::giver(&state, &headers, &judged)?;
+                judged.apps.admit_kind(None, weighed.resource.kind())?;
             }
             store.intend(Intended {
                 id: asked.id.clone(),
@@ -205,10 +220,25 @@ pub(crate) async fn approve(
                     },
                     at,
                 ),
+                (None, IdentityId::Agent(_)) => judged.grants.delegate_administrator(
+                    judged.directory,
+                    &PassOnRequest {
+                        operation,
+                        caller,
+                        route: body.route.into(),
+                        recipient: weighed.seeker,
+                        responsible: weighed.responsible,
+                        resource: weighed.resource.clone(),
+                        relation: weighed.relation.clone(),
+                        pass_on: PassOn::UseOnly,
+                        window,
+                    },
+                    Mode::Outright,
+                    at,
+                ),
                 (
                     None,
-                    IdentityId::Agent(_)
-                    | IdentityId::ServiceAccount(_)
+                    IdentityId::ServiceAccount(_)
                     | IdentityId::Connector(_)
                     | IdentityId::Machine(_)
                     | IdentityId::Organisation(_),

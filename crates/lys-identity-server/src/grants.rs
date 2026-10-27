@@ -55,7 +55,7 @@ pub(crate) use crate::grant_sight::grant_view;
 use crate::routes::{AppState, signed_in, with_directory};
 use crate::spicedb::{Relationships, SpiceDb, SpiceDbEngine};
 
-mod administrator;
+pub(crate) mod administrator;
 mod decisions;
 mod handlers;
 pub(crate) mod held;

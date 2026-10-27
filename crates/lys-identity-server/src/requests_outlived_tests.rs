@@ -39,7 +39,7 @@ async fn drop_viewer(service: &identity_contract::harness::Service, cookie: &str
         0
     };
     let body = json!({"operation": operation()?, "replaces": replaces,
-        "schema": {"kinds": {KIND: {"actions": ["read"], "relations": {"reader": ["read"]}}}}});
+        "schema": {"kinds": {KIND: {"actions": ["read"], "relations": {"reader": ["read"]}, "agents": ["read"]}}}});
     let (status, changed) = put(
         service,
         &format!("/apps/{APP}/schema"),
