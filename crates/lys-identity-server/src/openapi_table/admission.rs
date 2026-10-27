@@ -97,7 +97,6 @@ pub const HUMAN_ONLY: &[(Method, &str, &str)] = &[
     (GET, "/me/account", CREDENTIALS),
     (POST, "/me/account/email", CREDENTIALS),
     (POST, "/me/account/email/confirm", CREDENTIALS),
-    (POST, "/people/{id}/logins/move", CREDENTIALS),
     (POST, "/me/account/password", CREDENTIALS),
     (POST, "/directory/people/{id}/account/password", CREDENTIALS),
     (POST, "/people/{id}/logins", CREDENTIALS),

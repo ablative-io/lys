@@ -240,6 +240,73 @@ async fn change_as(
     Ok(answer.json().await?)
 }
 
+/// `agent`'s signed MCP call moving Bea's sign-in to a new record named
+/// Annabel, as the move from People asks it.
+async fn move_as(
+    service: &Service,
+    agent: (&str, &Ed25519Identity),
+    (person, subject): (&str, &str),
+) -> Result<Value, Box<dyn Error>> {
+    let body = json!({"operation": OperationId::generate()?.to_string(),
+        "issuer": service.issuer.issuer(), "subject": subject,
+        "target": {"display_name": "Annabel"}});
+    change_as(
+        service,
+        agent,
+        &format!("/people/{person}/logins/move"),
+        &body,
+    )
+    .await
+}
+
+#[tokio::test]
+async fn an_agent_given_organisation_administer_moves_a_sign_in_to_its_person() -> TestResult {
+    let (service, _rauthy, ada) = table_on(&shipped_model(), true).await?;
+    let agent = agent_of(&service, &ada).await?;
+    let grant = give(&service, &ada, &agent, "administrator").await?;
+    let pass = agent_pass(&service, &ada, &agent, &grant).await?;
+    let asked = bea(
+        &OperationId::generate()?.to_string(),
+        member_of("fixture_product.workspace"),
+    );
+    let (status, admitted) = admit_with(&service, &pass, &asked).await?;
+    assert_eq!(status, 200, "{admitted}");
+    let person = admitted["person"].as_str().ok_or("a person")?;
+    let subject = admitted["subject"].as_str().ok_or("a subject")?;
+
+    // An agent that may admit people, and not administer them, is refused
+    // the move, and Bea keeps her sign-in.
+    let only_admits = agent_of(&service, &ada).await?;
+    give(&service, &ada, &only_admits, "only.organisation.admit").await?;
+    let only_admits_key = certified(&service, &ada, &only_admits).await?;
+    let refused = move_as(
+        &service,
+        (only_admits.as_str(), only_admits_key.as_ref()),
+        (person, subject),
+    )
+    .await?;
+    assert!(refused.to_string().contains("NotHeld"), "{refused}");
+    let (_, kept) = service
+        .get(&format!("/identities/{person}"), Some(&ada))
+        .await?;
+    assert!(kept["logins"].to_string().contains(subject), "{kept}");
+
+    // The administrator agent moves it, as itself, and Bea's record no
+    // longer holds it.
+    let key = certified(&service, &ada, &agent).await?;
+    let reply = move_as(&service, (agent.as_str(), key.as_ref()), (person, subject)).await?;
+    assert!(reply["error"].is_null(), "{reply}");
+    assert!(
+        reply.to_string().contains(&agent),
+        "the act is the agent's: {reply}"
+    );
+    let (_, source) = service
+        .get(&format!("/identities/{person}"), Some(&ada))
+        .await?;
+    assert!(!source["logins"].to_string().contains(subject), "{source}");
+    Ok(())
+}
+
 /// `cookie`'s dashboard: its agents and the lines acted for them.
 async fn dashboard(service: &Service, cookie: &str) -> Result<(Value, Vec<Value>), Box<dyn Error>> {
     let (status, answer) = service.get("/dashboard", Some(cookie)).await?;

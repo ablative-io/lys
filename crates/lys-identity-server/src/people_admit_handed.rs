@@ -99,8 +99,10 @@ pub(crate) struct Withdrawn {
     digest: String,
 }
 
-/// Require an active person holding organisation.administer in the target's
-/// organisation. Authority over a different organisation admits nothing.
+/// Require an active caller holding organisation.administer in the target's
+/// organisation: a person, or an agent a person gave it to, judged by the
+/// agent's own grants (27 October 2026). Authority over a different
+/// organisation admits nothing.
 pub(crate) fn administrator(
     state: &AppState,
     actor: &Actor,
@@ -113,9 +115,7 @@ pub(crate) fn administrator(
         let refused = || ServerError::NotAdmitted {
             reason: "only an administrator of the person's organisation may manage their admission link",
         };
-        if !matches!(caller, IdentityId::Person(_))
-            || judged.directory.organisation_of(IdentityId::Person(person)) != Some(organisation)
-        {
+        if judged.directory.organisation_of(IdentityId::Person(person)) != Some(organisation) {
             return Err(refused());
         }
         let request = ExerciseRequest {

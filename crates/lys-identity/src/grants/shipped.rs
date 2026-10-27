@@ -161,11 +161,7 @@ pub const ACTIONS: &[&str] = &[
 /// after Tom's "assign everything to AI", 22 October 2026), always passed
 /// on from that person's own grant, so it ends when theirs does; an act Lys
 /// does not ship is never one.
-pub const WITHHELD_FROM_AGENTS: &[&str] = &[
-    "person.login.bind",
-    "person.password.set",
-    "person.sign-in.set",
-];
+pub const WITHHELD_FROM_AGENTS: &[&str] = &["person.password.set", "person.sign-in.set"];
 
 /// The acts an agent may hold, each decided: with [`WITHHELD_FROM_AGENTS`]
 /// it names every shipped act exactly once, so a new act cannot ship
@@ -215,6 +211,7 @@ pub const AGENT_MAY_HOLD: &[&str] = &[
     "organisation.read",
     "person.create",
     "person.email.set",
+    "person.login.bind",
     "person.profile.set",
     "person.session.end",
     "read",
@@ -303,6 +300,7 @@ pub const AGENTS_NOT_MACHINES: &[&str] = &[
     "organisation.admit",
     "organisation.grant",
     "person.email.set",
+    "person.login.bind",
     "request.approve",
     "request.decline",
     "role.create",
@@ -587,14 +585,14 @@ mod tests {
             );
         }
         // AGENTS-019 R1: a person's credentials stay out of every agent's
-        // reach; authority itself is a person's to give.
-        for credential in [
-            "person.login.bind",
-            "person.password.set",
-            "person.sign-in.set",
-        ] {
+        // reach; authority itself is a person's to give. Linking a login to
+        // its person is administration (27 October 2026): an agent may be
+        // given it, a machine never.
+        for credential in ["person.password.set", "person.sign-in.set"] {
             assert!(!agent_may_hold("person", credential), "{credential}");
         }
+        assert!(agent_may_hold("person", "person.login.bind"));
+        assert!(!machine_may_hold("person", "person.login.bind"));
         for authority in ["grant", "role.create", "secret.scope", "organisation.admit"] {
             assert!(agent_may_hold("directory", authority), "{authority}");
             assert!(!machine_may_hold("directory", authority), "{authority}");

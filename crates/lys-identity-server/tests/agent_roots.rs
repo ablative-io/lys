@@ -262,16 +262,14 @@ async fn only_the_administrator_may_ask_for_agent_roots() -> TestResult {
 
 /// AGENTS-019 R1, after Tom's "assign everything to AI" (22 October 2026):
 /// a person may give an agent every shipped act but a person's credentials,
-/// so exactly setting a password, a sign-in and a bound login stay withheld.
+/// so exactly setting a password and a sign-in stay withheld. Linking a
+/// login to its person is administration an agent may be given (Tom, 27
+/// October 2026: "you need to be able to manage everything for me").
 /// The acts AGENTS-015 R1 released, and the twenty-nine this brief releases,
 /// are each one a person may give.
 #[test]
 fn the_withheld_list_keeps_exactly_a_persons_credentials() {
-    let kept = [
-        "person.login.bind",
-        "person.password.set",
-        "person.sign-in.set",
-    ];
+    let kept = ["person.password.set", "person.sign-in.set"];
     assert_eq!(WITHHELD_FROM_AGENTS, kept);
     for released in [
         "agent.provisioning.set",
@@ -283,6 +281,7 @@ fn the_withheld_list_keeps_exactly_a_persons_credentials() {
         "grant",
         "organisation.admit",
         "person.email.set",
+        "person.login.bind",
         "request.approve",
         "secret.add",
         "runtime.stop-everything",
