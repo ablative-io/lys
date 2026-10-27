@@ -342,6 +342,8 @@ impl Sessions {
             .spawn(move || match delivered.recv() {
                 Ok((child, pump)) => {
                     observer.watch(&owned, generation, &watched_output, child, pump);
+                    #[cfg(test)]
+                    super::workers::Probes::run(&observer.worker_probes.exit);
                 }
                 Err(error) => {
                     crate::error::said(&format!("session_exit_worker_failed: {error}"));
@@ -363,11 +365,15 @@ impl Sessions {
                 );
             }
         };
+        // The watcher is kept with its session before it is given the child,
+        // so no end it records can be answered before it can be joined.
+        if let Some(mut table) = self.lock_logged() {
+            table.keep_worker(id, watcher);
+        }
         if let Err(error) = deliver.send((child, pump)) {
+            // The watcher ended without taking its child; it is joined, and
+            // any panic said, by whoever answers the end recorded here.
             let (child, pump) = error.0;
-            if watcher.join().is_err() {
-                crate::error::said("session_exit_worker_failed: the exit worker panicked");
-            }
             let failure = RunnerError::refused(
                 "session_exit_worker_failed",
                 "the exit worker ended before it took its child",
@@ -384,7 +390,6 @@ impl Sessions {
                 },
             );
         }
-        drop(watcher);
         Ok(())
     }
 

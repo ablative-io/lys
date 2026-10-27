@@ -67,6 +67,7 @@ impl Sessions {
                     stopped: None,
                     attach: crate::attach::Ring::new(scrollback),
                     last_signal: None,
+                    workers: Vec::new(),
                 },
             );
         }
@@ -97,6 +98,8 @@ impl Sessions {
                 writer,
                 #[cfg(test)]
                 spawn_probe: Mutex::new(None),
+                #[cfg(test)]
+                worker_probes: workers::Probes::default(),
             }
         });
         let table = sessions.lock()?;

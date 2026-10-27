@@ -60,6 +60,7 @@ mod owned;
 mod restart;
 mod stop;
 mod trust_dialog;
+mod workers;
 
 #[cfg(test)]
 #[path = "../tests/session_start/cases.rs"]
@@ -155,6 +156,9 @@ pub(crate) struct Session {
     pub(crate) attach: crate::attach::Ring,
     /// When its harness last signalled through a frame, hook or status line.
     pub(crate) last_signal: Option<u64>,
+    /// The threads that act for it and hold the runner while they run,
+    /// joined by whoever answers its end (see `workers`).
+    pub(crate) workers: Vec<std::thread::JoinHandle<()>>,
 }
 
 impl Session {
@@ -285,6 +289,8 @@ pub struct Sessions {
     pub(crate) writer: crate::durable::Writer,
     #[cfg(test)]
     spawn_probe: Mutex<Option<SpawnProbe>>,
+    #[cfg(test)]
+    worker_probes: workers::Probes,
 }
 
 pub(super) struct Starting {

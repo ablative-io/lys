@@ -47,17 +47,29 @@ impl Sessions {
         id: &str,
         directory: String,
     ) -> Result<(), RunnerError> {
+        // The watch is kept with its session under the table's lock, so an
+        // answered end always finds it to join; a run already ended has no
+        // first screen left to watch.
+        let mut table = self.lock()?;
+        if table
+            .sessions
+            .get(id)
+            .is_none_or(|session| session.ended.is_some())
+        {
+            return Ok(());
+        }
         let sessions = Arc::clone(self);
         let owned = id.to_owned();
-        std::thread::Builder::new()
+        let watch = std::thread::Builder::new()
             .name("runner-trust-dialog".to_owned())
             .spawn(move || {
                 if let Err(error) = sessions.answer_trust_dialog(&owned, &directory) {
                     crate::error::said(&format!("trust_dialog_watch_failed: {owned}: {error}"));
                 }
             })
-            .map(drop)
-            .map_err(|error| RunnerError::refused("trust_watch_failed", error.to_string()))
+            .map_err(|error| RunnerError::refused("trust_watch_failed", error.to_string()))?;
+        table.keep_worker(id, watch);
+        Ok(())
     }
 
     /// Read session `id`'s output from the spawn until the dialog is whole

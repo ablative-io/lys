@@ -124,7 +124,8 @@ impl Sessions {
         output.until(id, left, check)
     }
 
-    /// End session `id`'s process and answer once its exit is seen.
+    /// End session `id`'s process and answer once its exit is seen and the
+    /// threads acting for it have let the runner go.
     ///
     /// # Errors
     /// - `RunnerError::Refused` if session/output locking, process signalling or durable-writer completion fails, the session is unknown, or the caller leaves or runner stops before its exit.
@@ -140,6 +141,7 @@ impl Sessions {
             }
         }
         let ended = self.until(id, left, |session, _| session.ended().map(Ok))?;
+        self.join_workers([id])?;
         self.writer.barrier()?;
         Ok(ended)
     }
@@ -171,8 +173,9 @@ impl Sessions {
         })
     }
 
-    /// End every running session and answer once each exit is seen; the
-    /// runner then starts nothing more.
+    /// End every running session and answer once each exit is seen and the
+    /// threads acting for them have let the runner go; the runner then
+    /// starts nothing more.
     ///
     /// # Errors
     /// - `RunnerError::Refused` if table locking or waiting, or durable-writer completion fails.
@@ -204,9 +207,11 @@ impl Sessions {
             table = self.wait(table)?;
         }
         let persisted = self.persist(&table);
+        let ended: Vec<String> = table.sessions.keys().cloned().collect();
         drop(table);
         let flushed = self.writer.barrier();
         self.wake();
-        persisted.and(flushed)
+        let joined = self.join_workers(ended.iter().map(String::as_str));
+        persisted.and(flushed).and(joined)
     }
 }

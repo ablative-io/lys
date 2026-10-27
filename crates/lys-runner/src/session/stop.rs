@@ -54,6 +54,7 @@ struct Corded {
 
 impl Sessions {
     /// End every running session for `by`, because `reason`, as `ask` says.
+    /// Each session answered ended has had the threads acting for it joined.
     ///
     /// # Errors
     /// - `RunnerError::Refused` if caller/reason words are empty, table locking or waiting fails, the runner stops, durable completion fails or owned-seat state cannot be read.
@@ -100,6 +101,7 @@ impl Sessions {
                 .is_none_or(|session| session.ended.is_some())
         });
         drop(table);
+        self.join_workers(sessions.iter().map(String::as_str))?;
         self.writer.barrier()?;
         match waited {
             Ok(()) => {}

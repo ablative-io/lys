@@ -204,6 +204,7 @@ impl Sessions {
             stopped: None,
             attach: crate::attach::Ring::new(self.scrollback),
             last_signal: None,
+            workers: Vec::new(),
         }
     }
 
