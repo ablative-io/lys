@@ -2,12 +2,26 @@
 //! (AGENTS-018 R2).
 //!
 //! macOS registers `EVFILT_VNODE` on the folder's descriptor for
-//! `NOTE_DELETE`, `NOTE_RENAME` and `NOTE_REVOKE`; Linux adds an inotify
-//! watch for `IN_DELETE_SELF` and `IN_MOVE_SELF`. The registration is made
-//! when the owner starts, so an owner whose folder cannot be watched never
-//! starts; the wait is the kernel's event. The descriptor is held open for
-//! the watch's life: the kernel names the folder by it after the name is
-//! gone, which is what the event is for.
+//! `NOTE_DELETE`, `NOTE_RENAME` and `NOTE_REVOKE`. The descriptor is held
+//! open for the watch's life: the kernel names the folder by it after the
+//! name is gone, which is what the event is for, and `NOTE_DELETE` comes
+//! when the name is unlinked whoever still holds the folder.
+//!
+//! Linux cannot be told the same way by the folder alone. Its
+//! `IN_DELETE_SELF` comes only when the kernel lets the folder go, which is
+//! when the last thing holding it lets go, and the owner holds its own
+//! folder for its whole life (its lock file and log are open inside it), so
+//! a removal of the folder under a running owner was never told at all. The
+//! name leaving the folder's parent is told at the moment of the unlink, so
+//! Linux watches the parent too: `IN_DELETE`, `IN_MOVED_FROM` or
+//! `IN_MOVED_TO` naming the folder end the watch, as do `IN_DELETE_SELF` and
+//! `IN_MOVE_SELF` on the folder (a rename is told at once) and on the parent
+//! (a parent renamed away takes the folder's path with it). A queue that
+//! overflowed has lost what it would have told, so it is answered by asking
+//! whether the folder's path still names the folder that was watched.
+//!
+//! The registration is made when the owner starts, so an owner whose folder
+//! cannot be watched never starts; the wait is the kernel's event.
 
 use std::path::Path;
 
@@ -97,45 +111,77 @@ impl DirWatch {
 #[cfg(target_os = "linux")]
 pub(super) struct DirWatch {
     inotify: nix::sys::inotify::Inotify,
+    /// The folder's own watch: renamed away, or let go by the kernel.
+    folder: nix::sys::inotify::WatchDescriptor,
+    /// The parent's watch: the folder's name leaving it, told at the unlink.
+    parent: nix::sys::inotify::WatchDescriptor,
+    /// The folder's name in its parent.
+    name: std::ffi::OsString,
+    /// The folder's path with no links left in it, asked after an overflow.
+    path: std::path::PathBuf,
+    /// The folder's device and inode when the watch was made.
+    identity: (u64, u64),
 }
 
 #[cfg(target_os = "linux")]
 impl DirWatch {
-    /// Registers the watch on `dir`.
+    /// Registers the watch on `dir` and on the folder that holds it.
     ///
     /// # Errors
     ///
-    /// The words of the registration that was refused.
+    /// The words of the lookup or the registration that was refused.
     pub(super) fn open(dir: &Path) -> Result<Self, String> {
         use nix::sys::inotify::{AddWatchFlags, InitFlags, Inotify};
+        // The real path: the name the kernel unlinks is the real folder's
+        // name in its real parent, not a link's.
+        let path = std::fs::canonicalize(dir).map_err(|error| format!("the path: {error}"))?;
+        let name = path
+            .file_name()
+            .ok_or("the folder has no name in a parent folder")?
+            .to_os_string();
+        let parent_path = path.parent().ok_or("the folder has no parent folder")?;
         let inotify =
             Inotify::init(InitFlags::IN_CLOEXEC).map_err(|error| format!("inotify: {error}"))?;
-        inotify
+        // The parent first: a folder removed between the two registrations
+        // is then either told by the parent or refused by the folder's own.
+        let parent = inotify
             .add_watch(
-                dir,
-                AddWatchFlags::IN_DELETE_SELF | AddWatchFlags::IN_MOVE_SELF,
+                parent_path,
+                AddWatchFlags::IN_DELETE
+                    | AddWatchFlags::IN_MOVED_FROM
+                    | AddWatchFlags::IN_MOVED_TO
+                    | AddWatchFlags::IN_DELETE_SELF
+                    | AddWatchFlags::IN_MOVE_SELF
+                    | AddWatchFlags::IN_ONLYDIR,
+            )
+            .map_err(|error| format!("inotify watch on the parent: {error}"))?;
+        let folder = inotify
+            .add_watch(
+                &path,
+                AddWatchFlags::IN_DELETE_SELF
+                    | AddWatchFlags::IN_MOVE_SELF
+                    | AddWatchFlags::IN_ONLYDIR,
             )
             .map_err(|error| format!("inotify watch: {error}"))?;
-        Ok(Self { inotify })
+        let identity = identity_of(&path).map_err(|error| format!("the folder: {error}"))?;
+        Ok(Self {
+            inotify,
+            folder,
+            parent,
+            name,
+            path,
+            identity,
+        })
     }
 
-    /// Waits until the folder is removed or renamed away, answering which;
-    /// a watch that ends without that answers why.
+    /// Waits until the folder is removed or renamed away, or its parent is,
+    /// answering which; a watch that ends without that answers why.
     pub(super) fn wait(self) -> String {
-        use nix::sys::inotify::AddWatchFlags;
         loop {
             match self.inotify.read_events() {
                 Ok(events) => {
-                    for event in events {
-                        if event.mask.contains(AddWatchFlags::IN_DELETE_SELF) {
-                            return "removed".to_owned();
-                        }
-                        if event.mask.contains(AddWatchFlags::IN_MOVE_SELF) {
-                            return "renamed away".to_owned();
-                        }
-                        if event.mask.contains(AddWatchFlags::IN_IGNORED) {
-                            return "no longer watched by the kernel".to_owned();
-                        }
+                    if let Some(words) = events.iter().find_map(|event| self.ends(event)) {
+                        return words;
                     }
                 }
                 Err(nix::errno::Errno::EINTR) => {}
@@ -143,6 +189,65 @@ impl DirWatch {
             }
         }
     }
+
+    /// What one event says of the folder's end, if it says anything.
+    fn ends(&self, event: &nix::sys::inotify::InotifyEvent) -> Option<String> {
+        use nix::sys::inotify::AddWatchFlags;
+        let mask = event.mask;
+        if mask.contains(AddWatchFlags::IN_Q_OVERFLOW) {
+            return match identity_of(&self.path) {
+                Ok(identity) if identity == self.identity => None,
+                Ok(_) => Some("replaced (told after the watch overflowed)".to_owned()),
+                Err(error) => Some(format!("gone (told after the watch overflowed): {error}")),
+            };
+        }
+        if event.wd == self.folder {
+            if mask.contains(AddWatchFlags::IN_DELETE_SELF) {
+                return Some("removed".to_owned());
+            }
+            if mask.contains(AddWatchFlags::IN_MOVE_SELF) {
+                return Some("renamed away".to_owned());
+            }
+            if mask.contains(AddWatchFlags::IN_IGNORED) {
+                return Some("no longer watched by the kernel".to_owned());
+            }
+            return None;
+        }
+        if event.wd != self.parent {
+            return None;
+        }
+        if event.name.as_deref() == Some(self.name.as_os_str())
+            && mask.contains(AddWatchFlags::IN_ISDIR)
+        {
+            if mask.contains(AddWatchFlags::IN_DELETE) {
+                return Some("removed".to_owned());
+            }
+            if mask.contains(AddWatchFlags::IN_MOVED_FROM) {
+                return Some("renamed away".to_owned());
+            }
+            if mask.contains(AddWatchFlags::IN_MOVED_TO) {
+                return Some("replaced by a folder renamed onto its name".to_owned());
+            }
+        }
+        if mask.contains(AddWatchFlags::IN_DELETE_SELF) {
+            return Some("removed with its parent folder".to_owned());
+        }
+        if mask.contains(AddWatchFlags::IN_MOVE_SELF) {
+            return Some("renamed away with its parent folder".to_owned());
+        }
+        if mask.contains(AddWatchFlags::IN_IGNORED) {
+            return Some("no longer watched by the kernel through its parent folder".to_owned());
+        }
+        None
+    }
+}
+
+/// A folder's device and inode, by its path.
+#[cfg(target_os = "linux")]
+fn identity_of(path: &Path) -> std::io::Result<(u64, u64)> {
+    use std::os::unix::fs::MetadataExt;
+    let metadata = std::fs::metadata(path)?;
+    Ok((metadata.dev(), metadata.ino()))
 }
 
 /// No folder watch on this system: an owner refuses to start.
@@ -170,21 +275,75 @@ impl DirWatch {
 mod tests {
     use super::DirWatch;
 
-    #[test]
-    fn a_removed_folder_is_told_as_removed() -> Result<(), Box<dyn std::error::Error>> {
-        let temporary = tempfile::tempdir()?;
-        let dir = temporary.path().join("owner");
-        std::fs::create_dir(&dir)?;
-        let watch = DirWatch::open(&dir)?;
+    /// Opens the watch on `dir`, waits on it in a thread, does `act` once
+    /// the thread runs, and answers the watch's words.
+    fn told_after(
+        dir: &std::path::Path,
+        act: impl FnOnce() -> std::io::Result<()>,
+    ) -> Result<String, Box<dyn std::error::Error>> {
+        let watch = DirWatch::open(dir)?;
         let (started, start) = std::sync::mpsc::channel();
         let waited = std::thread::spawn(move || {
             started.send(()).map_err(|error| error.to_string())?;
             Ok::<String, String>(watch.wait())
         });
         start.recv()?;
-        std::fs::remove_dir(&dir)?;
-        let words = waited.join().map_err(|error| format!("{error:?}"))??;
+        act()?;
+        Ok(waited.join().map_err(|error| format!("{error:?}"))??)
+    }
+
+    #[test]
+    fn a_removed_folder_is_told_as_removed() -> Result<(), Box<dyn std::error::Error>> {
+        let temporary = tempfile::tempdir()?;
+        let dir = temporary.path().join("owner");
+        std::fs::create_dir(&dir)?;
+        let words = told_after(&dir, || std::fs::remove_dir(&dir))?;
         assert_eq!(words, "removed");
+        Ok(())
+    }
+
+    /// The owner holds its own folder (its lock and log are open inside
+    /// it); the removal is told while it still does.
+    #[test]
+    fn a_removed_folder_this_process_holds_is_told_as_removed()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let temporary = tempfile::tempdir()?;
+        let dir = temporary.path().join("owner");
+        std::fs::create_dir_all(dir.join("runner"))?;
+        let held = std::fs::File::create(dir.join("runner/lock"))?;
+        let words = told_after(&dir, || std::fs::remove_dir_all(&dir))?;
+        assert_eq!(words, "removed");
+        drop(held);
+        Ok(())
+    }
+
+    #[test]
+    fn a_renamed_folder_is_told_as_renamed_away() -> Result<(), Box<dyn std::error::Error>> {
+        let temporary = tempfile::tempdir()?;
+        let dir = temporary.path().join("owner");
+        std::fs::create_dir(&dir)?;
+        let held = std::fs::File::create(dir.join("lock"))?;
+        let words = told_after(&dir, || {
+            std::fs::rename(&dir, temporary.path().join("elsewhere"))
+        })?;
+        assert_eq!(words, "renamed away");
+        drop(held);
+        Ok(())
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn a_parent_renamed_away_is_told() -> Result<(), Box<dyn std::error::Error>> {
+        let temporary = tempfile::tempdir()?;
+        let parent = temporary.path().join("owners");
+        let dir = parent.join("owner");
+        std::fs::create_dir_all(&dir)?;
+        let held = std::fs::File::create(dir.join("lock"))?;
+        let words = told_after(&dir, || {
+            std::fs::rename(&parent, temporary.path().join("elsewhere"))
+        })?;
+        assert_eq!(words, "renamed away with its parent folder");
+        drop(held);
         Ok(())
     }
 
