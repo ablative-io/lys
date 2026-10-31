@@ -124,6 +124,30 @@ unreleased things cannot be used to tell what a published version contains.
   revision covering the original receipt. A failed revision read returns its
   original refusal and produces no acknowledgement or invented revision.
 
+## [lys-core 0.3.3] — 2026-10-31
+
+Published on its own; the other crates stay at their published versions. Every change is additive over 0.3.2.
+
+### Added — `lys-core`
+
+- `seat_file` (AGENTS-017 R5): the seat file, one JSON file at mode 0600 holding an agent's private key where
+  the agent runs, with what certifies it. Its members (`version`, `doorUrl`, `handle`, `device`,
+  `privateKeyPem`, `lysUrl`, `lysAgentId`, plus Lys's `certificatePem` and `serial`) are the shape every reader
+  reads. `version` is `SEAT_FILE_VERSION` (1). A file of any other version, or with no version, is refused, and
+  the refusal names the version found. The key never appears in `Debug` output or an error, and is wiped when
+  dropped.
+- `pairing_words` (AGENTS-020 R1): 256 short words, no two alike in sound. `code_from` turns four bytes into a
+  four-word code a person can read aloud.
+- `CertificateAuthority::issue_certificate_for_pairing` (AGENTS-020): issues over a request made under a
+  proposed name, which must match the request's common name, and certifies the name the authority gave. Every
+  other property of `issue_certificate_for_request` holds unchanged.
+
+### Changed — `lys-core`
+
+- `postcard` is taken without its default features, so `heapless` and the unmaintained `atomic-polyfill`
+  (RUSTSEC-2023-0089) are no longer in the graph. Lys calls only `to_allocvec` and `from_bytes`, which `alloc`
+  covers. The postcard encoding of a leaf, a frozen wire contract, is unchanged, and the leaf tests pin it.
+
 ## [0.3.0] — 2026-10-08
 
 ### Breaking
