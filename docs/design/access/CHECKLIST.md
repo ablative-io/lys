@@ -46,3 +46,9 @@
 ## Requests that outlive the model (ACCESS-011)
 
 - [ ] **C839** — GET /requests answers every request as it stands: one whose relation the current model does not define for its kind is listed with no actions and standing relation_unknown, refused on approve by name, declinable, and shown on the page as one that cannot be granted; no single request ever refuses the queue (ACCESS-011 R1 to R3).
+
+## Schema decisions reach the app (ACCESS-012)
+
+- [ ] **C873** — lys-identity's change stream offers a read following schemas (schemas, decided) and the frames schema_standing and schema_decided (outcome approved, declined or applied); ChangeFrame and ChangesRequest are non_exhaustive with constructors; a read that does not follow schemas is the same bytes as in 0.3.2; lys-identity is 0.4.0 (ACCESS-012 R1).
+- [ ] **C874** — POST /grants/changes answers an app following schemas with its own schema standing on a first read and each later decision on its schema in order from its cursor, wakes a waiting read on the decision's signal, resets a cursor past the app's decisions, and refuses the administrator by name; the decisions are indexed once, never replayed per read (ACCESS-012 R2).
+- [ ] **C875** — lys-identity 0.4.0 is published and tagged the day its gate is green, and liminal's lead is told the same minute (ACCESS-012 R3).

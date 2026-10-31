@@ -14,6 +14,8 @@
 
 **S474.** As the person who decides access, my Requests page always opens: a request that asks for something the model no longer defines is shown to me as one I cannot grant, and I can decline it, while everything else in the queue waits for my decision as before.
 
+**S508.** As the owner, when I approve or decline a product's schema change on the Apps screen, the product learns it from Lys's change stream as it happens, so its status never says it is waiting on me after I have decided.
+
 ## Hermes — a product lead (liminal)
 
 **S304.** As a product lead, I want one library that verifies a pass, reaches through parents and refuses in one shape, so that I do not implement permissions a fourth way.

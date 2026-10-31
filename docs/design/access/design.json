@@ -311,6 +311,16 @@
       "path": "surface/identity/vite.config.ts",
       "note": "The identity surface's build and test configuration; the vitest include list names each feature folder with tests.",
       "brief": "ACCESS-011"
+    },
+    {
+      "path": "crates/lys-identity/Cargo.toml",
+      "note": "lys-identity's own version, 0.4.0, for the schema frames (ACCESS-012)",
+      "brief": "ACCESS-012"
+    },
+    {
+      "path": "CHANGELOG.md",
+      "note": "the release notes: lys-identity 0.4.0's schema read and frames (ACCESS-012)",
+      "brief": "ACCESS-012"
     }
   ],
   "inventory": [

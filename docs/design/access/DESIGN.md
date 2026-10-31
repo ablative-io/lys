@@ -105,6 +105,8 @@ The design page docs/design/PERMISSIONS-ACROSS-THE-STACK-2026-10-06.md (decision
 | `crates/lys-identity-server/src/requests_views.rs` | The request view on the wire, with standing (ACCESS-011). | ACCESS-011 |
 | `crates/lys-identity-server/src/requests_decide.rs` | Approve and decline; approve refuses an outlived request by name (ACCESS-011). | ACCESS-011 |
 | `surface/identity/vite.config.ts` | The identity surface's build and test configuration; the vitest include list names each feature folder with tests. | ACCESS-011 |
+| `crates/lys-identity/Cargo.toml` | lys-identity's own version, 0.4.0, for the schema frames (ACCESS-012) | ACCESS-012 |
+| `CHANGELOG.md` | the release notes: lys-identity 0.4.0's schema read and frames (ACCESS-012) | ACCESS-012 |
 
 ## Inventory
 
