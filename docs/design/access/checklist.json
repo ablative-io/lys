@@ -175,6 +175,36 @@
           "done": false
         }
       ]
+    },
+    {
+      "name": "One agent decides and credentials for one person and team (ACCESS-013)",
+      "items": [
+        {
+          "id": "C876",
+          "text": "A grant can carry a team mark, key 17, written only when present, valid only on draft.decide or grant.delegate on a person, and kept by every pass-on (ACCESS-013 R1).",
+          "done": false
+        },
+        {
+          "id": "C877",
+          "text": "draft.decide and grant.delegate held on a person, narrowed to a team, decide and credential only that person's drafts and grants made or held by the team's agents, judged at each request; own_draft and own_grant refuse the agent acting for itself; organisation standing is never the route (ACCESS-013 R2).",
+          "done": false
+        },
+        {
+          "id": "C878",
+          "text": "A grant is passed on to a resource Lys has recorded under its own, never one the schema merely allows, carrying only actions it reaches there, ending no later than it, ended with it, and an agent never records a placement (ACCESS-013 R3).",
+          "done": false
+        },
+        {
+          "id": "C879",
+          "text": "The administrator's root on their own person passes draft.decide and grant.delegate on to agents, and a person-scoped grant on another person's id is refused (ACCESS-013 R4).",
+          "done": false
+        },
+        {
+          "id": "C880",
+          "text": "lys-identity's next minor is published and tagged the day its gate is green, and clx's and liminal's leads are told the same minute (ACCESS-013 R5).",
+          "done": false
+        }
+      ]
     }
   ]
 }

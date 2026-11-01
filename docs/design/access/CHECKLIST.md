@@ -52,3 +52,11 @@
 - [ ] **C873** — lys-identity's change stream offers a read following schemas (schemas, decided) and the frames schema_standing and schema_decided (outcome approved, declined or applied); ChangeFrame and ChangesRequest are non_exhaustive with constructors; a read that does not follow schemas is the same bytes as in 0.3.2; lys-identity is 0.4.0 (ACCESS-012 R1).
 - [ ] **C874** — POST /grants/changes answers an app following schemas with its own schema standing on a first read and each later decision on its schema in order from its cursor, wakes a waiting read on the decision's signal, resets a cursor past the app's decisions, and refuses the administrator by name; the decisions are indexed once, never replayed per read (ACCESS-012 R2).
 - [ ] **C875** — lys-identity 0.4.0 is published and tagged the day its gate is green, and liminal's lead is told the same minute (ACCESS-012 R3).
+
+## One agent decides and credentials for one person and team (ACCESS-013)
+
+- [ ] **C876** — A grant can carry a team mark, key 17, written only when present, valid only on draft.decide or grant.delegate on a person, and kept by every pass-on (ACCESS-013 R1).
+- [ ] **C877** — draft.decide and grant.delegate held on a person, narrowed to a team, decide and credential only that person's drafts and grants made or held by the team's agents, judged at each request; own_draft and own_grant refuse the agent acting for itself; organisation standing is never the route (ACCESS-013 R2).
+- [ ] **C878** — A grant is passed on to a resource Lys has recorded under its own, never one the schema merely allows, carrying only actions it reaches there, ending no later than it, ended with it, and an agent never records a placement (ACCESS-013 R3).
+- [ ] **C879** — The administrator's root on their own person passes draft.decide and grant.delegate on to agents, and a person-scoped grant on another person's id is refused (ACCESS-013 R4).
+- [ ] **C880** — lys-identity's next minor is published and tagged the day its gate is green, and clx's and liminal's leads are told the same minute (ACCESS-013 R5).

@@ -1,0 +1,178 @@
+---
+type: brief
+id: ACCESS-013
+cluster: access
+title: An agent decides and credentials one person's drafts and grants for one team, and passes a grant on only to a resource Lys has recorded under it
+---
+
+# ACCESS-013: An agent decides and credentials one person's drafts and grants for one team, and passes a grant on only to a resource Lys has recorded under it
+
+> **Cluster:** access
+> **Checklist:**
+> - C876 — A grant can carry a team mark, key 17, written only when present, valid only on draft.decide or grant.delegate on a person, and kept by every pass-on (ACCESS-013 R1).
+> - C877 — draft.decide and grant.delegate held on a person, narrowed to a team, decide and credential only that person's drafts and grants made or held by the team's agents, judged at each request; own_draft and own_grant refuse the agent acting for itself; organisation standing is never the route (ACCESS-013 R2).
+> - C878 — A grant is passed on to a resource Lys has recorded under its own, never one the schema merely allows, carrying only actions it reaches there, ending no later than it, ended with it, and an agent never records a placement (ACCESS-013 R3).
+> - C879 — The administrator's root on their own person passes draft.decide and grant.delegate on to agents, and a person-scoped grant on another person's id is refused (ACCESS-013 R4).
+> - C880 — lys-identity's next minor is published and tagged the day its gate is green, and clx's and liminal's leads are told the same minute (ACCESS-013 R5).
+> **Stories:**
+> - S509 (Tom, owner and administrator) — As the owner, I give one named agent the approvals and credentials for my team's seats in three grants, once, and it can reach only my drafts and grants for that team and only the network I named, never my organisation's administration.
+
+## Purpose
+
+Found on 2 November 2026 while planning every seat in the estate onto liminal and Prospekt (prospekt-mockups docs/briefs/every-seat-registered-2026-11-02.md). The plan needs about 100 grant drafts approved and 25 grant credentials written. Waffles decided (Lys is his to decide) that one named agent, not the machine's drafter, does both, and that Tom's only act is approving that agent's grants once. At 75daf161 no narrow way exists to give it. A grant names one `kind:id` (crates/lys-identity/src/grants/types.rs:163-168). Approve is scoped `draft.decide` on `draft:{id}` (crates/lys-identity-server/src/openapi_table.rs:152) and the credential route `grant.delegate` on `grant:{id}` (openapi_table.rs:180), the id taken from the path (openapi_table/admission.rs:43-60). The only other way in is the agent's organisation standing (organisation_standing.rs:41-63, route_actions.rs:84-95): `organisation.administer` behind `draft.decide` and `organisation.grant` behind `grant.delegate` (grants/shipped.rs:33-51), which reach every draft and every grant in the organisation. And approving alone registers nothing. Lys carries out an approved draft as its approver (drafts_apply.rs:105-111). clx new drafts each seat's grant as POST /grants from the administrator's standing (clx bin/src/network/drafts.rs:98-110), and an agent gives from standing only through its organisation standing (grants/administrator.rs:1-39). A pass-on must name its source grant's own resource, or it is refused ResourceOutside (grants/delegation.rs:110-117), so a grant on a liminal network can't give grants on the subjects in it. This brief gives the narrow way and nothing wider.
+
+## Task
+
+Add an optional team mark to a grant in crates/lys-identity. Hold `draft.decide` and `grant.delegate` on `person:<id>`, optionally narrowed to a team, and judge them in crates/lys-identity-server's door and in the draft and credential handlers, in a new module crates/lys-identity-server/src/responsibility.rs. Let a pass-on name a resource Lys has recorded under its source's resource, with the four conditions below. Let the administrator's root on their own person pass the two acts on. Release lys-identity the day it is green, and tell clx's lead and liminal's lead.
+
+The decisions this brief makes (Waffles, 2 November 2026), each with its reason:
+
+- **Held on a person, narrowed to a team.** `draft.decide` on `person:P` reaches a draft whose reviewer is P. `grant.delegate` on `person:P` reaches a grant P is responsible for. Narrowed to team T, each reaches only the drafts an agent in T made and the grants an agent in T holds. For the pilot both are held as person plus team. A person-only grant, without a team, is a valid form of the same grant, not an alternative to it. A person can be responsible for many things the pilot never touches; the team is what keeps the agent to the seats.
+- **organisation.administer is never the route for this.** Organisation standing reaches every draft and grant in the organisation, and administration reaches every other act besides. A narrow refusal under this brief is never answered by handing out the organisation's administration or standing. Say so in every refusal's words and in the code's comment.
+- **The agent never decides or credentials for itself.** `own_draft` stays: an agent never decides a draft it made. New, `own_grant`: an agent never writes a credential for a grant it holds, or it could mint its own credentials.
+- **Team membership is judged at each request.** Membership is read from the teams store as it is held at the request, in the same reading the GET /drafts team filter uses (list_page.rs:146-162): T's confirmed members and those of every team nested under T, never a held membership not yet confirmed. So an agent leaving T is refused from that moment, and the list and the decision always agree.
+- **A pass-on to a recorded child, narrowing only.** A grant on `liminal.network:N` can be passed on as a grant on a subject or agent Lys has recorded under N. That is what lets the named agent carry out a seat's drafts with its own grant, not the organisation's. liminal's schema places `liminal.subject` and `liminal.agent` under `liminal.network` (liminal docs/design/access/schema.json). It narrows only if four things hold, each a requirement here: the actions, the time, the revocation and, most of all, the placement. Placed means a placement Lys has recorded, which an agent can never record itself.
+- **Tom's act, once this is live:** approving three grants for the named agent. `draft.decide` and `grant.delegate` on `person:Tom`, each narrowed to the pilot's team, and one grant on `liminal.network:<the estate's network>`, which it may pass on to agents in that team. clx new then drafts each seat's grants from that network grant, not from the administrator's standing. That is clx's change, in its own brief after this is published.
+
+## Requirements
+
+### R1: A grant can carry a team mark, written only when present
+
+Structural. In crates/lys-identity/src/grants, `Grant` SHALL gain an optional team mark, the team's id as text: `with_team(Option<String>)` and `team() -> Option<&str>`, beside `with_organisation` (grant.rs:97-112). The codec (grants/codec.rs) SHALL write it as key 17, a text string, only when present. Absent, a grant's bytes are what they are today, as keys 13 to 16 were added (codec.rs:1-18). Decoding SHALL accept key 17 once and refuse it twice or as anything but text. The module comment SHALL name key 17. WHEN a grant carrying a team mark is built THE SYSTEM SHALL refuse it `team_mark_misplaced` by name unless its resource is of kind `person` and its actions are `draft.decide`, `grant.delegate` or both. WHEN a grant is passed on from a grant carrying a team mark THE SYSTEM SHALL give the passed grant the same mark, and SHALL refuse a pass-on naming another team or none, `team_mark_dropped`. THE SYSTEM SHALL NOT change the bytes of any grant that carries no team mark.
+
+**Acceptance:**
+- Red first (cargo nextest, lys-identity, tests/grant_team_mark.rs): `a_grant_without_a_team_keeps_its_bytes`: a grant from each of the shipped fixtures encodes to the same bytes as at 75daf161, pinned as hex in the test.
+- Red: `a_team_mark_is_key_17_and_round_trips`: a `draft.decide` grant on `person:P` with team `T` encodes key 17 = "T" and decodes back equal.
+- Red: `a_team_mark_on_another_kind_or_act_is_refused`: a team mark on `grant:G`, and on `person:P` with `read`, are each refused `team_mark_misplaced`.
+- Red: `a_pass_on_keeps_the_team_mark`: passing on from a grant marked T with no mark, or with mark U, is refused `team_mark_dropped`; with mark T it stands.
+
+**Files:**
+- create: crates/lys-identity/tests/grant_team_mark.rs
+- modify: crates/lys-identity/src/grants/grant.rs
+- modify: crates/lys-identity/src/grants/codec.rs
+- modify: crates/lys-identity/src/grants/delegation.rs
+- modify: crates/lys-identity/src/grants/error.rs
+
+**Checklist:**
+- C876 — A grant can carry a team mark, key 17, written only when present, valid only on draft.decide or grant.delegate on a person, and kept by every pass-on (ACCESS-013 R1).
+
+**Stories:**
+- S509 (Tom, owner and administrator) — As the owner, I give one named agent the approvals and credentials for my team's seats in three grants, once, and it can reach only my drafts and grants for that team and only the network I named, never my organisation's administration.
+
+### R2: draft.decide and grant.delegate held on a person, narrowed to a team, decide and credential only that person's drafts and grants for that team
+
+Behavioural. A new module crates/lys-identity-server/src/responsibility.rs SHALL hold the question and the team check. WHEN an agent asks POST /drafts/{id}/approve, /refuse or /correct THE SYSTEM SHALL ask, beside the agent's grant on `draft:{id}` and its standing, `draft.decide` on `person:<the draft's reviewer>` (route_actions.rs:84-95). WHEN an agent asks POST /grants/{id}/tokens THE SYSTEM SHALL ask `grant.delegate` on `person:<the grant's responsible person>`. WHERE the grant that admits the agent carries team T THE SYSTEM SHALL admit only a draft whose drafting agent, or a grant whose holder, is a confirmed member of T or of a team nested under T, read from the teams store as held at the request (list_page.rs:146-162), with T not retired. Otherwise it SHALL refuse `outside_team`, naming the team and the agent, or `team_retired`, naming the team. WHEN an agent asks for a credential for a grant it holds itself THE SYSTEM SHALL refuse `own_grant`. `own_draft` (drafts_api.rs:295-309) stays. grant_tokens.rs's `issue` SHALL NOT skip the responsible-person check for an admitted agent (grant_tokens.rs:240-262) unless the agent's own grant on `grant:{id}`, its standing, or a person-scoped grant above admits it. GET /drafts SHALL list to such an agent exactly the drafts its person-scoped grants may decide. THE SYSTEM SHALL NOT admit any of these acts through `organisation.administer` or `organisation.grant` because a person-scoped grant refused them, and each refusal's words SHALL say that organisation standing is not the route.
+
+**Acceptance:**
+- Red first (cargo nextest, lys-identity-server, tests/responsibility_grants.rs; every wait ends on an answer, never a sleep): `a_person_and_team_grant_approves_a_draft_its_team_made`: agent D holds draft.decide on person:P with team T; agent A in T drafts; D's approve answers executed.
+- Red: `a_draft_for_another_reviewer_is_refused`: the same D, a draft whose reviewer is Q: refused, not_permitted.
+- Red: `a_draft_by_an_agent_outside_the_team_is_refused_naming_it`: a draft by agent B, not in T: refused outside_team, the words naming T and B.
+- Red: `an_agent_leaving_the_team_is_refused_from_that_moment`: A's draft is decidable; A is removed from T (POST /teams/{id}/members/{member}/remove); D's next approve of A's second draft is refused outside_team naming T.
+- Red: `the_deciding_agents_own_draft_is_refused`: D's own draft: own_draft.
+- Red: `a_credential_for_another_persons_grant_is_refused`: D holds grant.delegate on person:P with team T; a grant Q is responsible for: refused, not_permitted.
+- Red: `a_credential_for_the_agents_own_grant_is_refused`: own_grant.
+- Red: `a_credential_for_a_team_agents_grant_is_written`: a grant P is responsible for, held by A in T: the credential is issued, and the record names D.
+- Red: `a_person_only_grant_reaches_every_draft_of_that_person`: D holds draft.decide on person:P with no team; drafts by A and B both answer executed.
+- Red: `the_list_shows_exactly_what_the_grant_decides`: GET /drafts as D lists A's draft for P and neither B's nor Q's.
+
+**Files:**
+- create: crates/lys-identity-server/src/responsibility.rs
+- create: crates/lys-identity-server/tests/responsibility_grants.rs
+- modify: crates/lys-identity-server/src/route_actions.rs
+- modify: crates/lys-identity-server/src/drafts_api.rs
+- modify: crates/lys-identity-server/src/drafts_list.rs
+- modify: crates/lys-identity-server/src/grant_tokens.rs
+- modify: crates/lys-identity-server/src/lib.rs
+- modify: crates/lys-identity-server/src/openapi_table.rs
+
+**Checklist:**
+- C877 — draft.decide and grant.delegate held on a person, narrowed to a team, decide and credential only that person's drafts and grants made or held by the team's agents, judged at each request; own_draft and own_grant refuse the agent acting for itself; organisation standing is never the route (ACCESS-013 R2).
+
+**Stories:**
+- S509 (Tom, owner and administrator) — As the owner, I give one named agent the approvals and credentials for my team's seats in three grants, once, and it can reach only my drafts and grants for that team and only the network I named, never my organisation's administration.
+
+### R3: A grant is passed on to a resource Lys has recorded under its own, and only narrower
+
+Behavioural. WHEN a pass-on names a resource other than its source grant's (grants/delegation.rs:110-117) THE SYSTEM SHALL admit it only where Lys holds a recorded, unrestricted placement chain from the requested resource up to the source grant's resource, as the server reads it at the pass-on (apps_store.rs:451-461, which climbs only recorded placements). The server SHALL hand that chain to the delegation check; a placement the schema merely allows SHALL NOT count. Otherwise it stays ResourceOutside. Four conditions hold on every such pass-on, each refused by name:
+- **Actions.** The passed grant SHALL carry only actions the source grant's relation reaches on the child kind through the schema's parent relation, the same reach a check makes. It never carries an action the source lacks, `pass_on_action_outside`.
+- **Time.** Its window SHALL end no later than the source grant's, and a source with an end refuses an open-ended pass-on, `pass_on_outlives_source`.
+- **Revocation.** WHEN the source grant is revoked or expires THE SYSTEM SHALL end every grant passed on from it at once, on the same event (permission.rs:6-10), and a later use SHALL be refused naming the parent grant.
+- **Placement.** A placement SHALL be recorded only by the app's own credential or by the administrator's own signed-in person session (apps_schema_api.rs:140-148, `may_change`). WHEN an agent asks POST /apps/{app}/placements, by its signature or through a draft it approves, THE SYSTEM SHALL refuse `placement_needs_app`, so the agent passing a grant on can never make the placement it passes on.
+
+For liminal, the one who records a placement under `liminal.network` is liminal-server, by its app credential, when it places each subject and agent it serves, or the administrator by hand.
+
+**Acceptance:**
+- Red first (cargo nextest, lys-identity-server, tests/pass_on_placed.rs): `a_grant_on_a_network_passes_on_to_a_subject_recorded_under_it`: the app places subject S under network N; agent D holds subscriber on N with pass-on to agents; D passes subscriber on S to agent A; it stands, and A's check on S is allowed.
+- Red: `a_subject_the_schema_allows_but_lys_never_placed_is_refused`: subject S2, never placed: ResourceOutside.
+- Red: `the_agent_cannot_place_a_foreign_subject_under_its_network`: D asks POST /apps/liminal/placements to place subject F of network M under N: placement_needs_app; D's pass-on of a grant on F is refused ResourceOutside.
+- Red: `a_pass_on_carrying_an_action_the_source_lacks_is_refused`: D holds subscriber on N and passes publisher on S: pass_on_action_outside.
+- Red: `a_pass_on_outliving_its_source_is_refused`: D's grant ends at t; a pass-on ending after t, and one with no end: each pass_on_outlives_source.
+- Red: `revoking_the_source_ends_every_child_grant_at_once`: D's grant on N is revoked; A's check on S is refused on the same revision, naming D's grant.
+- Red: `an_expired_source_ends_every_child_grant`: D's grant on N passes its end; A's check on S is refused naming D's grant.
+
+**Files:**
+- create: crates/lys-identity-server/tests/pass_on_placed.rs
+- modify: crates/lys-identity/src/grants/delegation.rs
+- modify: crates/lys-identity/src/grants/error.rs
+- modify: crates/lys-identity-server/src/grants/handlers.rs
+- modify: crates/lys-identity-server/src/apps_schema_api.rs
+- modify: crates/lys-identity-server/src/apps_store.rs
+
+**Checklist:**
+- C878 — A grant is passed on to a resource Lys has recorded under its own, never one the schema merely allows, carrying only actions it reaches there, ending no later than it, ended with it, and an agent never records a placement (ACCESS-013 R3).
+
+**Stories:**
+- S509 (Tom, owner and administrator) — As the owner, I give one named agent the approvals and credentials for my team's seats in three grants, once, and it can reach only my drafts and grants for that team and only the network I named, never my organisation's administration.
+
+### R4: The administrator's root on their own person passes draft.decide and grant.delegate on to agents
+
+Behavioural. The root on the administrator's own person that the agent's Access tab gives from (agent_roots.rs:8-18, AGENTS-017 R4) SHALL also pass `draft.decide` and `grant.delegate` to agents. An install whose root was recorded with fewer acts records the wider one on its administrator's next POST /grants/agent-roots, beside the old, as it does today. WHEN the administrator gives an agent `draft.decide` or `grant.delegate` on their own person, with or without a team, THE SYSTEM SHALL record it passed on from that root, so revoking the root ends it. THE SYSTEM SHALL refuse a person-scoped `draft.decide` or `grant.delegate` on another person's id, `not_your_person`. A person gives only their own responsibility.
+
+**Acceptance:**
+- Red first (cargo nextest, lys-identity-server, tests/responsibility_grants.rs): `the_administrator_gives_an_agent_decide_and_delegate_on_their_own_person`: after POST /grants/agent-roots, the administrator passes draft.decide with team T and grant.delegate with team T on person:<self> to agent D; both stand, sourced from the root.
+- Red: `a_grant_on_another_persons_id_is_refused`: the same on person:Q: not_your_person.
+
+**Files:**
+- modify: crates/lys-identity-server/src/agent_roots.rs
+
+**Checklist:**
+- C879 — The administrator's root on their own person passes draft.decide and grant.delegate on to agents, and a person-scoped grant on another person's id is refused (ACCESS-013 R4).
+
+**Stories:**
+- S509 (Tom, owner and administrator) — As the owner, I give one named agent the approvals and credentials for my team's seats in three grants, once, and it can reach only my drafts and grants for that team and only the network I named, never my organisation's administration.
+
+### R5: Released the day it is green, and clx's and liminal's leads told
+
+Behavioural. WHEN R1 to R4 pass the gate at one commit THE SYSTEM SHALL have lys-identity's next minor version published the same day from a MacBook export of that commit, checked three ways (the crates.io index checksum, the static.crates.io sha256, and the published files diffed against the commit's tree) and tagged (Tom, 15 October 2026). clx's lead SHALL be told the same minute: clx new drafts each seat's grants as a pass-on from the named agent's network grant, whose id station.json carries, not from the administrator's standing. liminal's lead SHALL be told that liminal-server's placements under `liminal.network` are now what a pass-on reaches.
+
+**Acceptance:**
+- The publish record names the three checks and the tag, and the messages to clx's and liminal's leads name the version and the move.
+
+**Files:**
+- modify: CHANGELOG.md
+- modify: Cargo.toml
+
+**Checklist:**
+- C880 — lys-identity's next minor is published and tagged the day its gate is green, and clx's and liminal's leads are told the same minute (ACCESS-013 R5).
+
+**Stories:**
+- S509 (Tom, owner and administrator) — As the owner, I give one named agent the approvals and credentials for my team's seats in three grants, once, and it can reach only my drafts and grants for that team and only the network I named, never my organisation's administration.
+
+## Boundaries
+
+- SHALL NOT admit any act under this brief through organisation.administer or organisation.grant, and SHALL NOT widen what organisation standing reaches.
+- SHALL NOT change the bytes of any grant without a team mark, or the meaning of a grant on one draft or one grant id.
+- SHALL NOT let an agent record a placement, by its signature or through a draft it approves.
+- SHALL NOT count a placement the schema allows but Lys has not recorded.
+- SHALL NOT let an agent decide its own draft or write a credential for its own grant.
+- SHALL NOT give any grant: each act becomes givable, and giving it stays the person's act.
+- SHALL NOT move clx's drafter; clx moves in its own brief after this is published.
+- SHALL NOT give every person a root on their own person; the administrator's (AGENTS-017 R4) is the one this brief widens.
+- SHALL NOT wait a set time anywhere, in the server or the tests: every wait ends on a signal, an answer, a closed connection or an exit.
+
+## Verification
+
+- gate -stages nextest -crates lys-identity,lys-identity-server -test 'test(team_mark) | test(responsibility) | test(pass_on)'; every red first with its FAIL line quoted.
+- python3 scripts/design/validate.py docs/design/access and python3 scripts/design/check-coverage.py docs/design/access, read for FAIL lines, never the exit code.
+- The whole declared gate on the MacBook at the final commit, with START and END posted with df and the swap line.
+- If this code were used in a hospital, the worst credible failure is an agent approving, or minting a credential for, access to a patient's records that its person never meant it to reach; R2's team and person refusals and R3's recorded-placement rule pin each path, and organisation standing is never the fallback, so about zero people are harmed.

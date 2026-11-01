@@ -16,6 +16,8 @@
 
 **S508.** As the owner, when I approve or decline a product's schema change on the Apps screen, the product learns it from Lys's change stream as it happens, so its status never says it is waiting on me after I have decided.
 
+**S509.** As the owner, I give one named agent the approvals and credentials for my team's seats in three grants, once, and it can reach only my drafts and grants for that team and only the network I named, never my organisation's administration.
+
 ## Hermes — a product lead (liminal)
 
 **S304.** As a product lead, I want one library that verifies a pass, reaches through parents and refuses in one shape, so that I do not implement permissions a fourth way.

@@ -52,10 +52,10 @@ Structural. THE SYSTEM SHALL add to `ChangesRequest` (crates/lys-identity/src/gr
 - Red (lys-identity, channel_membership_index_tests.rs): `a_schema_frame_moves_no_membership`: an index fed a schema_standing and a schema_decided between two changes holds the same members and cursor as one fed the changes alone, and stays Ready on the next Ready.
 
 **Files:**
+- create: crates/lys-identity/tests/change_stream_schemas.rs
 - modify: crates/lys-identity/src/grants/change_stream.rs
 - modify: crates/lys-identity/src/grants/channel_membership_index.rs
 - modify: crates/lys-identity/src/grants/channel_membership_index_tests.rs
-- create: crates/lys-identity/tests/change_stream_schemas.rs
 - modify: crates/lys-identity/Cargo.toml
 - modify: Cargo.toml
 - modify: CHANGELOG.md
@@ -98,16 +98,16 @@ The published shapes (`GrantChangesRequest`, `GrantChangeFrame`) SHALL carry the
 - The OpenAPI contract tests pass with the new field, frames and refusal.
 
 **Files:**
+- create: crates/lys-identity-server/src/grant_changes/published.rs
+- create: crates/lys-identity-server/src/grant_changes/schemas.rs
+- create: crates/lys-identity-server/tests/grant_changes_schemas.rs
 - modify: crates/lys-identity-server/src/apps_index.rs
 - modify: crates/lys-identity-server/src/apps_state.rs
 - modify: crates/lys-identity-server/src/apps_schema_api.rs
 - modify: crates/lys-identity-server/src/grant_changes.rs
-- create: crates/lys-identity-server/src/grant_changes/published.rs
-- create: crates/lys-identity-server/src/grant_changes/schemas.rs
 - modify: crates/lys-identity-server/src/grant_changes/stream.rs
 - modify: crates/lys-identity-server/src/error_grant_stream.rs
 - modify: crates/lys-identity-server/src/openapi_table.rs
-- create: crates/lys-identity-server/tests/grant_changes_schemas.rs
 
 **Checklist:**
 - C874 — POST /grants/changes answers an app following schemas with its own schema standing on a first read and each later decision on its schema in order from its cursor, wakes a waiting read on the decision's signal, resets a cursor past the app's decisions, and refuses the administrator by name; the decisions are indexed once, never replayed per read (ACCESS-012 R2).

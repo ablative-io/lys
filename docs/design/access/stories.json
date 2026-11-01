@@ -32,6 +32,10 @@
         {
           "id": "S508",
           "text": "As the owner, when I approve or decline a product's schema change on the Apps screen, the product learns it from Lys's change stream as it happens, so its status never says it is waiting on me after I have decided."
+        },
+        {
+          "id": "S509",
+          "text": "As the owner, I give one named agent the approvals and credentials for my team's seats in three grants, once, and it can reach only my drafts and grants for that team and only the network I named, never my organisation's administration."
         }
       ]
     },
