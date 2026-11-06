@@ -32,9 +32,6 @@ suite = "v1"
   kind = "ast-grep"
   rules = "portable"
 
-[pytest]
-  slow = "60s"
-
 [tsc-surface-identity]
   dir = "surface/identity"
   kind = "tsc"
