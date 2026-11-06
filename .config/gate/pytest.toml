@@ -1,0 +1,11 @@
+[read]
+  form = "text"
+  pattern = "^(?P<output>.*)$"
+  schema = "pytest.schema.json"
+
+[tool]
+  checked = []
+  name = "pytest"
+  report = true
+  run = ["pytest", "--junitxml={report}"]
+  version = ["pytest", "--version"]

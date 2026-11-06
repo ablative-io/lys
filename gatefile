@@ -1,0 +1,5 @@
+# lys gates (Apollo, 7 Nov, from the cutover proposal; the push stage removed, generated names shortened, since a gate only reads).
+check: length portable ruff shellcheck rules
+compiles: check clippy go-vet-cose-conformance go-vet-go-conformance tsc-surface-identity
+tested: compiles pytest nextest go-test-cose-conformance go-test-go-conformance vitest-surface-identity
+released: tested docs

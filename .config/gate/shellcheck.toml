@@ -1,0 +1,10 @@
+[read]
+  form = "text"
+  pattern = "^(?P<output>.*)$"
+  schema = "shellcheck.schema.json"
+
+[tool]
+  checked = []
+  name = "shellcheck"
+  run = ["shellcheck", "--format=json1"]
+  version = ["shellcheck", "--version"]
