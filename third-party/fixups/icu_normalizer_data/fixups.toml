@@ -1,0 +1,6 @@
+# Red: box2-build-04.log: include input absent from declared srcs.
+extra_srcs = ["data/**"]
+# Red: box2-build-04.log: include input absent from declared srcs.
+# Red: box2-build-03.log: include_str!/include! input missing from srcs.
+# Red: box2-buckify-02.log: build script needs an explicit decision.
+buildscript.run = true

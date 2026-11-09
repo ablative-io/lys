@@ -1,0 +1,13 @@
+vendor = true
+cargo_env = true
+
+[platform.macos-arm64]
+target = "aarch64-apple-darwin"
+
+[buck]
+# Setting [buck] resets Reindeer's rule names; keep the Cargo-flavoured ones.
+rust_library = "cargo.rust_library"
+rust_binary = "cargo.rust_binary"
+buckfile_imports = """
+load(":buckgen.bzl", "buildscript_run", "cargo")
+"""

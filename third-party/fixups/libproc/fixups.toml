@@ -1,0 +1,7 @@
+# The build script generates the libproc bindings with bindgen on macOS.
+[buildscript.run]
+
+[buildscript.run.env]
+OPT_LEVEL = "0"
+DEBUG = "false"
+PROFILE = "debug"

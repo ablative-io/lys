@@ -1,0 +1,13 @@
+# Red: box2-build-03.log: include_str!/include! input missing from srcs.
+extra_srcs = ["src/data/alg-rsa-encryption.der", "src/ec/curve25519/ed25519/ed25519_pkcs8_v2_template.der", "src/ec/suite_b/ecdsa/ecPublicKey_p256_pkcs8_v1_template.der", "src/ec/suite_b/ecdsa/ecPublicKey_p384_pkcs8_v1_template.der"]
+# Red: box2-buckify-02.log: build script needs an explicit decision.
+# Red: box2-build-05.log: cc-rs requires OPT_LEVEL.
+# Compile bundled native code and carry its link directives into Rust consumers.
+[buildscript.run]
+rustc_link_lib = true
+rustc_link_search = true
+[buildscript.run.env]
+OPT_LEVEL = "0"
+DEBUG = "false"
+PROFILE = "debug"
+# Red: box2-build-06.log: compiler shim uses Python 3.12 pathlib APIs.

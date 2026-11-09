@@ -1,0 +1,25 @@
+[cells]
+  root = .
+  prelude = prelude
+  toolchains = toolchains
+  build = build
+  none = none
+[cell_aliases]
+  config = prelude
+  ovr_config = prelude
+  fbcode = none
+  fbsource = none
+  fbcode_macros = none
+  buck = none
+[external_cells]
+  prelude = bundled
+  build = git
+[external_cell_build]
+  git_origin = https://github.com/tomWhiting/build.git
+  commit_hash = bc7bf696b2a6eef2a4ebcdc95319e409a2fc61d6
+[parser]
+  target_platform_detector_spec = target:root//...->prelude//platforms:default target:prelude//...->prelude//platforms:default target:toolchains//...->prelude//platforms:default target:build//...->prelude//platforms:default
+[build]
+  execution_platforms = prelude//platforms:default
+[project]
+  ignore = .git, .worktrees, target, node_modules, .gate, third-party/.cargo, third-party/target

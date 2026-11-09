@@ -1,0 +1,31 @@
+load("@prelude//toolchains:cxx.bzl", "system_cxx_toolchain")
+load("@prelude//toolchains:genrule.bzl", "system_genrule_toolchain")
+load("@prelude//toolchains:python.bzl", "system_python_bootstrap_toolchain")
+load(":rust.bzl", "host_rust_toolchain", "runtime_manifest_rust_toolchain")
+
+system_cxx_toolchain(
+    name = "cxx",
+    compiler = read_root_config("host_tools", "cc"),
+    cxx_compiler = read_root_config("host_tools", "cxx"),
+    linker = read_root_config("host_tools", "cxx"),
+    archiver = read_root_config("host_tools", "ar"),
+    visibility = ["PUBLIC"],
+)
+system_genrule_toolchain(name = "genrule", visibility = ["PUBLIC"])
+host_rust_toolchain(name = "rust", visibility = ["PUBLIC"])
+runtime_manifest_rust_toolchain(name = "rust-runtime-manifest", visibility = ["PUBLIC"])
+system_python_bootstrap_toolchain(
+    name = "python_bootstrap",
+    interpreter = read_root_config("host_tools", "python"),
+    visibility = ["PUBLIC"],
+)
+
+# Binaries built/discovered by the shared bootstrap; their bytes are action inputs.
+sh_binary(name = "buckcheck", main = "_local/buckcheck", visibility = ["PUBLIC"])
+sh_binary(name = "buckrun", main = "_local/buckrun", visibility = ["PUBLIC"])
+sh_binary(name = "tokei", main = "_local/tokei", visibility = ["PUBLIC"])
+sh_binary(name = "ast-grep", main = "_local/ast-grep", visibility = ["PUBLIC"])
+
+sh_binary(name = "buckgen", main = "_local/buckgen", visibility = ["PUBLIC"])
+
+sh_binary(name = "buckrusttest", main = "_local/buckrusttest", visibility = ["PUBLIC"])

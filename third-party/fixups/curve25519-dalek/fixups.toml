@@ -1,0 +1,4 @@
+# Red: box2-build-05.log: include input absent from declared srcs.
+extra_srcs = ["README.md"]
+# Red: box2-buckify-02.log: build script needs an explicit decision.
+buildscript.run = true

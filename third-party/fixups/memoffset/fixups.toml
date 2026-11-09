@@ -1,0 +1,2 @@
+# The build script probes the compiler version for its cfgs.
+buildscript.run = true

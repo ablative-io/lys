@@ -1,0 +1,7 @@
+extra_srcs = ["build/*.rs"]
+[buildscript.run]
+
+[buildscript.run.env]
+OPT_LEVEL = "0"
+DEBUG = "true"
+PROFILE = "debug"

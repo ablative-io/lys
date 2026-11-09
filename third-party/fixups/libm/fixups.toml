@@ -1,0 +1,4 @@
+# Red: box2-buckify-02.log: build script needs an explicit decision.
+# Red: box2-build-05.log: configure.rs requires Cargo's OPT_LEVEL.
+[buildscript.run.env]
+OPT_LEVEL = "0"

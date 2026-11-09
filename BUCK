@@ -1,0 +1,6406 @@
+load("@build//buck:checks.bzl", "file_check")
+
+load("@build//buck:drift.bzl", "generated_check")
+
+generated_check(
+    name = "check-generated",
+)
+file_check(
+    kind = "length",
+    logical = ".config/nextest.toml",
+    name = "check-length-.config__nextest.toml",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = ".config/nextest.toml",
+)
+
+file_check(
+    kind = "portable",
+    logical = ".config/nextest.toml",
+    name = "check-portable-.config__nextest.toml",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = ".config/nextest.toml",
+)
+file_check(
+    kind = "portable",
+    logical = ".github/workflows/ci.yml",
+    name = "check-portable-.github__workflows__ci.yml",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = ".github/workflows/ci.yml",
+)
+file_check(
+    kind = "length",
+    logical = ".gitmodules",
+    name = "check-length-.gitmodules",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = ".gitmodules",
+)
+file_check(
+    kind = "length",
+    logical = "Cargo.toml",
+    name = "check-length-Cargo.toml",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "Cargo.toml",
+)
+
+file_check(
+    kind = "portable",
+    logical = "Cargo.toml",
+    name = "check-portable-Cargo.toml",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "Cargo.toml",
+)
+
+file_check(
+    kind = "registry",
+    logical = "Cargo.toml",
+    name = "check-registry-Cargo.toml",
+    owned_crates = [
+        "identity-contract",
+        "lys",
+        "lys-anchor",
+        "lys-anchor-cli",
+        "lys-core",
+        "lys-home",
+        "lys-identity",
+        "lys-identity-server",
+        "lys-log-store",
+        "lys-openapi",
+        "lys-pass",
+        "lys-runner",
+        "lys-secrets"
+    ],
+    port_config = "",
+    src = "Cargo.toml",
+)
+file_check(
+    kind = "length",
+    logical = "LICENSE",
+    name = "check-length-LICENSE",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "LICENSE",
+)
+file_check(
+    kind = "length",
+    logical = "clippy.toml",
+    name = "check-length-clippy.toml",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "clippy.toml",
+)
+
+file_check(
+    kind = "portable",
+    logical = "clippy.toml",
+    name = "check-portable-clippy.toml",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "clippy.toml",
+)
+file_check(
+    kind = "length",
+    logical = "deny.toml",
+    name = "check-length-deny.toml",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "deny.toml",
+)
+
+file_check(
+    kind = "portable",
+    logical = "deny.toml",
+    name = "check-portable-deny.toml",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "deny.toml",
+)
+file_check(
+    kind = "portable",
+    logical = "deploy/identity/compose.yaml",
+    name = "check-portable-deploy__identity__compose.yaml",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "deploy/identity/compose.yaml",
+)
+file_check(
+    kind = "length",
+    logical = "deploy/identity/config.example.toml",
+    name = "check-length-deploy__identity__config.example.toml",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "deploy/identity/config.example.toml",
+)
+
+file_check(
+    kind = "portable",
+    logical = "deploy/identity/config.example.toml",
+    name = "check-portable-deploy__identity__config.example.toml",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "deploy/identity/config.example.toml",
+)
+file_check(
+    kind = "length",
+    logical = "deploy/identity/postgres-init.sql",
+    name = "check-length-deploy__identity__postgres-init.sql",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "deploy/identity/postgres-init.sql",
+)
+file_check(
+    kind = "length",
+    logical = "plugin/scripts/validate.py",
+    name = "check-length-plugin__scripts__validate.py",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "plugin/scripts/validate.py",
+)
+
+file_check(
+    kind = "portable",
+    logical = "plugin/scripts/validate.py",
+    name = "check-portable-plugin__scripts__validate.py",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "plugin/scripts/validate.py",
+)
+file_check(
+    kind = "length",
+    logical = "plugins/lys/agents/lys-access-reader.toml",
+    name = "check-length-plugins__lys__agents__lys-access-reader.toml",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "plugins/lys/agents/lys-access-reader.toml",
+)
+
+file_check(
+    kind = "portable",
+    logical = "plugins/lys/agents/lys-access-reader.toml",
+    name = "check-portable-plugins__lys__agents__lys-access-reader.toml",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "plugins/lys/agents/lys-access-reader.toml",
+)
+file_check(
+    kind = "length",
+    logical = "plugins/lys/agents/lys-draft-preparer.toml",
+    name = "check-length-plugins__lys__agents__lys-draft-preparer.toml",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "plugins/lys/agents/lys-draft-preparer.toml",
+)
+
+file_check(
+    kind = "portable",
+    logical = "plugins/lys/agents/lys-draft-preparer.toml",
+    name = "check-portable-plugins__lys__agents__lys-draft-preparer.toml",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "plugins/lys/agents/lys-draft-preparer.toml",
+)
+file_check(
+    kind = "portable",
+    logical = "rules/ast-grep-tests/__snapshots__/no-app-names-rust-snapshot.yml",
+    name = "check-portable-rules__ast-grep-tests____snapshots____no-app-names-rust-snapshot.yml",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "rules/ast-grep-tests/__snapshots__/no-app-names-rust-snapshot.yml",
+)
+file_check(
+    kind = "portable",
+    logical = "rules/ast-grep-tests/__snapshots__/no-app-names-tsx-snapshot.yml",
+    name = "check-portable-rules__ast-grep-tests____snapshots____no-app-names-tsx-snapshot.yml",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "rules/ast-grep-tests/__snapshots__/no-app-names-tsx-snapshot.yml",
+)
+file_check(
+    kind = "portable",
+    logical = "rules/ast-grep-tests/__snapshots__/no-poison-recovery-snapshot.yml",
+    name = "check-portable-rules__ast-grep-tests____snapshots____no-poison-recovery-snapshot.yml",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "rules/ast-grep-tests/__snapshots__/no-poison-recovery-snapshot.yml",
+)
+file_check(
+    kind = "portable",
+    logical = "rules/ast-grep-tests/no-app-names-rust-test.yml",
+    name = "check-portable-rules__ast-grep-tests__no-app-names-rust-test.yml",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "rules/ast-grep-tests/no-app-names-rust-test.yml",
+)
+file_check(
+    kind = "portable",
+    logical = "rules/ast-grep-tests/no-app-names-tsx-test.yml",
+    name = "check-portable-rules__ast-grep-tests__no-app-names-tsx-test.yml",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "rules/ast-grep-tests/no-app-names-tsx-test.yml",
+)
+file_check(
+    kind = "portable",
+    logical = "rules/ast-grep-tests/no-clock-on-a-peer-test.yml",
+    name = "check-portable-rules__ast-grep-tests__no-clock-on-a-peer-test.yml",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "rules/ast-grep-tests/no-clock-on-a-peer-test.yml",
+)
+file_check(
+    kind = "portable",
+    logical = "rules/ast-grep-tests/no-poison-recovery-test.yml",
+    name = "check-portable-rules__ast-grep-tests__no-poison-recovery-test.yml",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "rules/ast-grep-tests/no-poison-recovery-test.yml",
+)
+file_check(
+    kind = "portable",
+    logical = "rules/ast-grep/mod-rs-declarations-only.yml",
+    name = "check-portable-rules__ast-grep__mod-rs-declarations-only.yml",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "rules/ast-grep/mod-rs-declarations-only.yml",
+)
+file_check(
+    kind = "portable",
+    logical = "rules/ast-grep/no-app-names.yml",
+    name = "check-portable-rules__ast-grep__no-app-names.yml",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "rules/ast-grep/no-app-names.yml",
+)
+file_check(
+    kind = "portable",
+    logical = "rules/ast-grep/no-clock-on-a-peer.yml",
+    name = "check-portable-rules__ast-grep__no-clock-on-a-peer.yml",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "rules/ast-grep/no-clock-on-a-peer.yml",
+)
+file_check(
+    kind = "portable",
+    logical = "rules/ast-grep/no-let-underscore-on-results.yml",
+    name = "check-portable-rules__ast-grep__no-let-underscore-on-results.yml",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "rules/ast-grep/no-let-underscore-on-results.yml",
+)
+file_check(
+    kind = "portable",
+    logical = "rules/ast-grep/no-lint-bypass-attributes.yml",
+    name = "check-portable-rules__ast-grep__no-lint-bypass-attributes.yml",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "rules/ast-grep/no-lint-bypass-attributes.yml",
+)
+file_check(
+    kind = "portable",
+    logical = "rules/ast-grep/no-other-runner-names.yml",
+    name = "check-portable-rules__ast-grep__no-other-runner-names.yml",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "rules/ast-grep/no-other-runner-names.yml",
+)
+file_check(
+    kind = "portable",
+    logical = "rules/ast-grep/no-poison-recovery.yml",
+    name = "check-portable-rules__ast-grep__no-poison-recovery.yml",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "rules/ast-grep/no-poison-recovery.yml",
+)
+file_check(
+    kind = "portable",
+    logical = "rules/ast-grep/no-unwrap-expect-panic-outside-tests.yml",
+    name = "check-portable-rules__ast-grep__no-unwrap-expect-panic-outside-tests.yml",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "rules/ast-grep/no-unwrap-expect-panic-outside-tests.yml",
+)
+file_check(
+    kind = "length",
+    logical = "rust-toolchain.toml",
+    name = "check-length-rust-toolchain.toml",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "rust-toolchain.toml",
+)
+
+file_check(
+    kind = "portable",
+    logical = "rust-toolchain.toml",
+    name = "check-portable-rust-toolchain.toml",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "rust-toolchain.toml",
+)
+file_check(
+    kind = "length",
+    logical = "scripts/check_file_length.py",
+    name = "check-length-scripts__check_file_length.py",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "scripts/check_file_length.py",
+)
+
+file_check(
+    kind = "portable",
+    logical = "scripts/check_file_length.py",
+    name = "check-portable-scripts__check_file_length.py",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "scripts/check_file_length.py",
+)
+file_check(
+    kind = "length",
+    logical = "scripts/design/check-coverage.py",
+    name = "check-length-scripts__design__check-coverage.py",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "scripts/design/check-coverage.py",
+)
+
+file_check(
+    kind = "portable",
+    logical = "scripts/design/check-coverage.py",
+    name = "check-portable-scripts__design__check-coverage.py",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "scripts/design/check-coverage.py",
+)
+file_check(
+    kind = "length",
+    logical = "scripts/design/gate.sh",
+    name = "check-length-scripts__design__gate.sh",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "scripts/design/gate.sh",
+)
+
+file_check(
+    kind = "portable",
+    logical = "scripts/design/gate.sh",
+    name = "check-portable-scripts__design__gate.sh",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "scripts/design/gate.sh",
+)
+file_check(
+    kind = "length",
+    logical = "scripts/design/render-brief.py",
+    name = "check-length-scripts__design__render-brief.py",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "scripts/design/render-brief.py",
+)
+
+file_check(
+    kind = "portable",
+    logical = "scripts/design/render-brief.py",
+    name = "check-portable-scripts__design__render-brief.py",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "scripts/design/render-brief.py",
+)
+file_check(
+    kind = "length",
+    logical = "scripts/design/render-cluster.py",
+    name = "check-length-scripts__design__render-cluster.py",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "scripts/design/render-cluster.py",
+)
+
+file_check(
+    kind = "portable",
+    logical = "scripts/design/render-cluster.py",
+    name = "check-portable-scripts__design__render-cluster.py",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "scripts/design/render-cluster.py",
+)
+file_check(
+    kind = "length",
+    logical = "scripts/design/validate.py",
+    name = "check-length-scripts__design__validate.py",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "scripts/design/validate.py",
+)
+
+file_check(
+    kind = "portable",
+    logical = "scripts/design/validate.py",
+    name = "check-portable-scripts__design__validate.py",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "scripts/design/validate.py",
+)
+file_check(
+    kind = "length",
+    logical = "scripts/design/workers/ds2_ledger/__init__.py",
+    name = "check-length-scripts__design__workers__ds2_ledger____init__.py",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "scripts/design/workers/ds2_ledger/__init__.py",
+)
+
+file_check(
+    kind = "portable",
+    logical = "scripts/design/workers/ds2_ledger/__init__.py",
+    name = "check-portable-scripts__design__workers__ds2_ledger____init__.py",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "scripts/design/workers/ds2_ledger/__init__.py",
+)
+file_check(
+    kind = "length",
+    logical = "scripts/design/workers/ds2_ledger/roots.py",
+    name = "check-length-scripts__design__workers__ds2_ledger__roots.py",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "scripts/design/workers/ds2_ledger/roots.py",
+)
+
+file_check(
+    kind = "portable",
+    logical = "scripts/design/workers/ds2_ledger/roots.py",
+    name = "check-portable-scripts__design__workers__ds2_ledger__roots.py",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "scripts/design/workers/ds2_ledger/roots.py",
+)
+file_check(
+    kind = "length",
+    logical = "scripts/file-length.sh",
+    name = "check-length-scripts__file-length.sh",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "scripts/file-length.sh",
+)
+
+file_check(
+    kind = "portable",
+    logical = "scripts/file-length.sh",
+    name = "check-portable-scripts__file-length.sh",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "scripts/file-length.sh",
+)
+file_check(
+    kind = "length",
+    logical = "scripts/identity-gates/rauthy_ready.py",
+    name = "check-length-scripts__identity-gates__rauthy_ready.py",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "scripts/identity-gates/rauthy_ready.py",
+)
+
+file_check(
+    kind = "portable",
+    logical = "scripts/identity-gates/rauthy_ready.py",
+    name = "check-portable-scripts__identity-gates__rauthy_ready.py",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "scripts/identity-gates/rauthy_ready.py",
+)
+file_check(
+    kind = "length",
+    logical = "scripts/identity-gates/release.sh",
+    name = "check-length-scripts__identity-gates__release.sh",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "scripts/identity-gates/release.sh",
+)
+
+file_check(
+    kind = "portable",
+    logical = "scripts/identity-gates/release.sh",
+    name = "check-portable-scripts__identity-gates__release.sh",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "scripts/identity-gates/release.sh",
+)
+file_check(
+    kind = "length",
+    logical = "scripts/identity-gates/release_isolation.py",
+    name = "check-length-scripts__identity-gates__release_isolation.py",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "scripts/identity-gates/release_isolation.py",
+)
+
+file_check(
+    kind = "portable",
+    logical = "scripts/identity-gates/release_isolation.py",
+    name = "check-portable-scripts__identity-gates__release_isolation.py",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "scripts/identity-gates/release_isolation.py",
+)
+file_check(
+    kind = "length",
+    logical = "scripts/identity-gates/spicedb_fixture.py",
+    name = "check-length-scripts__identity-gates__spicedb_fixture.py",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "scripts/identity-gates/spicedb_fixture.py",
+)
+
+file_check(
+    kind = "portable",
+    logical = "scripts/identity-gates/spicedb_fixture.py",
+    name = "check-portable-scripts__identity-gates__spicedb_fixture.py",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "scripts/identity-gates/spicedb_fixture.py",
+)
+file_check(
+    kind = "length",
+    logical = "scripts/identity-gates/spicedb_fixture_tests.py",
+    name = "check-length-scripts__identity-gates__spicedb_fixture_tests.py",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "scripts/identity-gates/spicedb_fixture_tests.py",
+)
+
+file_check(
+    kind = "portable",
+    logical = "scripts/identity-gates/spicedb_fixture_tests.py",
+    name = "check-portable-scripts__identity-gates__spicedb_fixture_tests.py",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "scripts/identity-gates/spicedb_fixture_tests.py",
+)
+file_check(
+    kind = "length",
+    logical = "scripts/identity-gates/surface_fixture.py",
+    name = "check-length-scripts__identity-gates__surface_fixture.py",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "scripts/identity-gates/surface_fixture.py",
+)
+
+file_check(
+    kind = "portable",
+    logical = "scripts/identity-gates/surface_fixture.py",
+    name = "check-portable-scripts__identity-gates__surface_fixture.py",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "scripts/identity-gates/surface_fixture.py",
+)
+file_check(
+    kind = "length",
+    logical = "scripts/identity-gates/surface_fixture_tests.py",
+    name = "check-length-scripts__identity-gates__surface_fixture_tests.py",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "scripts/identity-gates/surface_fixture_tests.py",
+)
+
+file_check(
+    kind = "portable",
+    logical = "scripts/identity-gates/surface_fixture_tests.py",
+    name = "check-portable-scripts__identity-gates__surface_fixture_tests.py",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "scripts/identity-gates/surface_fixture_tests.py",
+)
+file_check(
+    kind = "length",
+    logical = "scripts/identity-gates/upgrade_fixture.py",
+    name = "check-length-scripts__identity-gates__upgrade_fixture.py",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "scripts/identity-gates/upgrade_fixture.py",
+)
+
+file_check(
+    kind = "portable",
+    logical = "scripts/identity-gates/upgrade_fixture.py",
+    name = "check-portable-scripts__identity-gates__upgrade_fixture.py",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "scripts/identity-gates/upgrade_fixture.py",
+)
+file_check(
+    kind = "length",
+    logical = "scripts/identity-gates/upgrade_layout.py",
+    name = "check-length-scripts__identity-gates__upgrade_layout.py",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "scripts/identity-gates/upgrade_layout.py",
+)
+
+file_check(
+    kind = "portable",
+    logical = "scripts/identity-gates/upgrade_layout.py",
+    name = "check-portable-scripts__identity-gates__upgrade_layout.py",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "scripts/identity-gates/upgrade_layout.py",
+)
+file_check(
+    kind = "length",
+    logical = "scripts/identity-gates/upgrade_legacy.py",
+    name = "check-length-scripts__identity-gates__upgrade_legacy.py",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "scripts/identity-gates/upgrade_legacy.py",
+)
+
+file_check(
+    kind = "portable",
+    logical = "scripts/identity-gates/upgrade_legacy.py",
+    name = "check-portable-scripts__identity-gates__upgrade_legacy.py",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "scripts/identity-gates/upgrade_legacy.py",
+)
+file_check(
+    kind = "length",
+    logical = "scripts/identity-gates/upgrade_live.py",
+    name = "check-length-scripts__identity-gates__upgrade_live.py",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "scripts/identity-gates/upgrade_live.py",
+)
+
+file_check(
+    kind = "portable",
+    logical = "scripts/identity-gates/upgrade_live.py",
+    name = "check-portable-scripts__identity-gates__upgrade_live.py",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "scripts/identity-gates/upgrade_live.py",
+)
+file_check(
+    kind = "length",
+    logical = "scripts/identity-gates/upgrade_log.py",
+    name = "check-length-scripts__identity-gates__upgrade_log.py",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "scripts/identity-gates/upgrade_log.py",
+)
+
+file_check(
+    kind = "portable",
+    logical = "scripts/identity-gates/upgrade_log.py",
+    name = "check-portable-scripts__identity-gates__upgrade_log.py",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "scripts/identity-gates/upgrade_log.py",
+)
+file_check(
+    kind = "length",
+    logical = "scripts/identity-gates/upgrade_login.py",
+    name = "check-length-scripts__identity-gates__upgrade_login.py",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "scripts/identity-gates/upgrade_login.py",
+)
+
+file_check(
+    kind = "portable",
+    logical = "scripts/identity-gates/upgrade_login.py",
+    name = "check-portable-scripts__identity-gates__upgrade_login.py",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "scripts/identity-gates/upgrade_login.py",
+)
+file_check(
+    kind = "length",
+    logical = "scripts/identity-gates/upgrade_negative.py",
+    name = "check-length-scripts__identity-gates__upgrade_negative.py",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "scripts/identity-gates/upgrade_negative.py",
+)
+
+file_check(
+    kind = "portable",
+    logical = "scripts/identity-gates/upgrade_negative.py",
+    name = "check-portable-scripts__identity-gates__upgrade_negative.py",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "scripts/identity-gates/upgrade_negative.py",
+)
+file_check(
+    kind = "length",
+    logical = "scripts/identity-gates/upgrade_preflight.py",
+    name = "check-length-scripts__identity-gates__upgrade_preflight.py",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "scripts/identity-gates/upgrade_preflight.py",
+)
+
+file_check(
+    kind = "portable",
+    logical = "scripts/identity-gates/upgrade_preflight.py",
+    name = "check-portable-scripts__identity-gates__upgrade_preflight.py",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "scripts/identity-gates/upgrade_preflight.py",
+)
+file_check(
+    kind = "length",
+    logical = "scripts/identity-gates/upgrade_proof_baselines.sh",
+    name = "check-length-scripts__identity-gates__upgrade_proof_baselines.sh",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "scripts/identity-gates/upgrade_proof_baselines.sh",
+)
+
+file_check(
+    kind = "portable",
+    logical = "scripts/identity-gates/upgrade_proof_baselines.sh",
+    name = "check-portable-scripts__identity-gates__upgrade_proof_baselines.sh",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "scripts/identity-gates/upgrade_proof_baselines.sh",
+)
+file_check(
+    kind = "length",
+    logical = "scripts/identity-gates/upgrade_proof_build.sh",
+    name = "check-length-scripts__identity-gates__upgrade_proof_build.sh",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "scripts/identity-gates/upgrade_proof_build.sh",
+)
+
+file_check(
+    kind = "portable",
+    logical = "scripts/identity-gates/upgrade_proof_build.sh",
+    name = "check-portable-scripts__identity-gates__upgrade_proof_build.sh",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "scripts/identity-gates/upgrade_proof_build.sh",
+)
+file_check(
+    kind = "length",
+    logical = "scripts/identity-gates/upgrade_proof_leg.sh",
+    name = "check-length-scripts__identity-gates__upgrade_proof_leg.sh",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "scripts/identity-gates/upgrade_proof_leg.sh",
+)
+
+file_check(
+    kind = "portable",
+    logical = "scripts/identity-gates/upgrade_proof_leg.sh",
+    name = "check-portable-scripts__identity-gates__upgrade_proof_leg.sh",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "scripts/identity-gates/upgrade_proof_leg.sh",
+)
+file_check(
+    kind = "length",
+    logical = "scripts/identity-gates/upgrade_proof_run.sh",
+    name = "check-length-scripts__identity-gates__upgrade_proof_run.sh",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "scripts/identity-gates/upgrade_proof_run.sh",
+)
+
+file_check(
+    kind = "portable",
+    logical = "scripts/identity-gates/upgrade_proof_run.sh",
+    name = "check-portable-scripts__identity-gates__upgrade_proof_run.sh",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "scripts/identity-gates/upgrade_proof_run.sh",
+)
+file_check(
+    kind = "length",
+    logical = "scripts/identity-gates/upgrade_provenance.py",
+    name = "check-length-scripts__identity-gates__upgrade_provenance.py",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "scripts/identity-gates/upgrade_provenance.py",
+)
+
+file_check(
+    kind = "portable",
+    logical = "scripts/identity-gates/upgrade_provenance.py",
+    name = "check-portable-scripts__identity-gates__upgrade_provenance.py",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "scripts/identity-gates/upgrade_provenance.py",
+)
+file_check(
+    kind = "length",
+    logical = "scripts/identity-gates/upgrade_release.py",
+    name = "check-length-scripts__identity-gates__upgrade_release.py",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "scripts/identity-gates/upgrade_release.py",
+)
+
+file_check(
+    kind = "portable",
+    logical = "scripts/identity-gates/upgrade_release.py",
+    name = "check-portable-scripts__identity-gates__upgrade_release.py",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "scripts/identity-gates/upgrade_release.py",
+)
+file_check(
+    kind = "length",
+    logical = "scripts/identity-gates/upgrade_restart.py",
+    name = "check-length-scripts__identity-gates__upgrade_restart.py",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "scripts/identity-gates/upgrade_restart.py",
+)
+
+file_check(
+    kind = "portable",
+    logical = "scripts/identity-gates/upgrade_restart.py",
+    name = "check-portable-scripts__identity-gates__upgrade_restart.py",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "scripts/identity-gates/upgrade_restart.py",
+)
+file_check(
+    kind = "length",
+    logical = "scripts/identity-gates/upgrade_teardown.py",
+    name = "check-length-scripts__identity-gates__upgrade_teardown.py",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "scripts/identity-gates/upgrade_teardown.py",
+)
+
+file_check(
+    kind = "portable",
+    logical = "scripts/identity-gates/upgrade_teardown.py",
+    name = "check-portable-scripts__identity-gates__upgrade_teardown.py",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "scripts/identity-gates/upgrade_teardown.py",
+)
+file_check(
+    kind = "length",
+    logical = "scripts/identity-gates/upgrade_window.py",
+    name = "check-length-scripts__identity-gates__upgrade_window.py",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "scripts/identity-gates/upgrade_window.py",
+)
+
+file_check(
+    kind = "portable",
+    logical = "scripts/identity-gates/upgrade_window.py",
+    name = "check-portable-scripts__identity-gates__upgrade_window.py",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "scripts/identity-gates/upgrade_window.py",
+)
+file_check(
+    kind = "length",
+    logical = "scripts/qualify/judge.py",
+    name = "check-length-scripts__qualify__judge.py",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "scripts/qualify/judge.py",
+)
+
+file_check(
+    kind = "portable",
+    logical = "scripts/qualify/judge.py",
+    name = "check-portable-scripts__qualify__judge.py",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "scripts/qualify/judge.py",
+)
+file_check(
+    kind = "length",
+    logical = "scripts/qualify/qual.sh",
+    name = "check-length-scripts__qualify__qual.sh",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "scripts/qualify/qual.sh",
+)
+
+file_check(
+    kind = "portable",
+    logical = "scripts/qualify/qual.sh",
+    name = "check-portable-scripts__qualify__qual.sh",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "scripts/qualify/qual.sh",
+)
+file_check(
+    kind = "length",
+    logical = "scripts/verify_inclusion.py",
+    name = "check-length-scripts__verify_inclusion.py",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "scripts/verify_inclusion.py",
+)
+
+file_check(
+    kind = "portable",
+    logical = "scripts/verify_inclusion.py",
+    name = "check-portable-scripts__verify_inclusion.py",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "scripts/verify_inclusion.py",
+)
+file_check(
+    kind = "portable",
+    logical = "sgconfig.yml",
+    name = "check-portable-sgconfig.yml",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "sgconfig.yml",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/.gitignore",
+    name = "check-length-surface__identity__.gitignore",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/.gitignore",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/dev/seed-grants.sh",
+    name = "check-length-surface__identity__dev__seed-grants.sh",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/dev/seed-grants.sh",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/dev/seed-grants.sh",
+    name = "check-portable-surface__identity__dev__seed-grants.sh",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/dev/seed-grants.sh",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/dev/start.sh",
+    name = "check-length-surface__identity__dev__start.sh",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/dev/start.sh",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/dev/start.sh",
+    name = "check-portable-surface__identity__dev__start.sh",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/dev/start.sh",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/dev/stop.sh",
+    name = "check-length-surface__identity__dev__stop.sh",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/dev/stop.sh",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/dev/stop.sh",
+    name = "check-portable-surface__identity__dev__stop.sh",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/dev/stop.sh",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/index.html",
+    name = "check-length-surface__identity__index.html",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/index.html",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/index.html",
+    name = "check-portable-surface__identity__index.html",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/index.html",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/issuer/builder-arm64.Dockerfile",
+    name = "check-length-surface__identity__issuer__builder-arm64.Dockerfile",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/issuer/builder-arm64.Dockerfile",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/issuer/rauthy-0.36.2-lys.patch",
+    name = "check-length-surface__identity__issuer__rauthy-0.36.2-lys.patch",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/issuer/rauthy-0.36.2-lys.patch",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/issuer/verify-assets.mjs",
+    name = "check-length-surface__identity__issuer__verify-assets.mjs",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/issuer/verify-assets.mjs",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/issuer/verify-assets.mjs",
+    name = "check-portable-surface__identity__issuer__verify-assets.mjs",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/issuer/verify-assets.mjs",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/public/favicon.ico",
+    name = "check-length-surface__identity__public__favicon.ico",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/public/favicon.ico",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/scripts/package.mjs",
+    name = "check-length-surface__identity__scripts__package.mjs",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/scripts/package.mjs",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/scripts/package.mjs",
+    name = "check-portable-surface__identity__scripts__package.mjs",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/scripts/package.mjs",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/App.tsx",
+    name = "check-length-surface__identity__src__App.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/App.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/App.tsx",
+    name = "check-portable-surface__identity__src__App.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/App.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/api.ts",
+    name = "check-length-surface__identity__src__api.ts",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/api.ts",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/api.ts",
+    name = "check-portable-surface__identity__src__api.ts",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/api.ts",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/access/Access.tsx",
+    name = "check-length-surface__identity__src__features__access__Access.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/access/Access.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/access/Access.tsx",
+    name = "check-portable-surface__identity__src__features__access__Access.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/access/Access.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/access/AccessLayout.tsx",
+    name = "check-length-surface__identity__src__features__access__AccessLayout.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/access/AccessLayout.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/access/AccessLayout.tsx",
+    name = "check-portable-surface__identity__src__features__access__AccessLayout.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/access/AccessLayout.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/access/AccessTabs.tsx",
+    name = "check-length-surface__identity__src__features__access__AccessTabs.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/access/AccessTabs.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/access/AccessTabs.tsx",
+    name = "check-portable-surface__identity__src__features__access__AccessTabs.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/access/AccessTabs.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/access/Graph.tsx",
+    name = "check-length-surface__identity__src__features__access__Graph.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/access/Graph.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/access/Graph.tsx",
+    name = "check-portable-surface__identity__src__features__access__Graph.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/access/Graph.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/access/Model.tsx",
+    name = "check-length-surface__identity__src__features__access__Model.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/access/Model.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/access/Model.tsx",
+    name = "check-portable-surface__identity__src__features__access__Model.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/access/Model.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/access/Resources.tsx",
+    name = "check-length-surface__identity__src__features__access__Resources.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/access/Resources.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/access/Resources.tsx",
+    name = "check-portable-surface__identity__src__features__access__Resources.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/access/Resources.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/access/graph-labels.ts",
+    name = "check-length-surface__identity__src__features__access__graph-labels.ts",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/access/graph-labels.ts",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/access/graph-labels.ts",
+    name = "check-portable-surface__identity__src__features__access__graph-labels.ts",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/access/graph-labels.ts",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/access/graph.css",
+    name = "check-length-surface__identity__src__features__access__graph.css",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/access/graph.css",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/access/installed.ts",
+    name = "check-length-surface__identity__src__features__access__installed.ts",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/access/installed.ts",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/access/installed.ts",
+    name = "check-portable-surface__identity__src__features__access__installed.ts",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/access/installed.ts",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/apps/Apps.tsx",
+    name = "check-length-surface__identity__src__features__apps__Apps.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/apps/Apps.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/apps/Apps.tsx",
+    name = "check-portable-surface__identity__src__features__apps__Apps.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/apps/Apps.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/apps/ClientCredentials.tsx",
+    name = "check-length-surface__identity__src__features__apps__ClientCredentials.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/apps/ClientCredentials.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/apps/ClientCredentials.tsx",
+    name = "check-portable-surface__identity__src__features__apps__ClientCredentials.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/apps/ClientCredentials.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/apps/ConnectApp.tsx",
+    name = "check-length-surface__identity__src__features__apps__ConnectApp.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/apps/ConnectApp.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/apps/ConnectApp.tsx",
+    name = "check-portable-surface__identity__src__features__apps__ConnectApp.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/apps/ConnectApp.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/apps/SchemaBench.tsx",
+    name = "check-length-surface__identity__src__features__apps__SchemaBench.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/apps/SchemaBench.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/apps/SchemaBench.tsx",
+    name = "check-portable-surface__identity__src__features__apps__SchemaBench.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/apps/SchemaBench.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/apps/SchemaBuilder.tsx",
+    name = "check-length-surface__identity__src__features__apps__SchemaBuilder.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/apps/SchemaBuilder.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/apps/SchemaBuilder.tsx",
+    name = "check-portable-surface__identity__src__features__apps__SchemaBuilder.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/apps/SchemaBuilder.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/apps/SchemaMatrix.tsx",
+    name = "check-length-surface__identity__src__features__apps__SchemaMatrix.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/apps/SchemaMatrix.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/apps/SchemaMatrix.tsx",
+    name = "check-portable-surface__identity__src__features__apps__SchemaMatrix.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/apps/SchemaMatrix.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/apps/WhoCanUse.tsx",
+    name = "check-length-surface__identity__src__features__apps__WhoCanUse.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/apps/WhoCanUse.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/apps/WhoCanUse.tsx",
+    name = "check-portable-surface__identity__src__features__apps__WhoCanUse.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/apps/WhoCanUse.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/apps/apps.css",
+    name = "check-length-surface__identity__src__features__apps__apps.css",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/apps/apps.css",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/apps/kind-builder.tsx",
+    name = "check-length-surface__identity__src__features__apps__kind-builder.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/apps/kind-builder.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/apps/kind-builder.tsx",
+    name = "check-portable-surface__identity__src__features__apps__kind-builder.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/apps/kind-builder.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/apps/roleChanges.ts",
+    name = "check-length-surface__identity__src__features__apps__roleChanges.ts",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/apps/roleChanges.ts",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/apps/roleChanges.ts",
+    name = "check-portable-surface__identity__src__features__apps__roleChanges.ts",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/apps/roleChanges.ts",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/apps/schema-builder.css",
+    name = "check-length-surface__identity__src__features__apps__schema-builder.css",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/apps/schema-builder.css",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/apps/schema-matrix.css",
+    name = "check-length-surface__identity__src__features__apps__schema-matrix.css",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/apps/schema-matrix.css",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/budgets/WidgetUsageReadings.tsx",
+    name = "check-length-surface__identity__src__features__budgets__WidgetUsageReadings.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/budgets/WidgetUsageReadings.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/budgets/WidgetUsageReadings.tsx",
+    name = "check-portable-surface__identity__src__features__budgets__WidgetUsageReadings.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/budgets/WidgetUsageReadings.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/budgets/tokenReadings.ts",
+    name = "check-length-surface__identity__src__features__budgets__tokenReadings.ts",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/budgets/tokenReadings.ts",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/budgets/tokenReadings.ts",
+    name = "check-portable-surface__identity__src__features__budgets__tokenReadings.ts",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/budgets/tokenReadings.ts",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/budgets/widgetReadings.css",
+    name = "check-length-surface__identity__src__features__budgets__widgetReadings.css",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/budgets/widgetReadings.css",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/budgets/widgetReadings.tsx",
+    name = "check-length-surface__identity__src__features__budgets__widgetReadings.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/budgets/widgetReadings.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/budgets/widgetReadings.tsx",
+    name = "check-portable-surface__identity__src__features__budgets__widgetReadings.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/budgets/widgetReadings.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/connections/Connections.tsx",
+    name = "check-length-surface__identity__src__features__connections__Connections.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/connections/Connections.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/connections/Connections.tsx",
+    name = "check-portable-surface__identity__src__features__connections__Connections.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/connections/Connections.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/connections/SignInProviders.tsx",
+    name = "check-length-surface__identity__src__features__connections__SignInProviders.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/connections/SignInProviders.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/connections/SignInProviders.tsx",
+    name = "check-portable-surface__identity__src__features__connections__SignInProviders.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/connections/SignInProviders.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/connections/provider-guides.ts",
+    name = "check-length-surface__identity__src__features__connections__provider-guides.ts",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/connections/provider-guides.ts",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/connections/provider-guides.ts",
+    name = "check-portable-surface__identity__src__features__connections__provider-guides.ts",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/connections/provider-guides.ts",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/connections/providers.css",
+    name = "check-length-surface__identity__src__features__connections__providers.css",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/connections/providers.css",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/dashboard/ActedByAgents.tsx",
+    name = "check-length-surface__identity__src__features__dashboard__ActedByAgents.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/dashboard/ActedByAgents.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/dashboard/ActedByAgents.tsx",
+    name = "check-portable-surface__identity__src__features__dashboard__ActedByAgents.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/dashboard/ActedByAgents.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/dashboard/AgentTree.tsx",
+    name = "check-length-surface__identity__src__features__dashboard__AgentTree.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/dashboard/AgentTree.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/dashboard/AgentTree.tsx",
+    name = "check-portable-surface__identity__src__features__dashboard__AgentTree.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/dashboard/AgentTree.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/dashboard/Alarms.tsx",
+    name = "check-length-surface__identity__src__features__dashboard__Alarms.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/dashboard/Alarms.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/dashboard/Alarms.tsx",
+    name = "check-portable-surface__identity__src__features__dashboard__Alarms.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/dashboard/Alarms.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/dashboard/Dashboard.tsx",
+    name = "check-length-surface__identity__src__features__dashboard__Dashboard.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/dashboard/Dashboard.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/dashboard/Dashboard.tsx",
+    name = "check-portable-surface__identity__src__features__dashboard__Dashboard.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/dashboard/Dashboard.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/dashboard/DashboardOptions.tsx",
+    name = "check-length-surface__identity__src__features__dashboard__DashboardOptions.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/dashboard/DashboardOptions.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/dashboard/DashboardOptions.tsx",
+    name = "check-portable-surface__identity__src__features__dashboard__DashboardOptions.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/dashboard/DashboardOptions.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/dashboard/Exceptions.tsx",
+    name = "check-length-surface__identity__src__features__dashboard__Exceptions.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/dashboard/Exceptions.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/dashboard/Exceptions.tsx",
+    name = "check-portable-surface__identity__src__features__dashboard__Exceptions.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/dashboard/Exceptions.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/dashboard/GettingStarted.tsx",
+    name = "check-length-surface__identity__src__features__dashboard__GettingStarted.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/dashboard/GettingStarted.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/dashboard/GettingStarted.tsx",
+    name = "check-portable-surface__identity__src__features__dashboard__GettingStarted.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/dashboard/GettingStarted.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/dashboard/SecurityEvents.tsx",
+    name = "check-length-surface__identity__src__features__dashboard__SecurityEvents.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/dashboard/SecurityEvents.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/dashboard/SecurityEvents.tsx",
+    name = "check-portable-surface__identity__src__features__dashboard__SecurityEvents.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/dashboard/SecurityEvents.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/dashboard/Spend.tsx",
+    name = "check-length-surface__identity__src__features__dashboard__Spend.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/dashboard/Spend.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/dashboard/Spend.tsx",
+    name = "check-portable-surface__identity__src__features__dashboard__Spend.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/dashboard/Spend.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/dashboard/StopEverything.tsx",
+    name = "check-length-surface__identity__src__features__dashboard__StopEverything.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/dashboard/StopEverything.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/dashboard/StopEverything.tsx",
+    name = "check-portable-surface__identity__src__features__dashboard__StopEverything.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/dashboard/StopEverything.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/dashboard/Unread.tsx",
+    name = "check-length-surface__identity__src__features__dashboard__Unread.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/dashboard/Unread.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/dashboard/Unread.tsx",
+    name = "check-portable-surface__identity__src__features__dashboard__Unread.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/dashboard/Unread.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/dashboard/WaitingOnYou.tsx",
+    name = "check-length-surface__identity__src__features__dashboard__WaitingOnYou.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/dashboard/WaitingOnYou.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/dashboard/WaitingOnYou.tsx",
+    name = "check-portable-surface__identity__src__features__dashboard__WaitingOnYou.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/dashboard/WaitingOnYou.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/dashboard/Widgets.tsx",
+    name = "check-length-surface__identity__src__features__dashboard__Widgets.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/dashboard/Widgets.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/dashboard/Widgets.tsx",
+    name = "check-portable-surface__identity__src__features__dashboard__Widgets.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/dashboard/Widgets.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/dashboard/board.ts",
+    name = "check-length-surface__identity__src__features__dashboard__board.ts",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/dashboard/board.ts",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/dashboard/board.ts",
+    name = "check-portable-surface__identity__src__features__dashboard__board.ts",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/dashboard/board.ts",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/dashboard/contract.ts",
+    name = "check-length-surface__identity__src__features__dashboard__contract.ts",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/dashboard/contract.ts",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/dashboard/contract.ts",
+    name = "check-portable-surface__identity__src__features__dashboard__contract.ts",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/dashboard/contract.ts",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/dashboard/cord.ts",
+    name = "check-length-surface__identity__src__features__dashboard__cord.ts",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/dashboard/cord.ts",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/dashboard/cord.ts",
+    name = "check-portable-surface__identity__src__features__dashboard__cord.ts",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/dashboard/cord.ts",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/dashboard/dashboard-cherie.fixture.ts",
+    name = "check-length-surface__identity__src__features__dashboard__dashboard-cherie.fixture.ts",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/dashboard/dashboard-cherie.fixture.ts",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/dashboard/dashboard-cherie.fixture.ts",
+    name = "check-portable-surface__identity__src__features__dashboard__dashboard-cherie.fixture.ts",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/dashboard/dashboard-cherie.fixture.ts",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/dashboard/dashboard-options.css",
+    name = "check-length-surface__identity__src__features__dashboard__dashboard-options.css",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/dashboard/dashboard-options.css",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/dashboard/dashboard.css",
+    name = "check-length-surface__identity__src__features__dashboard__dashboard.css",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/dashboard/dashboard.css",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/dashboard/waiting.ts",
+    name = "check-length-surface__identity__src__features__dashboard__waiting.ts",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/dashboard/waiting.ts",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/dashboard/waiting.ts",
+    name = "check-portable-surface__identity__src__features__dashboard__waiting.ts",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/dashboard/waiting.ts",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/dashboard/words.ts",
+    name = "check-length-surface__identity__src__features__dashboard__words.ts",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/dashboard/words.ts",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/dashboard/words.ts",
+    name = "check-portable-surface__identity__src__features__dashboard__words.ts",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/dashboard/words.ts",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/drafts/DraftDecide.tsx",
+    name = "check-length-surface__identity__src__features__drafts__DraftDecide.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/drafts/DraftDecide.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/drafts/DraftDecide.tsx",
+    name = "check-portable-surface__identity__src__features__drafts__DraftDecide.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/drafts/DraftDecide.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/drafts/Drafts.tsx",
+    name = "check-length-surface__identity__src__features__drafts__Drafts.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/drafts/Drafts.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/drafts/Drafts.tsx",
+    name = "check-portable-surface__identity__src__features__drafts__Drafts.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/drafts/Drafts.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/drafts/ProductDrafts.tsx",
+    name = "check-length-surface__identity__src__features__drafts__ProductDrafts.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/drafts/ProductDrafts.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/drafts/ProductDrafts.tsx",
+    name = "check-portable-surface__identity__src__features__drafts__ProductDrafts.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/drafts/ProductDrafts.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/drafts/contract.ts",
+    name = "check-length-surface__identity__src__features__drafts__contract.ts",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/drafts/contract.ts",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/drafts/contract.ts",
+    name = "check-portable-surface__identity__src__features__drafts__contract.ts",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/drafts/contract.ts",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/drafts/drafts.css",
+    name = "check-length-surface__identity__src__features__drafts__drafts.css",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/drafts/drafts.css",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/file/AgentCertificates.tsx",
+    name = "check-length-surface__identity__src__features__file__AgentCertificates.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/file/AgentCertificates.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/file/AgentCertificates.tsx",
+    name = "check-portable-surface__identity__src__features__file__AgentCertificates.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/file/AgentCertificates.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/file/AgentConnect.tsx",
+    name = "check-length-surface__identity__src__features__file__AgentConnect.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/file/AgentConnect.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/file/AgentConnect.tsx",
+    name = "check-portable-surface__identity__src__features__file__AgentConnect.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/file/AgentConnect.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/file/AgentCredentials.tsx",
+    name = "check-length-surface__identity__src__features__file__AgentCredentials.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/file/AgentCredentials.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/file/AgentCredentials.tsx",
+    name = "check-portable-surface__identity__src__features__file__AgentCredentials.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/file/AgentCredentials.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/file/AgentMemory.tsx",
+    name = "check-length-surface__identity__src__features__file__AgentMemory.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/file/AgentMemory.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/file/AgentMemory.tsx",
+    name = "check-portable-surface__identity__src__features__file__AgentMemory.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/file/AgentMemory.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/file/AgentOverview.tsx",
+    name = "check-length-surface__identity__src__features__file__AgentOverview.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/file/AgentOverview.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/file/AgentOverview.tsx",
+    name = "check-portable-surface__identity__src__features__file__AgentOverview.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/file/AgentOverview.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/file/AgentRefusals.tsx",
+    name = "check-length-surface__identity__src__features__file__AgentRefusals.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/file/AgentRefusals.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/file/AgentRefusals.tsx",
+    name = "check-portable-surface__identity__src__features__file__AgentRefusals.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/file/AgentRefusals.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/file/AppNext.tsx",
+    name = "check-length-surface__identity__src__features__file__AppNext.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/file/AppNext.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/file/AppNext.tsx",
+    name = "check-portable-surface__identity__src__features__file__AppNext.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/file/AppNext.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/file/CertificateChanges.tsx",
+    name = "check-length-surface__identity__src__features__file__CertificateChanges.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/file/CertificateChanges.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/file/CertificateChanges.tsx",
+    name = "check-portable-surface__identity__src__features__file__CertificateChanges.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/file/CertificateChanges.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/file/DropHandle.tsx",
+    name = "check-length-surface__identity__src__features__file__DropHandle.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/file/DropHandle.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/file/DropHandle.tsx",
+    name = "check-portable-surface__identity__src__features__file__DropHandle.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/file/DropHandle.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/file/EmergencyStop.tsx",
+    name = "check-length-surface__identity__src__features__file__EmergencyStop.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/file/EmergencyStop.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/file/EmergencyStop.tsx",
+    name = "check-portable-surface__identity__src__features__file__EmergencyStop.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/file/EmergencyStop.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/file/GiveAccess.tsx",
+    name = "check-length-surface__identity__src__features__file__GiveAccess.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/file/GiveAccess.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/file/GiveAccess.tsx",
+    name = "check-portable-surface__identity__src__features__file__GiveAccess.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/file/GiveAccess.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/file/HeadMenu.tsx",
+    name = "check-length-surface__identity__src__features__file__HeadMenu.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/file/HeadMenu.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/file/HeadMenu.tsx",
+    name = "check-portable-surface__identity__src__features__file__HeadMenu.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/file/HeadMenu.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/file/IdentityFile.tsx",
+    name = "check-length-surface__identity__src__features__file__IdentityFile.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/file/IdentityFile.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/file/IdentityFile.tsx",
+    name = "check-portable-surface__identity__src__features__file__IdentityFile.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/file/IdentityFile.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/file/PersonSecurity.tsx",
+    name = "check-length-surface__identity__src__features__file__PersonSecurity.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/file/PersonSecurity.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/file/PersonSecurity.tsx",
+    name = "check-portable-surface__identity__src__features__file__PersonSecurity.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/file/PersonSecurity.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/file/PersonalBudgets.tsx",
+    name = "check-length-surface__identity__src__features__file__PersonalBudgets.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/file/PersonalBudgets.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/file/PersonalBudgets.tsx",
+    name = "check-portable-surface__identity__src__features__file__PersonalBudgets.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/file/PersonalBudgets.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/file/StopHistory.tsx",
+    name = "check-length-surface__identity__src__features__file__StopHistory.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/file/StopHistory.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/file/StopHistory.tsx",
+    name = "check-portable-surface__identity__src__features__file__StopHistory.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/file/StopHistory.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/file/TeamsOf.tsx",
+    name = "check-length-surface__identity__src__features__file__TeamsOf.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/file/TeamsOf.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/file/TeamsOf.tsx",
+    name = "check-portable-surface__identity__src__features__file__TeamsOf.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/file/TeamsOf.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/file/agent-overview.css",
+    name = "check-length-surface__identity__src__features__file__agent-overview.css",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/file/agent-overview.css",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/file/file.css",
+    name = "check-length-surface__identity__src__features__file__file.css",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/file/file.css",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/file/giveLink.ts",
+    name = "check-length-surface__identity__src__features__file__giveLink.ts",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/file/giveLink.ts",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/file/giveLink.ts",
+    name = "check-portable-surface__identity__src__features__file__giveLink.ts",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/file/giveLink.ts",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/file/policyContract.ts",
+    name = "check-length-surface__identity__src__features__file__policyContract.ts",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/file/policyContract.ts",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/file/policyContract.ts",
+    name = "check-portable-surface__identity__src__features__file__policyContract.ts",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/file/policyContract.ts",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/file/receipt-words.ts",
+    name = "check-length-surface__identity__src__features__file__receipt-words.ts",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/file/receipt-words.ts",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/file/receipt-words.ts",
+    name = "check-portable-surface__identity__src__features__file__receipt-words.ts",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/file/receipt-words.ts",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/file/sections.tsx",
+    name = "check-length-surface__identity__src__features__file__sections.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/file/sections.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/file/sections.tsx",
+    name = "check-portable-surface__identity__src__features__file__sections.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/file/sections.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/file/tabs.ts",
+    name = "check-length-surface__identity__src__features__file__tabs.ts",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/file/tabs.ts",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/file/tabs.ts",
+    name = "check-portable-surface__identity__src__features__file__tabs.ts",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/file/tabs.ts",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/file/time.ts",
+    name = "check-length-surface__identity__src__features__file__time.ts",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/file/time.ts",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/file/time.ts",
+    name = "check-portable-surface__identity__src__features__file__time.ts",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/file/time.ts",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/found/Found.tsx",
+    name = "check-length-surface__identity__src__features__found__Found.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/found/Found.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/found/Found.tsx",
+    name = "check-portable-surface__identity__src__features__found__Found.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/found/Found.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/found/Prove.tsx",
+    name = "check-length-surface__identity__src__features__found__Prove.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/found/Prove.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/found/Prove.tsx",
+    name = "check-portable-surface__identity__src__features__found__Prove.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/found/Prove.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/grants/ActionPicker.tsx",
+    name = "check-length-surface__identity__src__features__grants__ActionPicker.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/grants/ActionPicker.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/grants/ActionPicker.tsx",
+    name = "check-portable-surface__identity__src__features__grants__ActionPicker.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/grants/ActionPicker.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/grants/Answer.tsx",
+    name = "check-length-surface__identity__src__features__grants__Answer.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/grants/Answer.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/grants/Answer.tsx",
+    name = "check-portable-surface__identity__src__features__grants__Answer.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/grants/Answer.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/grants/AppsFirst.tsx",
+    name = "check-length-surface__identity__src__features__grants__AppsFirst.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/grants/AppsFirst.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/grants/AppsFirst.tsx",
+    name = "check-portable-surface__identity__src__features__grants__AppsFirst.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/grants/AppsFirst.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/grants/CannotGiveList.tsx",
+    name = "check-length-surface__identity__src__features__grants__CannotGiveList.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/grants/CannotGiveList.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/grants/CannotGiveList.tsx",
+    name = "check-portable-surface__identity__src__features__grants__CannotGiveList.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/grants/CannotGiveList.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/grants/Chain.tsx",
+    name = "check-length-surface__identity__src__features__grants__Chain.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/grants/Chain.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/grants/Chain.tsx",
+    name = "check-portable-surface__identity__src__features__grants__Chain.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/grants/Chain.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/grants/CheckBox.tsx",
+    name = "check-length-surface__identity__src__features__grants__CheckBox.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/grants/CheckBox.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/grants/CheckBox.tsx",
+    name = "check-portable-surface__identity__src__features__grants__CheckBox.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/grants/CheckBox.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/grants/Delegate.tsx",
+    name = "check-length-surface__identity__src__features__grants__Delegate.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/grants/Delegate.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/grants/Delegate.tsx",
+    name = "check-portable-surface__identity__src__features__grants__Delegate.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/grants/Delegate.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/grants/GrantTable.tsx",
+    name = "check-length-surface__identity__src__features__grants__GrantTable.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/grants/GrantTable.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/grants/GrantTable.tsx",
+    name = "check-portable-surface__identity__src__features__grants__GrantTable.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/grants/GrantTable.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/grants/IssueRoot.tsx",
+    name = "check-length-surface__identity__src__features__grants__IssueRoot.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/grants/IssueRoot.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/grants/IssueRoot.tsx",
+    name = "check-portable-surface__identity__src__features__grants__IssueRoot.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/grants/IssueRoot.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/grants/LevelPicker.tsx",
+    name = "check-length-surface__identity__src__features__grants__LevelPicker.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/grants/LevelPicker.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/grants/LevelPicker.tsx",
+    name = "check-portable-surface__identity__src__features__grants__LevelPicker.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/grants/LevelPicker.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/grants/Outcome.tsx",
+    name = "check-length-surface__identity__src__features__grants__Outcome.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/grants/Outcome.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/grants/Outcome.tsx",
+    name = "check-portable-surface__identity__src__features__grants__Outcome.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/grants/Outcome.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/grants/Revoke.tsx",
+    name = "check-length-surface__identity__src__features__grants__Revoke.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/grants/Revoke.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/grants/Revoke.tsx",
+    name = "check-portable-surface__identity__src__features__grants__Revoke.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/grants/Revoke.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/grants/StuckRecord.tsx",
+    name = "check-length-surface__identity__src__features__grants__StuckRecord.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/grants/StuckRecord.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/grants/StuckRecord.tsx",
+    name = "check-portable-surface__identity__src__features__grants__StuckRecord.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/grants/StuckRecord.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/grants/action-words.ts",
+    name = "check-length-surface__identity__src__features__grants__action-words.ts",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/grants/action-words.ts",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/grants/action-words.ts",
+    name = "check-portable-surface__identity__src__features__grants__action-words.ts",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/grants/action-words.ts",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/grants/agent-actions.ts",
+    name = "check-length-surface__identity__src__features__grants__agent-actions.ts",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/grants/agent-actions.ts",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/grants/agent-actions.ts",
+    name = "check-portable-surface__identity__src__features__grants__agent-actions.ts",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/grants/agent-actions.ts",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/grants/cannotGiveAnswer.ts",
+    name = "check-length-surface__identity__src__features__grants__cannotGiveAnswer.ts",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/grants/cannotGiveAnswer.ts",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/grants/cannotGiveAnswer.ts",
+    name = "check-portable-surface__identity__src__features__grants__cannotGiveAnswer.ts",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/grants/cannotGiveAnswer.ts",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/grants/check.ts",
+    name = "check-length-surface__identity__src__features__grants__check.ts",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/grants/check.ts",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/grants/check.ts",
+    name = "check-portable-surface__identity__src__features__grants__check.ts",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/grants/check.ts",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/grants/delegateChoices.ts",
+    name = "check-length-surface__identity__src__features__grants__delegateChoices.ts",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/grants/delegateChoices.ts",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/grants/delegateChoices.ts",
+    name = "check-portable-surface__identity__src__features__grants__delegateChoices.ts",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/grants/delegateChoices.ts",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/grants/grants.css",
+    name = "check-length-surface__identity__src__features__grants__grants.css",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/grants/grants.css",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/grants/mode-words.ts",
+    name = "check-length-surface__identity__src__features__grants__mode-words.ts",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/grants/mode-words.ts",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/grants/mode-words.ts",
+    name = "check-portable-surface__identity__src__features__grants__mode-words.ts",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/grants/mode-words.ts",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/grants/model.ts",
+    name = "check-length-surface__identity__src__features__grants__model.ts",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/grants/model.ts",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/grants/model.ts",
+    name = "check-portable-surface__identity__src__features__grants__model.ts",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/grants/model.ts",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/grants/organisation-acts.ts",
+    name = "check-length-surface__identity__src__features__grants__organisation-acts.ts",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/grants/organisation-acts.ts",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/grants/organisation-acts.ts",
+    name = "check-portable-surface__identity__src__features__grants__organisation-acts.ts",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/grants/organisation-acts.ts",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/grants/pendingGrant.ts",
+    name = "check-length-surface__identity__src__features__grants__pendingGrant.ts",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/grants/pendingGrant.ts",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/grants/pendingGrant.ts",
+    name = "check-portable-surface__identity__src__features__grants__pendingGrant.ts",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/grants/pendingGrant.ts",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/health/Elapsed.tsx",
+    name = "check-length-surface__identity__src__features__health__Elapsed.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/health/Elapsed.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/health/Elapsed.tsx",
+    name = "check-portable-surface__identity__src__features__health__Elapsed.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/health/Elapsed.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/health/Health.tsx",
+    name = "check-length-surface__identity__src__features__health__Health.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/health/Health.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/health/Health.tsx",
+    name = "check-portable-surface__identity__src__features__health__Health.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/health/Health.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/import/EstateApproval.tsx",
+    name = "check-length-surface__identity__src__features__import__EstateApproval.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/import/EstateApproval.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/import/EstateApproval.tsx",
+    name = "check-portable-surface__identity__src__features__import__EstateApproval.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/import/EstateApproval.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/me/SignOut.tsx",
+    name = "check-length-surface__identity__src__features__me__SignOut.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/me/SignOut.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/me/SignOut.tsx",
+    name = "check-portable-surface__identity__src__features__me__SignOut.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/me/SignOut.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/me/You.tsx",
+    name = "check-length-surface__identity__src__features__me__You.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/me/You.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/me/You.tsx",
+    name = "check-portable-surface__identity__src__features__me__You.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/me/You.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/me/sign-out.css",
+    name = "check-length-surface__identity__src__features__me__sign-out.css",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/me/sign-out.css",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/me/you.css",
+    name = "check-length-surface__identity__src__features__me__you.css",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/me/you.css",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/network/AddMachine.tsx",
+    name = "check-length-surface__identity__src__features__network__AddMachine.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/network/AddMachine.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/network/AddMachine.tsx",
+    name = "check-portable-surface__identity__src__features__network__AddMachine.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/network/AddMachine.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/network/ComputerAdmission.tsx",
+    name = "check-length-surface__identity__src__features__network__ComputerAdmission.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/network/ComputerAdmission.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/network/ComputerAdmission.tsx",
+    name = "check-portable-surface__identity__src__features__network__ComputerAdmission.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/network/ComputerAdmission.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/network/JoinCode.tsx",
+    name = "check-length-surface__identity__src__features__network__JoinCode.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/network/JoinCode.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/network/JoinCode.tsx",
+    name = "check-portable-surface__identity__src__features__network__JoinCode.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/network/JoinCode.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/network/MachineDetail.tsx",
+    name = "check-length-surface__identity__src__features__network__MachineDetail.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/network/MachineDetail.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/network/MachineDetail.tsx",
+    name = "check-portable-surface__identity__src__features__network__MachineDetail.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/network/MachineDetail.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/network/MachineIdentities.tsx",
+    name = "check-length-surface__identity__src__features__network__MachineIdentities.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/network/MachineIdentities.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/network/MachineIdentities.tsx",
+    name = "check-portable-surface__identity__src__features__network__MachineIdentities.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/network/MachineIdentities.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/network/Network.tsx",
+    name = "check-length-surface__identity__src__features__network__Network.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/network/Network.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/network/Network.tsx",
+    name = "check-portable-surface__identity__src__features__network__Network.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/network/Network.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/network/allowed.ts",
+    name = "check-length-surface__identity__src__features__network__allowed.ts",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/network/allowed.ts",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/network/allowed.ts",
+    name = "check-portable-surface__identity__src__features__network__allowed.ts",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/network/allowed.ts",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/network/connectLines.ts",
+    name = "check-length-surface__identity__src__features__network__connectLines.ts",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/network/connectLines.ts",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/network/connectLines.ts",
+    name = "check-portable-surface__identity__src__features__network__connectLines.ts",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/network/connectLines.ts",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/network/contract.ts",
+    name = "check-length-surface__identity__src__features__network__contract.ts",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/network/contract.ts",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/network/contract.ts",
+    name = "check-portable-surface__identity__src__features__network__contract.ts",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/network/contract.ts",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/network/labels.ts",
+    name = "check-length-surface__identity__src__features__network__labels.ts",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/network/labels.ts",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/network/labels.ts",
+    name = "check-portable-surface__identity__src__features__network__labels.ts",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/network/labels.ts",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/network/machine-admission.ts",
+    name = "check-length-surface__identity__src__features__network__machine-admission.ts",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/network/machine-admission.ts",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/network/machine-admission.ts",
+    name = "check-portable-surface__identity__src__features__network__machine-admission.ts",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/network/machine-admission.ts",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/network/network.css",
+    name = "check-length-surface__identity__src__features__network__network.css",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/network/network.css",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/network/reconnect-clock.ts",
+    name = "check-length-surface__identity__src__features__network__reconnect-clock.ts",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/network/reconnect-clock.ts",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/network/reconnect-clock.ts",
+    name = "check-portable-surface__identity__src__features__network__reconnect-clock.ts",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/network/reconnect-clock.ts",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/network/shared-read.ts",
+    name = "check-length-surface__identity__src__features__network__shared-read.ts",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/network/shared-read.ts",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/network/shared-read.ts",
+    name = "check-portable-surface__identity__src__features__network__shared-read.ts",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/network/shared-read.ts",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/pair/PairPage.tsx",
+    name = "check-length-surface__identity__src__features__pair__PairPage.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/pair/PairPage.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/pair/PairPage.tsx",
+    name = "check-portable-surface__identity__src__features__pair__PairPage.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/pair/PairPage.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/people/Account.tsx",
+    name = "check-length-surface__identity__src__features__people__Account.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/people/Account.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/people/Account.tsx",
+    name = "check-portable-surface__identity__src__features__people__Account.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/people/Account.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/people/AddAgent.tsx",
+    name = "check-length-surface__identity__src__features__people__AddAgent.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/people/AddAgent.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/people/AddAgent.tsx",
+    name = "check-portable-surface__identity__src__features__people__AddAgent.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/people/AddAgent.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/people/AddPerson.tsx",
+    name = "check-length-surface__identity__src__features__people__AddPerson.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/people/AddPerson.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/people/AddPerson.tsx",
+    name = "check-portable-surface__identity__src__features__people__AddPerson.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/people/AddPerson.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/people/AgentGrantPicker.tsx",
+    name = "check-length-surface__identity__src__features__people__AgentGrantPicker.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/people/AgentGrantPicker.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/people/AgentGrantPicker.tsx",
+    name = "check-portable-surface__identity__src__features__people__AgentGrantPicker.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/people/AgentGrantPicker.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/people/People.tsx",
+    name = "check-length-surface__identity__src__features__people__People.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/people/People.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/people/People.tsx",
+    name = "check-portable-surface__identity__src__features__people__People.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/people/People.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/people/Pill.tsx",
+    name = "check-length-surface__identity__src__features__people__Pill.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/people/Pill.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/people/Pill.tsx",
+    name = "check-portable-surface__identity__src__features__people__Pill.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/people/Pill.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/people/RecordedForm.tsx",
+    name = "check-length-surface__identity__src__features__people__RecordedForm.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/people/RecordedForm.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/people/RecordedForm.tsx",
+    name = "check-portable-surface__identity__src__features__people__RecordedForm.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/people/RecordedForm.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/people/SavedRequest.tsx",
+    name = "check-length-surface__identity__src__features__people__SavedRequest.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/people/SavedRequest.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/people/SavedRequest.tsx",
+    name = "check-portable-surface__identity__src__features__people__SavedRequest.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/people/SavedRequest.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/people/Words.tsx",
+    name = "check-length-surface__identity__src__features__people__Words.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/people/Words.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/people/Words.tsx",
+    name = "check-portable-surface__identity__src__features__people__Words.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/people/Words.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/people/add-agent-request.ts",
+    name = "check-length-surface__identity__src__features__people__add-agent-request.ts",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/people/add-agent-request.ts",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/people/add-agent-request.ts",
+    name = "check-portable-surface__identity__src__features__people__add-agent-request.ts",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/people/add-agent-request.ts",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/people/add-agent.css",
+    name = "check-length-surface__identity__src__features__people__add-agent.css",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/people/add-agent.css",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/people/add-and-run.ts",
+    name = "check-length-surface__identity__src__features__people__add-and-run.ts",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/people/add-and-run.ts",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/people/add-and-run.ts",
+    name = "check-portable-surface__identity__src__features__people__add-and-run.ts",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/people/add-and-run.ts",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/people/agent-grants.ts",
+    name = "check-length-surface__identity__src__features__people__agent-grants.ts",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/people/agent-grants.ts",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/people/agent-grants.ts",
+    name = "check-portable-surface__identity__src__features__people__agent-grants.ts",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/people/agent-grants.ts",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/people/agent-resource-names.ts",
+    name = "check-length-surface__identity__src__features__people__agent-resource-names.ts",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/people/agent-resource-names.ts",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/people/agent-resource-names.ts",
+    name = "check-portable-surface__identity__src__features__people__agent-resource-names.ts",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/people/agent-resource-names.ts",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/people/directory.ts",
+    name = "check-length-surface__identity__src__features__people__directory.ts",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/people/directory.ts",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/people/directory.ts",
+    name = "check-portable-surface__identity__src__features__people__directory.ts",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/people/directory.ts",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/people/manage.css",
+    name = "check-length-surface__identity__src__features__people__manage.css",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/people/manage.css",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/people/people.css",
+    name = "check-length-surface__identity__src__features__people__people.css",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/people/people.css",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/people/person-name.ts",
+    name = "check-length-surface__identity__src__features__people__person-name.ts",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/people/person-name.ts",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/people/person-name.ts",
+    name = "check-portable-surface__identity__src__features__people__person-name.ts",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/people/person-name.ts",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/people/reach.tsx",
+    name = "check-length-surface__identity__src__features__people__reach.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/people/reach.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/people/reach.tsx",
+    name = "check-portable-surface__identity__src__features__people__reach.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/people/reach.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/people/recorded-form.css",
+    name = "check-length-surface__identity__src__features__people__recorded-form.css",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/people/recorded-form.css",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/people/recorded-receipt.ts",
+    name = "check-length-surface__identity__src__features__people__recorded-receipt.ts",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/people/recorded-receipt.ts",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/people/recorded-receipt.ts",
+    name = "check-portable-surface__identity__src__features__people__recorded-receipt.ts",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/people/recorded-receipt.ts",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/people/registration-capability.ts",
+    name = "check-length-surface__identity__src__features__people__registration-capability.ts",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/people/registration-capability.ts",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/people/registration-capability.ts",
+    name = "check-portable-surface__identity__src__features__people__registration-capability.ts",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/people/registration-capability.ts",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/people/tree.ts",
+    name = "check-length-surface__identity__src__features__people__tree.ts",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/people/tree.ts",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/people/tree.ts",
+    name = "check-portable-surface__identity__src__features__people__tree.ts",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/people/tree.ts",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/provisioning/FolderChooser.tsx",
+    name = "check-length-surface__identity__src__features__provisioning__FolderChooser.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/provisioning/FolderChooser.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/provisioning/FolderChooser.tsx",
+    name = "check-portable-surface__identity__src__features__provisioning__FolderChooser.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/provisioning/FolderChooser.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/provisioning/Given.tsx",
+    name = "check-length-surface__identity__src__features__provisioning__Given.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/provisioning/Given.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/provisioning/Given.tsx",
+    name = "check-portable-surface__identity__src__features__provisioning__Given.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/provisioning/Given.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/provisioning/McpServers.tsx",
+    name = "check-length-surface__identity__src__features__provisioning__McpServers.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/provisioning/McpServers.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/provisioning/McpServers.tsx",
+    name = "check-portable-surface__identity__src__features__provisioning__McpServers.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/provisioning/McpServers.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/provisioning/ModeWords.tsx",
+    name = "check-length-surface__identity__src__features__provisioning__ModeWords.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/provisioning/ModeWords.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/provisioning/ModeWords.tsx",
+    name = "check-portable-surface__identity__src__features__provisioning__ModeWords.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/provisioning/ModeWords.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/provisioning/Permissions.tsx",
+    name = "check-length-surface__identity__src__features__provisioning__Permissions.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/provisioning/Permissions.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/provisioning/Permissions.tsx",
+    name = "check-portable-surface__identity__src__features__provisioning__Permissions.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/provisioning/Permissions.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/provisioning/ProfileCopies.tsx",
+    name = "check-length-surface__identity__src__features__provisioning__ProfileCopies.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/provisioning/ProfileCopies.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/provisioning/ProfileCopies.tsx",
+    name = "check-portable-surface__identity__src__features__provisioning__ProfileCopies.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/provisioning/ProfileCopies.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/provisioning/ProfileEditor.tsx",
+    name = "check-length-surface__identity__src__features__provisioning__ProfileEditor.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/provisioning/ProfileEditor.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/provisioning/ProfileEditor.tsx",
+    name = "check-portable-surface__identity__src__features__provisioning__ProfileEditor.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/provisioning/ProfileEditor.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/provisioning/Provisioning.tsx",
+    name = "check-length-surface__identity__src__features__provisioning__Provisioning.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/provisioning/Provisioning.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/provisioning/Provisioning.tsx",
+    name = "check-portable-surface__identity__src__features__provisioning__Provisioning.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/provisioning/Provisioning.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/provisioning/SaveSettings.tsx",
+    name = "check-length-surface__identity__src__features__provisioning__SaveSettings.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/provisioning/SaveSettings.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/provisioning/SaveSettings.tsx",
+    name = "check-portable-surface__identity__src__features__provisioning__SaveSettings.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/provisioning/SaveSettings.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/provisioning/SeatProgramChange.tsx",
+    name = "check-length-surface__identity__src__features__provisioning__SeatProgramChange.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/provisioning/SeatProgramChange.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/provisioning/SeatProgramChange.tsx",
+    name = "check-portable-surface__identity__src__features__provisioning__SeatProgramChange.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/provisioning/SeatProgramChange.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/provisioning/choices.ts",
+    name = "check-length-surface__identity__src__features__provisioning__choices.ts",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/provisioning/choices.ts",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/provisioning/choices.ts",
+    name = "check-portable-surface__identity__src__features__provisioning__choices.ts",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/provisioning/choices.ts",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/provisioning/harness-program.ts",
+    name = "check-length-surface__identity__src__features__provisioning__harness-program.ts",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/provisioning/harness-program.ts",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/provisioning/harness-program.ts",
+    name = "check-portable-surface__identity__src__features__provisioning__harness-program.ts",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/provisioning/harness-program.ts",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/provisioning/permission-modes.ts",
+    name = "check-length-surface__identity__src__features__provisioning__permission-modes.ts",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/provisioning/permission-modes.ts",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/provisioning/permission-modes.ts",
+    name = "check-portable-surface__identity__src__features__provisioning__permission-modes.ts",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/provisioning/permission-modes.ts",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/provisioning/permission-rules.ts",
+    name = "check-length-surface__identity__src__features__provisioning__permission-rules.ts",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/provisioning/permission-rules.ts",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/provisioning/permission-rules.ts",
+    name = "check-portable-surface__identity__src__features__provisioning__permission-rules.ts",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/provisioning/permission-rules.ts",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/provisioning/permissions.css",
+    name = "check-length-surface__identity__src__features__provisioning__permissions.css",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/provisioning/permissions.css",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/provisioning/working-folder.ts",
+    name = "check-length-surface__identity__src__features__provisioning__working-folder.ts",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/provisioning/working-folder.ts",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/provisioning/working-folder.ts",
+    name = "check-portable-surface__identity__src__features__provisioning__working-folder.ts",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/provisioning/working-folder.ts",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/proxy/ProxyRead.tsx",
+    name = "check-length-surface__identity__src__features__proxy__ProxyRead.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/proxy/ProxyRead.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/proxy/ProxyRead.tsx",
+    name = "check-portable-surface__identity__src__features__proxy__ProxyRead.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/proxy/ProxyRead.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/proxy/ProxyView.tsx",
+    name = "check-length-surface__identity__src__features__proxy__ProxyView.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/proxy/ProxyView.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/proxy/ProxyView.tsx",
+    name = "check-portable-surface__identity__src__features__proxy__ProxyView.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/proxy/ProxyView.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/proxy/contract.ts",
+    name = "check-length-surface__identity__src__features__proxy__contract.ts",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/proxy/contract.ts",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/proxy/contract.ts",
+    name = "check-portable-surface__identity__src__features__proxy__contract.ts",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/proxy/contract.ts",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/proxy/json-colour.tsx",
+    name = "check-length-surface__identity__src__features__proxy__json-colour.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/proxy/json-colour.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/proxy/json-colour.tsx",
+    name = "check-portable-surface__identity__src__features__proxy__json-colour.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/proxy/json-colour.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/proxy/proxy-read.ts",
+    name = "check-length-surface__identity__src__features__proxy__proxy-read.ts",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/proxy/proxy-read.ts",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/proxy/proxy-read.ts",
+    name = "check-portable-surface__identity__src__features__proxy__proxy-read.ts",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/proxy/proxy-read.ts",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/proxy/proxy.css",
+    name = "check-length-surface__identity__src__features__proxy__proxy.css",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/proxy/proxy.css",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/requests/AskForm.tsx",
+    name = "check-length-surface__identity__src__features__requests__AskForm.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/requests/AskForm.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/requests/AskForm.tsx",
+    name = "check-portable-surface__identity__src__features__requests__AskForm.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/requests/AskForm.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/requests/DecisionForm.tsx",
+    name = "check-length-surface__identity__src__features__requests__DecisionForm.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/requests/DecisionForm.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/requests/DecisionForm.tsx",
+    name = "check-portable-surface__identity__src__features__requests__DecisionForm.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/requests/DecisionForm.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/requests/HeldApproval.tsx",
+    name = "check-length-surface__identity__src__features__requests__HeldApproval.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/requests/HeldApproval.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/requests/HeldApproval.tsx",
+    name = "check-portable-surface__identity__src__features__requests__HeldApproval.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/requests/HeldApproval.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/requests/Requests.tsx",
+    name = "check-length-surface__identity__src__features__requests__Requests.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/requests/Requests.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/requests/Requests.tsx",
+    name = "check-portable-surface__identity__src__features__requests__Requests.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/requests/Requests.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/requests/contract.ts",
+    name = "check-length-surface__identity__src__features__requests__contract.ts",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/requests/contract.ts",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/requests/contract.ts",
+    name = "check-portable-surface__identity__src__features__requests__contract.ts",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/requests/contract.ts",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/requests/decision-words.ts",
+    name = "check-length-surface__identity__src__features__requests__decision-words.ts",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/requests/decision-words.ts",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/requests/decision-words.ts",
+    name = "check-portable-surface__identity__src__features__requests__decision-words.ts",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/requests/decision-words.ts",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/requests/requests.css",
+    name = "check-length-surface__identity__src__features__requests__requests.css",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/requests/requests.css",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/reviews/KeepGrant.tsx",
+    name = "check-length-surface__identity__src__features__reviews__KeepGrant.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/reviews/KeepGrant.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/reviews/KeepGrant.tsx",
+    name = "check-portable-surface__identity__src__features__reviews__KeepGrant.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/reviews/KeepGrant.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/reviews/Reviews.tsx",
+    name = "check-length-surface__identity__src__features__reviews__Reviews.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/reviews/Reviews.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/reviews/Reviews.tsx",
+    name = "check-portable-surface__identity__src__features__reviews__Reviews.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/reviews/Reviews.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/roles/AssignedRoles.tsx",
+    name = "check-length-surface__identity__src__features__roles__AssignedRoles.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/roles/AssignedRoles.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/roles/AssignedRoles.tsx",
+    name = "check-portable-surface__identity__src__features__roles__AssignedRoles.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/roles/AssignedRoles.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/roles/ChangeStatus.tsx",
+    name = "check-length-surface__identity__src__features__roles__ChangeStatus.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/roles/ChangeStatus.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/roles/ChangeStatus.tsx",
+    name = "check-portable-surface__identity__src__features__roles__ChangeStatus.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/roles/ChangeStatus.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/roles/RoleEditor.tsx",
+    name = "check-length-surface__identity__src__features__roles__RoleEditor.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/roles/RoleEditor.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/roles/RoleEditor.tsx",
+    name = "check-portable-surface__identity__src__features__roles__RoleEditor.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/roles/RoleEditor.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/roles/RoleHolders.tsx",
+    name = "check-length-surface__identity__src__features__roles__RoleHolders.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/roles/RoleHolders.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/roles/RoleHolders.tsx",
+    name = "check-portable-surface__identity__src__features__roles__RoleHolders.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/roles/RoleHolders.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/roles/Roles.tsx",
+    name = "check-length-surface__identity__src__features__roles__Roles.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/roles/Roles.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/roles/Roles.tsx",
+    name = "check-portable-surface__identity__src__features__roles__Roles.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/roles/Roles.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/roles/contract.ts",
+    name = "check-length-surface__identity__src__features__roles__contract.ts",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/roles/contract.ts",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/roles/contract.ts",
+    name = "check-portable-surface__identity__src__features__roles__contract.ts",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/roles/contract.ts",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/roles/roles.css",
+    name = "check-length-surface__identity__src__features__roles__roles.css",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/roles/roles.css",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/roles/useRoleChange.ts",
+    name = "check-length-surface__identity__src__features__roles__useRoleChange.ts",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/roles/useRoleChange.ts",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/roles/useRoleChange.ts",
+    name = "check-portable-surface__identity__src__features__roles__useRoleChange.ts",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/roles/useRoleChange.ts",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/run/AgentRun.tsx",
+    name = "check-length-surface__identity__src__features__run__AgentRun.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/run/AgentRun.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/run/AgentRun.tsx",
+    name = "check-portable-surface__identity__src__features__run__AgentRun.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/run/AgentRun.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/run/RunConfirm.tsx",
+    name = "check-length-surface__identity__src__features__run__RunConfirm.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/run/RunConfirm.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/run/RunConfirm.tsx",
+    name = "check-portable-surface__identity__src__features__run__RunConfirm.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/run/RunConfirm.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/run/SessionStop.tsx",
+    name = "check-length-surface__identity__src__features__run__SessionStop.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/run/SessionStop.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/run/SessionStop.tsx",
+    name = "check-portable-surface__identity__src__features__run__SessionStop.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/run/SessionStop.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/run/Start.tsx",
+    name = "check-length-surface__identity__src__features__run__Start.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/run/Start.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/run/Start.tsx",
+    name = "check-portable-surface__identity__src__features__run__Start.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/run/Start.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/run/StopWaiting.tsx",
+    name = "check-length-surface__identity__src__features__run__StopWaiting.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/run/StopWaiting.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/run/StopWaiting.tsx",
+    name = "check-portable-surface__identity__src__features__run__StopWaiting.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/run/StopWaiting.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/run/run.css",
+    name = "check-length-surface__identity__src__features__run__run.css",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/run/run.css",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/runtime/CannotStart.tsx",
+    name = "check-length-surface__identity__src__features__runtime__CannotStart.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/runtime/CannotStart.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/runtime/CannotStart.tsx",
+    name = "check-portable-surface__identity__src__features__runtime__CannotStart.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/runtime/CannotStart.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/runtime/CanvasDock.tsx",
+    name = "check-length-surface__identity__src__features__runtime__CanvasDock.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/runtime/CanvasDock.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/runtime/CanvasDock.tsx",
+    name = "check-portable-surface__identity__src__features__runtime__CanvasDock.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/runtime/CanvasDock.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/runtime/CanvasMarks.tsx",
+    name = "check-length-surface__identity__src__features__runtime__CanvasMarks.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/runtime/CanvasMarks.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/runtime/CanvasMarks.tsx",
+    name = "check-portable-surface__identity__src__features__runtime__CanvasMarks.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/runtime/CanvasMarks.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/runtime/CanvasSurface.tsx",
+    name = "check-length-surface__identity__src__features__runtime__CanvasSurface.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/runtime/CanvasSurface.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/runtime/CanvasSurface.tsx",
+    name = "check-portable-surface__identity__src__features__runtime__CanvasSurface.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/runtime/CanvasSurface.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/runtime/CanvasTogether.tsx",
+    name = "check-length-surface__identity__src__features__runtime__CanvasTogether.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/runtime/CanvasTogether.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/runtime/CanvasTogether.tsx",
+    name = "check-portable-surface__identity__src__features__runtime__CanvasTogether.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/runtime/CanvasTogether.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/runtime/CanvasWidgets.tsx",
+    name = "check-length-surface__identity__src__features__runtime__CanvasWidgets.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/runtime/CanvasWidgets.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/runtime/CanvasWidgets.tsx",
+    name = "check-portable-surface__identity__src__features__runtime__CanvasWidgets.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/runtime/CanvasWidgets.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/runtime/GpuTerminal.tsx",
+    name = "check-length-surface__identity__src__features__runtime__GpuTerminal.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/runtime/GpuTerminal.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/runtime/GpuTerminal.tsx",
+    name = "check-portable-surface__identity__src__features__runtime__GpuTerminal.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/runtime/GpuTerminal.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/runtime/MessageConnections.tsx",
+    name = "check-length-surface__identity__src__features__runtime__MessageConnections.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/runtime/MessageConnections.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/runtime/MessageConnections.tsx",
+    name = "check-portable-surface__identity__src__features__runtime__MessageConnections.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/runtime/MessageConnections.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/runtime/NetworkAgentPane.tsx",
+    name = "check-length-surface__identity__src__features__runtime__NetworkAgentPane.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/runtime/NetworkAgentPane.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/runtime/NetworkAgentPane.tsx",
+    name = "check-portable-surface__identity__src__features__runtime__NetworkAgentPane.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/runtime/NetworkAgentPane.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/runtime/NetworkTree.tsx",
+    name = "check-length-surface__identity__src__features__runtime__NetworkTree.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/runtime/NetworkTree.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/runtime/NetworkTree.tsx",
+    name = "check-portable-surface__identity__src__features__runtime__NetworkTree.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/runtime/NetworkTree.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/runtime/NetworkTreePane.tsx",
+    name = "check-length-surface__identity__src__features__runtime__NetworkTreePane.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/runtime/NetworkTreePane.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/runtime/NetworkTreePane.tsx",
+    name = "check-portable-surface__identity__src__features__runtime__NetworkTreePane.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/runtime/NetworkTreePane.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/runtime/RuntimeCounts.tsx",
+    name = "check-length-surface__identity__src__features__runtime__RuntimeCounts.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/runtime/RuntimeCounts.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/runtime/RuntimeCounts.tsx",
+    name = "check-portable-surface__identity__src__features__runtime__RuntimeCounts.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/runtime/RuntimeCounts.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/runtime/RuntimeSessions.tsx",
+    name = "check-length-surface__identity__src__features__runtime__RuntimeSessions.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/runtime/RuntimeSessions.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/runtime/RuntimeSessions.tsx",
+    name = "check-portable-surface__identity__src__features__runtime__RuntimeSessions.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/runtime/RuntimeSessions.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/runtime/SessionCanvas.tsx",
+    name = "check-length-surface__identity__src__features__runtime__SessionCanvas.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/runtime/SessionCanvas.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/runtime/SessionCanvas.tsx",
+    name = "check-portable-surface__identity__src__features__runtime__SessionCanvas.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/runtime/SessionCanvas.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/runtime/Sessions.tsx",
+    name = "check-length-surface__identity__src__features__runtime__Sessions.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/runtime/Sessions.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/runtime/Sessions.tsx",
+    name = "check-portable-surface__identity__src__features__runtime__Sessions.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/runtime/Sessions.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/runtime/Terminal.tsx",
+    name = "check-length-surface__identity__src__features__runtime__Terminal.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/runtime/Terminal.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/runtime/Terminal.tsx",
+    name = "check-portable-surface__identity__src__features__runtime__Terminal.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/runtime/Terminal.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/runtime/canvas-fit.ts",
+    name = "check-length-surface__identity__src__features__runtime__canvas-fit.ts",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/runtime/canvas-fit.ts",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/runtime/canvas-fit.ts",
+    name = "check-portable-surface__identity__src__features__runtime__canvas-fit.ts",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/runtime/canvas-fit.ts",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/runtime/canvas-kept.ts",
+    name = "check-length-surface__identity__src__features__runtime__canvas-kept.ts",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/runtime/canvas-kept.ts",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/runtime/canvas-kept.ts",
+    name = "check-portable-surface__identity__src__features__runtime__canvas-kept.ts",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/runtime/canvas-kept.ts",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/runtime/canvas-marks.css",
+    name = "check-length-surface__identity__src__features__runtime__canvas-marks.css",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/runtime/canvas-marks.css",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/runtime/canvas-marks.ts",
+    name = "check-length-surface__identity__src__features__runtime__canvas-marks.ts",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/runtime/canvas-marks.ts",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/runtime/canvas-marks.ts",
+    name = "check-portable-surface__identity__src__features__runtime__canvas-marks.ts",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/runtime/canvas-marks.ts",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/runtime/canvas-operations.ts",
+    name = "check-length-surface__identity__src__features__runtime__canvas-operations.ts",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/runtime/canvas-operations.ts",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/runtime/canvas-operations.ts",
+    name = "check-portable-surface__identity__src__features__runtime__canvas-operations.ts",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/runtime/canvas-operations.ts",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/runtime/canvas-place.ts",
+    name = "check-length-surface__identity__src__features__runtime__canvas-place.ts",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/runtime/canvas-place.ts",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/runtime/canvas-place.ts",
+    name = "check-portable-surface__identity__src__features__runtime__canvas-place.ts",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/runtime/canvas-place.ts",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/runtime/canvas-teams.ts",
+    name = "check-length-surface__identity__src__features__runtime__canvas-teams.ts",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/runtime/canvas-teams.ts",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/runtime/canvas-teams.ts",
+    name = "check-portable-surface__identity__src__features__runtime__canvas-teams.ts",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/runtime/canvas-teams.ts",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/runtime/canvas-tidy.ts",
+    name = "check-length-surface__identity__src__features__runtime__canvas-tidy.ts",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/runtime/canvas-tidy.ts",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/runtime/canvas-tidy.ts",
+    name = "check-portable-surface__identity__src__features__runtime__canvas-tidy.ts",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/runtime/canvas-tidy.ts",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/runtime/canvas-view.ts",
+    name = "check-length-surface__identity__src__features__runtime__canvas-view.ts",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/runtime/canvas-view.ts",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/runtime/canvas-view.ts",
+    name = "check-portable-surface__identity__src__features__runtime__canvas-view.ts",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/runtime/canvas-view.ts",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/runtime/canvas-widgets.ts",
+    name = "check-length-surface__identity__src__features__runtime__canvas-widgets.ts",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/runtime/canvas-widgets.ts",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/runtime/canvas-widgets.ts",
+    name = "check-portable-surface__identity__src__features__runtime__canvas-widgets.ts",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/runtime/canvas-widgets.ts",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/runtime/message-connections.ts",
+    name = "check-length-surface__identity__src__features__runtime__message-connections.ts",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/runtime/message-connections.ts",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/runtime/message-connections.ts",
+    name = "check-portable-surface__identity__src__features__runtime__message-connections.ts",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/runtime/message-connections.ts",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/runtime/network-tree.css",
+    name = "check-length-surface__identity__src__features__runtime__network-tree.css",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/runtime/network-tree.css",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/runtime/network-tree.ts",
+    name = "check-length-surface__identity__src__features__runtime__network-tree.ts",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/runtime/network-tree.ts",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/runtime/network-tree.ts",
+    name = "check-portable-surface__identity__src__features__runtime__network-tree.ts",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/runtime/network-tree.ts",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/runtime/session-canvas.css",
+    name = "check-length-surface__identity__src__features__runtime__session-canvas.css",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/runtime/session-canvas.css",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/runtime/session-graph.ts",
+    name = "check-length-surface__identity__src__features__runtime__session-graph.ts",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/runtime/session-graph.ts",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/runtime/session-graph.ts",
+    name = "check-portable-surface__identity__src__features__runtime__session-graph.ts",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/runtime/session-graph.ts",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/runtime/start-requests.ts",
+    name = "check-length-surface__identity__src__features__runtime__start-requests.ts",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/runtime/start-requests.ts",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/runtime/start-requests.ts",
+    name = "check-portable-surface__identity__src__features__runtime__start-requests.ts",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/runtime/start-requests.ts",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/runtime/terminal-transport.ts",
+    name = "check-length-surface__identity__src__features__runtime__terminal-transport.ts",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/runtime/terminal-transport.ts",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/runtime/terminal-transport.ts",
+    name = "check-portable-surface__identity__src__features__runtime__terminal-transport.ts",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/runtime/terminal-transport.ts",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/runtime/terminal.css",
+    name = "check-length-surface__identity__src__features__runtime__terminal.css",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/runtime/terminal.css",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/secrets/AddSecretRow.tsx",
+    name = "check-length-surface__identity__src__features__secrets__AddSecretRow.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/secrets/AddSecretRow.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/secrets/AddSecretRow.tsx",
+    name = "check-portable-surface__identity__src__features__secrets__AddSecretRow.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/secrets/AddSecretRow.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/secrets/CurrentSettings.tsx",
+    name = "check-length-surface__identity__src__features__secrets__CurrentSettings.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/secrets/CurrentSettings.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/secrets/CurrentSettings.tsx",
+    name = "check-portable-surface__identity__src__features__secrets__CurrentSettings.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/secrets/CurrentSettings.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/secrets/SecretControls.tsx",
+    name = "check-length-surface__identity__src__features__secrets__SecretControls.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/secrets/SecretControls.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/secrets/SecretControls.tsx",
+    name = "check-portable-surface__identity__src__features__secrets__SecretControls.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/secrets/SecretControls.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/secrets/SecretProblem.tsx",
+    name = "check-length-surface__identity__src__features__secrets__SecretProblem.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/secrets/SecretProblem.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/secrets/SecretProblem.tsx",
+    name = "check-portable-surface__identity__src__features__secrets__SecretProblem.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/secrets/SecretProblem.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/secrets/Secrets.tsx",
+    name = "check-length-surface__identity__src__features__secrets__Secrets.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/secrets/Secrets.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/secrets/Secrets.tsx",
+    name = "check-portable-surface__identity__src__features__secrets__Secrets.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/secrets/Secrets.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/secrets/SecretsDetail.tsx",
+    name = "check-length-surface__identity__src__features__secrets__SecretsDetail.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/secrets/SecretsDetail.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/secrets/SecretsDetail.tsx",
+    name = "check-portable-surface__identity__src__features__secrets__SecretsDetail.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/secrets/SecretsDetail.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/secrets/SecretsPage.tsx",
+    name = "check-length-surface__identity__src__features__secrets__SecretsPage.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/secrets/SecretsPage.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/secrets/SecretsPage.tsx",
+    name = "check-portable-surface__identity__src__features__secrets__SecretsPage.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/secrets/SecretsPage.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/secrets/ValueChange.tsx",
+    name = "check-length-surface__identity__src__features__secrets__ValueChange.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/secrets/ValueChange.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/secrets/ValueChange.tsx",
+    name = "check-portable-surface__identity__src__features__secrets__ValueChange.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/secrets/ValueChange.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/secrets/pendingChange.ts",
+    name = "check-length-surface__identity__src__features__secrets__pendingChange.ts",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/secrets/pendingChange.ts",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/secrets/pendingChange.ts",
+    name = "check-portable-surface__identity__src__features__secrets__pendingChange.ts",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/secrets/pendingChange.ts",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/secrets/secret-name.ts",
+    name = "check-length-surface__identity__src__features__secrets__secret-name.ts",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/secrets/secret-name.ts",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/secrets/secret-name.ts",
+    name = "check-portable-surface__identity__src__features__secrets__secret-name.ts",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/secrets/secret-name.ts",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/secrets/secrets.css",
+    name = "check-length-surface__identity__src__features__secrets__secrets.css",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/secrets/secrets.css",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/secrets/secretsApi.ts",
+    name = "check-length-surface__identity__src__features__secrets__secretsApi.ts",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/secrets/secretsApi.ts",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/secrets/secretsApi.ts",
+    name = "check-portable-surface__identity__src__features__secrets__secretsApi.ts",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/secrets/secretsApi.ts",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/secrets/useOwnerChange.ts",
+    name = "check-length-surface__identity__src__features__secrets__useOwnerChange.ts",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/secrets/useOwnerChange.ts",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/secrets/useOwnerChange.ts",
+    name = "check-portable-surface__identity__src__features__secrets__useOwnerChange.ts",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/secrets/useOwnerChange.ts",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/service-accounts/ServiceAccounts.tsx",
+    name = "check-length-surface__identity__src__features__service-accounts__ServiceAccounts.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/service-accounts/ServiceAccounts.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/service-accounts/ServiceAccounts.tsx",
+    name = "check-portable-surface__identity__src__features__service-accounts__ServiceAccounts.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/service-accounts/ServiceAccounts.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/sessions/Owned.tsx",
+    name = "check-length-surface__identity__src__features__sessions__Owned.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/sessions/Owned.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/sessions/Owned.tsx",
+    name = "check-portable-surface__identity__src__features__sessions__Owned.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/sessions/Owned.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/sessions/Seats.tsx",
+    name = "check-length-surface__identity__src__features__sessions__Seats.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/sessions/Seats.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/sessions/Seats.tsx",
+    name = "check-portable-surface__identity__src__features__sessions__Seats.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/sessions/Seats.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/sessions/Sessions.tsx",
+    name = "check-length-surface__identity__src__features__sessions__Sessions.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/sessions/Sessions.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/sessions/Sessions.tsx",
+    name = "check-portable-surface__identity__src__features__sessions__Sessions.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/sessions/Sessions.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/sessions/seats.css",
+    name = "check-length-surface__identity__src__features__sessions__seats.css",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/sessions/seats.css",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/settings/ConfigTabs.tsx",
+    name = "check-length-surface__identity__src__features__settings__ConfigTabs.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/settings/ConfigTabs.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/settings/ConfigTabs.tsx",
+    name = "check-portable-surface__identity__src__features__settings__ConfigTabs.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/settings/ConfigTabs.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/settings/EffectiveSettings.tsx",
+    name = "check-length-surface__identity__src__features__settings__EffectiveSettings.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/settings/EffectiveSettings.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/settings/EffectiveSettings.tsx",
+    name = "check-portable-surface__identity__src__features__settings__EffectiveSettings.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/settings/EffectiveSettings.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/settings/ModelWindows.tsx",
+    name = "check-length-surface__identity__src__features__settings__ModelWindows.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/settings/ModelWindows.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/settings/ModelWindows.tsx",
+    name = "check-portable-surface__identity__src__features__settings__ModelWindows.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/settings/ModelWindows.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/settings/Settings.tsx",
+    name = "check-length-surface__identity__src__features__settings__Settings.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/settings/Settings.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/settings/Settings.tsx",
+    name = "check-portable-surface__identity__src__features__settings__Settings.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/settings/Settings.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/settings/settings.css",
+    name = "check-length-surface__identity__src__features__settings__settings.css",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/settings/settings.css",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/setup/Setup.tsx",
+    name = "check-length-surface__identity__src__features__setup__Setup.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/setup/Setup.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/setup/Setup.tsx",
+    name = "check-portable-surface__identity__src__features__setup__Setup.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/setup/Setup.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/setup/SetupBoundary.tsx",
+    name = "check-length-surface__identity__src__features__setup__SetupBoundary.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/setup/SetupBoundary.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/setup/SetupBoundary.tsx",
+    name = "check-portable-surface__identity__src__features__setup__SetupBoundary.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/setup/SetupBoundary.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/sign-in/SignIn.tsx",
+    name = "check-length-surface__identity__src__features__sign-in__SignIn.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/sign-in/SignIn.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/sign-in/SignIn.tsx",
+    name = "check-portable-surface__identity__src__features__sign-in__SignIn.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/sign-in/SignIn.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/sign-in/sign-in.css",
+    name = "check-length-surface__identity__src__features__sign-in__sign-in.css",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/sign-in/sign-in.css",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/signin/AccountHelp.tsx",
+    name = "check-length-surface__identity__src__features__signin__AccountHelp.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/signin/AccountHelp.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/signin/AccountHelp.tsx",
+    name = "check-portable-surface__identity__src__features__signin__AccountHelp.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/signin/AccountHelp.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/signin/Gate.tsx",
+    name = "check-length-surface__identity__src__features__signin__Gate.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/signin/Gate.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/signin/Gate.tsx",
+    name = "check-portable-surface__identity__src__features__signin__Gate.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/signin/Gate.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/signin/fileReturn.tsx",
+    name = "check-length-surface__identity__src__features__signin__fileReturn.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/signin/fileReturn.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/signin/fileReturn.tsx",
+    name = "check-portable-surface__identity__src__features__signin__fileReturn.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/signin/fileReturn.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/signin/words.tsx",
+    name = "check-length-surface__identity__src__features__signin__words.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/signin/words.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/signin/words.tsx",
+    name = "check-portable-surface__identity__src__features__signin__words.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/signin/words.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/teams/TeamActions.tsx",
+    name = "check-length-surface__identity__src__features__teams__TeamActions.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/teams/TeamActions.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/teams/TeamActions.tsx",
+    name = "check-portable-surface__identity__src__features__teams__TeamActions.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/teams/TeamActions.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/teams/Teams.tsx",
+    name = "check-length-surface__identity__src__features__teams__Teams.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/teams/Teams.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/teams/Teams.tsx",
+    name = "check-portable-surface__identity__src__features__teams__Teams.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/teams/Teams.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/teams/contract.ts",
+    name = "check-length-surface__identity__src__features__teams__contract.ts",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/teams/contract.ts",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/teams/contract.ts",
+    name = "check-portable-surface__identity__src__features__teams__contract.ts",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/teams/contract.ts",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/teams/teams.css",
+    name = "check-length-surface__identity__src__features__teams__teams.css",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/teams/teams.css",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/usage/ContextDefault.tsx",
+    name = "check-length-surface__identity__src__features__usage__ContextDefault.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/usage/ContextDefault.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/usage/ContextDefault.tsx",
+    name = "check-portable-surface__identity__src__features__usage__ContextDefault.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/usage/ContextDefault.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/usage/Schedules.tsx",
+    name = "check-length-surface__identity__src__features__usage__Schedules.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/usage/Schedules.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/usage/Schedules.tsx",
+    name = "check-portable-surface__identity__src__features__usage__Schedules.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/usage/Schedules.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/usage/SpendingLimit.tsx",
+    name = "check-length-surface__identity__src__features__usage__SpendingLimit.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/usage/SpendingLimit.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/usage/SpendingLimit.tsx",
+    name = "check-portable-surface__identity__src__features__usage__SpendingLimit.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/usage/SpendingLimit.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/usage/Usage.tsx",
+    name = "check-length-surface__identity__src__features__usage__Usage.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/usage/Usage.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/usage/Usage.tsx",
+    name = "check-portable-surface__identity__src__features__usage__Usage.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/usage/Usage.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/usage/UsageBudgets.tsx",
+    name = "check-length-surface__identity__src__features__usage__UsageBudgets.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/usage/UsageBudgets.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/usage/UsageBudgets.tsx",
+    name = "check-portable-surface__identity__src__features__usage__UsageBudgets.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/usage/UsageBudgets.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/usage/UsageGoals.tsx",
+    name = "check-length-surface__identity__src__features__usage__UsageGoals.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/usage/UsageGoals.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/usage/UsageGoals.tsx",
+    name = "check-portable-surface__identity__src__features__usage__UsageGoals.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/usage/UsageGoals.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/usage/UsedNow.tsx",
+    name = "check-length-surface__identity__src__features__usage__UsedNow.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/usage/UsedNow.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/usage/UsedNow.tsx",
+    name = "check-portable-surface__identity__src__features__usage__UsedNow.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/usage/UsedNow.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/usage/Variables.tsx",
+    name = "check-length-surface__identity__src__features__usage__Variables.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/usage/Variables.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/usage/Variables.tsx",
+    name = "check-portable-surface__identity__src__features__usage__Variables.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/usage/Variables.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/usage/Words.tsx",
+    name = "check-length-surface__identity__src__features__usage__Words.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/usage/Words.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/usage/Words.tsx",
+    name = "check-portable-surface__identity__src__features__usage__Words.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/usage/Words.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/usage/budgetForm.ts",
+    name = "check-length-surface__identity__src__features__usage__budgetForm.ts",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/usage/budgetForm.ts",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/usage/budgetForm.ts",
+    name = "check-portable-surface__identity__src__features__usage__budgetForm.ts",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/usage/budgetForm.ts",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/usage/budgetWords.ts",
+    name = "check-length-surface__identity__src__features__usage__budgetWords.ts",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/usage/budgetWords.ts",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/usage/budgetWords.ts",
+    name = "check-portable-surface__identity__src__features__usage__budgetWords.ts",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/usage/budgetWords.ts",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/usage/contract.ts",
+    name = "check-length-surface__identity__src__features__usage__contract.ts",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/usage/contract.ts",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/usage/contract.ts",
+    name = "check-portable-surface__identity__src__features__usage__contract.ts",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/usage/contract.ts",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/usage/reasons.ts",
+    name = "check-length-surface__identity__src__features__usage__reasons.ts",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/usage/reasons.ts",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/features/usage/reasons.ts",
+    name = "check-portable-surface__identity__src__features__usage__reasons.ts",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/features/usage/reasons.ts",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/features/usage/usage.css",
+    name = "check-length-surface__identity__src__features__usage__usage.css",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/features/usage/usage.css",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/generated/grants.ts",
+    name = "check-length-surface__identity__src__generated__grants.ts",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/generated/grants.ts",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/generated/grants.ts",
+    name = "check-portable-surface__identity__src__generated__grants.ts",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/generated/grants.ts",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/generated/index.ts",
+    name = "check-length-surface__identity__src__generated__index.ts",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/generated/index.ts",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/generated/index.ts",
+    name = "check-portable-surface__identity__src__generated__index.ts",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/generated/index.ts",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/kept.ts",
+    name = "check-length-surface__identity__src__kept.ts",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/kept.ts",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/kept.ts",
+    name = "check-portable-surface__identity__src__kept.ts",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/kept.ts",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/live.ts",
+    name = "check-length-surface__identity__src__live.ts",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/live.ts",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/live.ts",
+    name = "check-portable-surface__identity__src__live.ts",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/live.ts",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/main.tsx",
+    name = "check-length-surface__identity__src__main.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/main.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/main.tsx",
+    name = "check-portable-surface__identity__src__main.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/main.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/reads.ts",
+    name = "check-length-surface__identity__src__reads.ts",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/reads.ts",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/reads.ts",
+    name = "check-portable-surface__identity__src__reads.ts",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/reads.ts",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/routes.tsx",
+    name = "check-length-surface__identity__src__routes.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/routes.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/routes.tsx",
+    name = "check-portable-surface__identity__src__routes.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/routes.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/shell/Act.tsx",
+    name = "check-length-surface__identity__src__shell__Act.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/shell/Act.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/shell/Act.tsx",
+    name = "check-portable-surface__identity__src__shell__Act.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/shell/Act.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/shell/Dock.tsx",
+    name = "check-length-surface__identity__src__shell__Dock.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/shell/Dock.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/shell/Dock.tsx",
+    name = "check-portable-surface__identity__src__shell__Dock.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/shell/Dock.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/shell/Listing.tsx",
+    name = "check-length-surface__identity__src__shell__Listing.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/shell/Listing.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/shell/Listing.tsx",
+    name = "check-portable-surface__identity__src__shell__Listing.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/shell/Listing.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/shell/LysMark.tsx",
+    name = "check-length-surface__identity__src__shell__LysMark.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/shell/LysMark.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/shell/LysMark.tsx",
+    name = "check-portable-surface__identity__src__shell__LysMark.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/shell/LysMark.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/shell/NavigationAccess.tsx",
+    name = "check-length-surface__identity__src__shell__NavigationAccess.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/shell/NavigationAccess.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/shell/NavigationAccess.tsx",
+    name = "check-portable-surface__identity__src__shell__NavigationAccess.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/shell/NavigationAccess.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/shell/NotFound.tsx",
+    name = "check-length-surface__identity__src__shell__NotFound.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/shell/NotFound.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/shell/NotFound.tsx",
+    name = "check-portable-surface__identity__src__shell__NotFound.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/shell/NotFound.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/shell/PageHeader.tsx",
+    name = "check-length-surface__identity__src__shell__PageHeader.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/shell/PageHeader.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/shell/PageHeader.tsx",
+    name = "check-portable-surface__identity__src__shell__PageHeader.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/shell/PageHeader.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/shell/Palette.tsx",
+    name = "check-length-surface__identity__src__shell__Palette.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/shell/Palette.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/shell/Palette.tsx",
+    name = "check-portable-surface__identity__src__shell__Palette.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/shell/Palette.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/shell/Picker.tsx",
+    name = "check-length-surface__identity__src__shell__Picker.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/shell/Picker.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/shell/Picker.tsx",
+    name = "check-portable-surface__identity__src__shell__Picker.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/shell/Picker.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/shell/Rail.tsx",
+    name = "check-length-surface__identity__src__shell__Rail.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/shell/Rail.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/shell/Rail.tsx",
+    name = "check-portable-surface__identity__src__shell__Rail.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/shell/Rail.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/shell/RecordCopy.tsx",
+    name = "check-length-surface__identity__src__shell__RecordCopy.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/shell/RecordCopy.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/shell/RecordCopy.tsx",
+    name = "check-portable-surface__identity__src__shell__RecordCopy.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/shell/RecordCopy.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/shell/RecordName.tsx",
+    name = "check-length-surface__identity__src__shell__RecordName.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/shell/RecordName.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/shell/RecordName.tsx",
+    name = "check-portable-surface__identity__src__shell__RecordName.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/shell/RecordName.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/shell/RouteChecks.tsx",
+    name = "check-length-surface__identity__src__shell__RouteChecks.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/shell/RouteChecks.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/shell/RouteChecks.tsx",
+    name = "check-portable-surface__identity__src__shell__RouteChecks.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/shell/RouteChecks.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/shell/Shell.tsx",
+    name = "check-length-surface__identity__src__shell__Shell.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/shell/Shell.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/shell/Shell.tsx",
+    name = "check-portable-surface__identity__src__shell__Shell.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/shell/Shell.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/shell/ShellContext.tsx",
+    name = "check-length-surface__identity__src__shell__ShellContext.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/shell/ShellContext.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/shell/ShellContext.tsx",
+    name = "check-portable-surface__identity__src__shell__ShellContext.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/shell/ShellContext.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/shell/Upgraded.tsx",
+    name = "check-length-surface__identity__src__shell__Upgraded.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/shell/Upgraded.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/shell/Upgraded.tsx",
+    name = "check-portable-surface__identity__src__shell__Upgraded.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/shell/Upgraded.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/shell/Whose.tsx",
+    name = "check-length-surface__identity__src__shell__Whose.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/shell/Whose.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/shell/Whose.tsx",
+    name = "check-portable-surface__identity__src__shell__Whose.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/shell/Whose.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/shell/count.ts",
+    name = "check-length-surface__identity__src__shell__count.ts",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/shell/count.ts",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/shell/count.ts",
+    name = "check-portable-surface__identity__src__shell__count.ts",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/shell/count.ts",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/shell/help/HelpDock.tsx",
+    name = "check-length-surface__identity__src__shell__help__HelpDock.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/shell/help/HelpDock.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/shell/help/HelpDock.tsx",
+    name = "check-portable-surface__identity__src__shell__help__HelpDock.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/shell/help/HelpDock.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/shell/help/PageHelp.tsx",
+    name = "check-length-surface__identity__src__shell__help__PageHelp.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/shell/help/PageHelp.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/shell/help/PageHelp.tsx",
+    name = "check-portable-surface__identity__src__shell__help__PageHelp.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/shell/help/PageHelp.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/shell/help/concepts/access.ts",
+    name = "check-length-surface__identity__src__shell__help__concepts__access.ts",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/shell/help/concepts/access.ts",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/shell/help/concepts/access.ts",
+    name = "check-portable-surface__identity__src__shell__help__concepts__access.ts",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/shell/help/concepts/access.ts",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/shell/help/concepts/apps.ts",
+    name = "check-length-surface__identity__src__shell__help__concepts__apps.ts",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/shell/help/concepts/apps.ts",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/shell/help/concepts/apps.ts",
+    name = "check-portable-surface__identity__src__shell__help__concepts__apps.ts",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/shell/help/concepts/apps.ts",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/shell/help/concepts/budgets.ts",
+    name = "check-length-surface__identity__src__shell__help__concepts__budgets.ts",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/shell/help/concepts/budgets.ts",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/shell/help/concepts/budgets.ts",
+    name = "check-portable-surface__identity__src__shell__help__concepts__budgets.ts",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/shell/help/concepts/budgets.ts",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/shell/help/concepts/computers.ts",
+    name = "check-length-surface__identity__src__shell__help__concepts__computers.ts",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/shell/help/concepts/computers.ts",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/shell/help/concepts/computers.ts",
+    name = "check-portable-surface__identity__src__shell__help__concepts__computers.ts",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/shell/help/concepts/computers.ts",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/shell/help/concepts/index.ts",
+    name = "check-length-surface__identity__src__shell__help__concepts__index.ts",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/shell/help/concepts/index.ts",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/shell/help/concepts/index.ts",
+    name = "check-portable-surface__identity__src__shell__help__concepts__index.ts",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/shell/help/concepts/index.ts",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/shell/help/concepts/people.ts",
+    name = "check-length-surface__identity__src__shell__help__concepts__people.ts",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/shell/help/concepts/people.ts",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/shell/help/concepts/people.ts",
+    name = "check-portable-surface__identity__src__shell__help__concepts__people.ts",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/shell/help/concepts/people.ts",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/shell/help/concepts/start.ts",
+    name = "check-length-surface__identity__src__shell__help__concepts__start.ts",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/shell/help/concepts/start.ts",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/shell/help/concepts/start.ts",
+    name = "check-portable-surface__identity__src__shell__help__concepts__start.ts",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/shell/help/concepts/start.ts",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/shell/help/concepts/trouble.ts",
+    name = "check-length-surface__identity__src__shell__help__concepts__trouble.ts",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/shell/help/concepts/trouble.ts",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/shell/help/concepts/trouble.ts",
+    name = "check-portable-surface__identity__src__shell__help__concepts__trouble.ts",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/shell/help/concepts/trouble.ts",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/shell/help/concepts/types.ts",
+    name = "check-length-surface__identity__src__shell__help__concepts__types.ts",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/shell/help/concepts/types.ts",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/shell/help/concepts/types.ts",
+    name = "check-portable-surface__identity__src__shell__help__concepts__types.ts",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/shell/help/concepts/types.ts",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/shell/help/help.css",
+    name = "check-length-surface__identity__src__shell__help__help.css",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/shell/help/help.css",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/shell/help/pages.ts",
+    name = "check-length-surface__identity__src__shell__help__pages.ts",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/shell/help/pages.ts",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/shell/help/pages.ts",
+    name = "check-portable-surface__identity__src__shell__help__pages.ts",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/shell/help/pages.ts",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/shell/help/shortcuts.ts",
+    name = "check-length-surface__identity__src__shell__help__shortcuts.ts",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/shell/help/shortcuts.ts",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/shell/help/shortcuts.ts",
+    name = "check-portable-surface__identity__src__shell__help__shortcuts.ts",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/shell/help/shortcuts.ts",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/shell/help/url.ts",
+    name = "check-length-surface__identity__src__shell__help__url.ts",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/shell/help/url.ts",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/shell/help/url.ts",
+    name = "check-portable-surface__identity__src__shell__help__url.ts",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/shell/help/url.ts",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/shell/keyable.ts",
+    name = "check-length-surface__identity__src__shell__keyable.ts",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/shell/keyable.ts",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/shell/keyable.ts",
+    name = "check-portable-surface__identity__src__shell__keyable.ts",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/shell/keyable.ts",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/shell/keys.ts",
+    name = "check-length-surface__identity__src__shell__keys.ts",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/shell/keys.ts",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/shell/keys.ts",
+    name = "check-portable-surface__identity__src__shell__keys.ts",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/shell/keys.ts",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/shell/org.ts",
+    name = "check-length-surface__identity__src__shell__org.ts",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/shell/org.ts",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/shell/org.ts",
+    name = "check-portable-surface__identity__src__shell__org.ts",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/shell/org.ts",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/shell/prefs.ts",
+    name = "check-length-surface__identity__src__shell__prefs.ts",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/shell/prefs.ts",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/shell/prefs.ts",
+    name = "check-portable-surface__identity__src__shell__prefs.ts",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/shell/prefs.ts",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/shell/railItems.ts",
+    name = "check-length-surface__identity__src__shell__railItems.ts",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/shell/railItems.ts",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/shell/railItems.ts",
+    name = "check-portable-surface__identity__src__shell__railItems.ts",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/shell/railItems.ts",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/shell/symbols.tsx",
+    name = "check-length-surface__identity__src__shell__symbols.tsx",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/shell/symbols.tsx",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/shell/symbols.tsx",
+    name = "check-portable-surface__identity__src__shell__symbols.tsx",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/shell/symbols.tsx",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/styles.d.ts",
+    name = "check-length-surface__identity__src__styles.d.ts",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/styles.d.ts",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/src/styles.d.ts",
+    name = "check-portable-surface__identity__src__styles.d.ts",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/src/styles.d.ts",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/styles/dock.css",
+    name = "check-length-surface__identity__src__styles__dock.css",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/styles/dock.css",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/styles/forms.css",
+    name = "check-length-surface__identity__src__styles__forms.css",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/styles/forms.css",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/styles/overlays.css",
+    name = "check-length-surface__identity__src__styles__overlays.css",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/styles/overlays.css",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/styles/rail.css",
+    name = "check-length-surface__identity__src__styles__rail.css",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/styles/rail.css",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/styles/screen.css",
+    name = "check-length-surface__identity__src__styles__screen.css",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/styles/screen.css",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/src/styles/tokens.css",
+    name = "check-length-surface__identity__src__styles__tokens.css",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/src/styles/tokens.css",
+)
+file_check(
+    kind = "length",
+    logical = "surface/identity/vite.config.ts",
+    name = "check-length-surface__identity__vite.config.ts",
+    port_config = "",
+    scanner = "toolchains//:tokei",
+    src = "surface/identity/vite.config.ts",
+)
+
+file_check(
+    kind = "portable",
+    logical = "surface/identity/vite.config.ts",
+    name = "check-portable-surface__identity__vite.config.ts",
+    port_config = "",
+    scanner = "toolchains//:ast-grep",
+    src = "surface/identity/vite.config.ts",
+)

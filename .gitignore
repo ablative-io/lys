@@ -9,3 +9,22 @@ __pycache__/
 
 # vitest reporter output; never source (the dev-scripts test refuses a dirty surface)
 surface/identity/.vitest/
+
+# Lys signing keys never leave the machine.
+lys-keys.json
+
+# Buck outputs and discovered host tools are machine-local.
+/buck-out/
+/.buckconfig.local
+/toolchains/_local/
+/third-party/vendor/
+/third-party/.cargo/
+/third-party/target/
+# Reindeer reads these overrides when materializing ignored vendor sources.
+reindeer:!/third-party/vendor/
+reindeer:!/third-party/vendor/**
+# Generated input snapshots are recreated by buckgen before Buck loads their export targets.
+/buckgen/inputs/**
+!/buckgen/inputs/BUCK
+/buckgen/tmp/
+/nativelink-platform/

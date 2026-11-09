@@ -1,0 +1,2 @@
+# Red: box2-buckify-02.log: build script needs an explicit decision.
+buildscript.run = true
