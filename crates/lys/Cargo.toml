@@ -80,8 +80,8 @@ reqwest = { workspace = true, features = ["json", "rustls-tls"] }
 [target.'cfg(unix)'.dev-dependencies]
 nix = { version = "0.28", features = ["event", "fs", "time", "user"] }
 
-# The container-backed identity targets run only on the identity leg of
-# .land/gates.sh, never under `cargo test --workspace --all-features`.
+# The container-backed identity targets need a container runtime and run only
+# when selected by name, never under `cargo test --workspace --all-features`.
 [[test]]
 name = "identity_deploy"
 path = "tests/identity_deploy.rs"
