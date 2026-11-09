@@ -146790,7 +146790,8 @@ workspace_rust_test(
     features = [],
     framework = True,
     labels = [
-        "tier-1"
+        "tier-1",
+        "needs-spicedb"
     ],
     mapped_srcs = {
         "//:input-Cargo.lock": "Cargo.lock",

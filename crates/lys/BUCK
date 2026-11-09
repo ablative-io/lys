@@ -5540,7 +5540,8 @@ workspace_rust_test(
     ],
     framework = True,
     labels = [
-        "tier-1"
+        "tier-1",
+        "needs-container-runtime"
     ],
     mapped_srcs = {
         "//:input-Cargo.lock": "Cargo.lock",
@@ -5905,7 +5906,8 @@ workspace_rust_test(
     ],
     framework = True,
     labels = [
-        "tier-1"
+        "tier-1",
+        "needs-container-runtime"
     ],
     mapped_srcs = {
         "//:input-Cargo.lock": "Cargo.lock",
@@ -6270,7 +6272,8 @@ workspace_rust_test(
     ],
     framework = True,
     labels = [
-        "tier-1"
+        "tier-1",
+        "needs-container-runtime"
     ],
     mapped_srcs = {
         "//:input-Cargo.lock": "Cargo.lock",
@@ -6635,7 +6638,8 @@ workspace_rust_test(
     ],
     framework = True,
     labels = [
-        "tier-1"
+        "tier-1",
+        "needs-container-runtime"
     ],
     mapped_srcs = {
         "//:input-Cargo.lock": "Cargo.lock",
@@ -7000,7 +7004,8 @@ workspace_rust_test(
     ],
     framework = True,
     labels = [
-        "tier-1"
+        "tier-1",
+        "needs-container-runtime"
     ],
     mapped_srcs = {
         "//:input-Cargo.lock": "Cargo.lock",
@@ -7365,7 +7370,8 @@ workspace_rust_test(
     ],
     framework = True,
     labels = [
-        "tier-1"
+        "tier-1",
+        "needs-container-runtime"
     ],
     mapped_srcs = {
         "//:input-Cargo.lock": "Cargo.lock",
@@ -8825,7 +8831,8 @@ workspace_rust_test(
     ],
     framework = True,
     labels = [
-        "tier-1"
+        "tier-1",
+        "needs-container-runtime"
     ],
     mapped_srcs = {
         "//:input-Cargo.lock": "Cargo.lock",

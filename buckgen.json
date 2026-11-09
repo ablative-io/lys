@@ -1,7 +1,16 @@
 {
   "lys": {
     "checkout_git": true,
-    "reason": "build.rs stamps the binary with the checkout's HEAD commit and whether it is dirty (build/provenance.rs), read from live Git as Cargo runs it."
+    "reason": "build.rs stamps the binary with the checkout's HEAD commit and whether it is dirty (build/provenance.rs), read from live Git as Cargo runs it. Its identity tests start Rauthy and Postgres in containers (container_runtime_missing without one), so they run only where the machine declares a container runtime.",
+    "needs": {
+      "identity_deploy": ["container-runtime"],
+      "identity_install": ["container-runtime"],
+      "identity_refusals": ["container-runtime"],
+      "identity_restart": ["container-runtime"],
+      "identity_shared_db": ["container-runtime"],
+      "identity_theme": ["container-runtime"],
+      "rauthy_mail_leg": ["container-runtime"]
+    }
   },
   "lys-home": {
     "checkout_git": true,
@@ -9,7 +18,10 @@
   },
   "lys-identity-server": {
     "checkout_git": true,
-    "reason": "build.rs stamps the binary with the checkout's HEAD commit and whether it is dirty (build/provenance.rs), read from live Git as Cargo runs it. Its seat_import_lifecycle tests run the workspace's lys binary from beside themselves, as a workspace run of Cargo leaves it (workspace_bins).",
+    "reason": "build.rs stamps the binary with the checkout's HEAD commit and whether it is dirty (build/provenance.rs), read from live Git as Cargo runs it. Its seat_import_lifecycle tests run the workspace's lys binary from beside themselves, as a workspace run of Cargo leaves it (workspace_bins). identity_spicedb asks a live SpiceDB (LYS_SPICEDB_ENDPOINT), so it runs only where the machine declares one.",
+    "needs": {
+      "identity_spicedb": ["spicedb"]
+    },
     "workspace_bins": {
       "lys": [
         "lys"
