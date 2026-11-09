@@ -1,7 +1,7 @@
 load("@prelude//toolchains:cxx.bzl", "system_cxx_toolchain")
 load("@prelude//toolchains:genrule.bzl", "system_genrule_toolchain")
 load("@prelude//toolchains:python.bzl", "system_python_bootstrap_toolchain")
-load(":rust.bzl", "host_rust_toolchain", "runtime_manifest_rust_toolchain")
+load(":rust.bzl", "bin_exe_rust_toolchain", "host_rust_toolchain", "runtime_manifest_rust_toolchain")
 
 system_cxx_toolchain(
     name = "cxx",
@@ -14,6 +14,7 @@ system_cxx_toolchain(
 system_genrule_toolchain(name = "genrule", visibility = ["PUBLIC"])
 host_rust_toolchain(name = "rust", visibility = ["PUBLIC"])
 runtime_manifest_rust_toolchain(name = "rust-runtime-manifest", visibility = ["PUBLIC"])
+bin_exe_rust_toolchain(name = "rust-bin-exe", visibility = ["PUBLIC"])
 system_python_bootstrap_toolchain(
     name = "python_bootstrap",
     interpreter = read_root_config("host_tools", "python"),

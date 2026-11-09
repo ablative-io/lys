@@ -1,0 +1,2 @@
+# Literal include inputs from published src files.
+extra_srcs = ["assets/IGC_A.der", "assets/IGC_A.pem", "assets/crl-ext/crl-complex.der", "assets/crl-ext/crl-no-crl.der", "assets/crl-ext/crl-simple.der", "assets/example.crl", "assets/extension1.der", "assets/extension2.der"]

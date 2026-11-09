@@ -1,0 +1,2 @@
+# Red: box2-build-08.log: include input absent from declared srcs.
+extra_srcs = ["src/data/alg-rsa-pkcs1-sha256-absent-params.der", "src/data/alg-rsa-pkcs1-sha384-absent-params.der", "src/data/alg-rsa-pkcs1-sha512-absent-params.der"]

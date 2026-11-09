@@ -22,8 +22,14 @@ def _impl(ctx):
 def _runtime_manifest_impl(ctx):
     return _toolchain(ctx, RunInfo(args = [ctx.attrs._runner[RunInfo], "--runtime-manifest-rustc", read_root_config("host_tools", "rustc"), "--"]))
 
+# Tests reading CARGO_BIN_EXE_* at run time (see @build//buck:binexe.sh).
+def _bin_exe_impl(ctx):
+    return _toolchain(ctx, RunInfo(args = [ctx.attrs._binexe[RunInfo], read_root_config("host_tools", "rustc")]))
+
 _attrs = {"_runner": attrs.exec_dep(default = "toolchains//:buckrun", providers = [RunInfo])}
 
 host_rust_toolchain = rule(impl = _impl, attrs = _attrs, is_toolchain_rule = True)
 
 runtime_manifest_rust_toolchain = rule(impl = _runtime_manifest_impl, attrs = _attrs, is_toolchain_rule = True)
+
+bin_exe_rust_toolchain = rule(impl = _bin_exe_impl, attrs = dict(_attrs, _binexe = attrs.exec_dep(default = "build//buck:binexe", providers = [RunInfo])), is_toolchain_rule = True)

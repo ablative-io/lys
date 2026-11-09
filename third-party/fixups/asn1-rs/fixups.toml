@@ -1,0 +1,2 @@
+# Literal include inputs from published src files.
+extra_srcs = ["doc/DEBUG.md", "doc/DERIVE.md", "doc/RECIPES.md"]

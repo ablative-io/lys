@@ -1,0 +1,3 @@
+# Literal include inputs from published src files.
+extra_srcs = ["doc/nom_recipes.md"]
+# Current locked nom has no build script; no trial buildscript override applies.

@@ -16,10 +16,13 @@
   build = git
 [external_cell_build]
   git_origin = https://github.com/tomWhiting/build.git
-  commit_hash = bc7bf696b2a6eef2a4ebcdc95319e409a2fc61d6
+  commit_hash = 03b8a17f46e4614580d837084ff77977129160be
 [parser]
   target_platform_detector_spec = target:root//...->prelude//platforms:default target:prelude//...->prelude//platforms:default target:toolchains//...->prelude//platforms:default target:build//...->prelude//platforms:default
 [build]
   execution_platforms = prelude//platforms:default
 [project]
   ignore = .git, .worktrees, target, node_modules, .gate, third-party/.cargo, third-party/target
+[buck2]
+  defer_write_actions = true
+  sqlite_materializer_state = true

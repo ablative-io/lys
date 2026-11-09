@@ -368,6 +368,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "admission",
     crate_root = "tests/identity_contract/tests/admission.rs",
@@ -458,6 +459,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "agent_signed_actor",
     crate_root = "tests/identity_contract/tests/agent_signed_actor.rs",
@@ -548,6 +550,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "dev_scripts",
     crate_root = "tests/identity_contract/tests/dev_scripts.rs",
@@ -638,6 +641,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "events",
     crate_root = "tests/identity_contract/tests/events.rs",
@@ -728,6 +732,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "harness_lifetime",
     crate_root = "tests/identity_contract/tests/harness_lifetime.rs",
@@ -818,6 +823,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "lifecycle",
     crate_root = "tests/identity_contract/tests/lifecycle.rs",
@@ -908,6 +914,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "link_audit",
     crate_root = "tests/identity_contract/tests/link_audit.rs",
@@ -998,6 +1005,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "registration",
     crate_root = "tests/identity_contract/tests/registration.rs",
@@ -1088,6 +1096,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "setup_event",
     crate_root = "tests/identity_contract/tests/setup_event.rs",

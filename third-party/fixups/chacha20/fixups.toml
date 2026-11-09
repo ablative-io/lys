@@ -1,0 +1,3 @@
+# Red: box2-build-04.log: include input absent from declared srcs.
+extra_srcs = ["README.md"]
+# Red: box2-build-04.log: include input absent from declared srcs.

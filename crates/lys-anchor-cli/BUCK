@@ -316,6 +316,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "anchor_cli",
     crate_root = "crates/lys-anchor-cli/tests/anchor_cli.rs",

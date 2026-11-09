@@ -12368,6 +12368,7 @@ rust_binary(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "accounts",
     crate_root = "crates/lys-identity-server/tests/accounts.rs",
@@ -13780,6 +13781,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "action_sentences",
     crate_root = "crates/lys-identity-server/tests/action_sentences.rs",
@@ -15192,6 +15194,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "add_agent_walk",
     crate_root = "crates/lys-identity-server/tests/add_agent_walk.rs",
@@ -16604,6 +16607,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "administrator_give",
     crate_root = "crates/lys-identity-server/tests/administrator_give.rs",
@@ -18016,6 +18020,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "admission_authority",
     crate_root = "crates/lys-identity-server/tests/admission_authority.rs",
@@ -19428,6 +19433,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "agent_app_pass",
     crate_root = "crates/lys-identity-server/tests/agent_app_pass.rs",
@@ -20840,6 +20846,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "agent_pass",
     crate_root = "crates/lys-identity-server/tests/agent_pass.rs",
@@ -22252,6 +22259,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "agent_pass_path",
     crate_root = "crates/lys-identity-server/tests/agent_pass_path.rs",
@@ -23664,6 +23672,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "agent_pass_recovery",
     crate_root = "crates/lys-identity-server/tests/agent_pass_recovery.rs",
@@ -25076,6 +25085,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "agent_policy",
     crate_root = "crates/lys-identity-server/tests/agent_policy.rs",
@@ -26488,6 +26498,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "agent_policy_default",
     crate_root = "crates/lys-identity-server/tests/agent_policy_default.rs",
@@ -27900,6 +27911,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "agent_roots",
     crate_root = "crates/lys-identity-server/tests/agent_roots.rs",
@@ -29312,6 +29324,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "agent_route_parity",
     crate_root = "crates/lys-identity-server/tests/agent_route_parity.rs",
@@ -30724,6 +30737,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "agent_signature",
     crate_root = "crates/lys-identity-server/tests/agent_signature.rs",
@@ -32136,6 +32150,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "agent_starts_agent",
     crate_root = "crates/lys-identity-server/tests/agent_starts_agent.rs",
@@ -33548,6 +33563,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "alarms",
     crate_root = "crates/lys-identity-server/tests/alarms.rs",
@@ -34960,6 +34976,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "alarms_follow",
     crate_root = "crates/lys-identity-server/tests/alarms_follow.rs",
@@ -36372,6 +36389,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "apps",
     crate_root = "crates/lys-identity-server/tests/apps.rs",
@@ -37784,6 +37802,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "apps_agents_diff",
     crate_root = "crates/lys-identity-server/tests/apps_agents_diff.rs",
@@ -39196,6 +39215,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "apps_connect",
     crate_root = "crates/lys-identity-server/tests/apps_connect.rs",
@@ -40608,6 +40628,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "apps_connect_retry",
     crate_root = "crates/lys-identity-server/tests/apps_connect_retry.rs",
@@ -42020,6 +42041,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "apps_lines",
     crate_root = "crates/lys-identity-server/tests/apps_lines.rs",
@@ -43432,6 +43454,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "apps_roles",
     crate_root = "crates/lys-identity-server/tests/apps_roles.rs",
@@ -44844,6 +44867,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "apps_schema",
     crate_root = "crates/lys-identity-server/tests/apps_schema.rs",
@@ -46256,6 +46280,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "apps_schema_class",
     crate_root = "crates/lys-identity-server/tests/apps_schema_class.rs",
@@ -47668,6 +47693,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "apps_schema_first_grant",
     crate_root = "crates/lys-identity-server/tests/apps_schema_first_grant.rs",
@@ -49080,6 +49106,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "apps_snapshot",
     crate_root = "crates/lys-identity-server/tests/apps_snapshot.rs",
@@ -50492,6 +50519,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "authority_build",
     crate_root = "crates/lys-identity-server/tests/authority_build.rs",
@@ -51904,6 +51932,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "body_limits",
     crate_root = "crates/lys-identity-server/tests/body_limits.rs",
@@ -53316,6 +53345,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "budget_admission",
     crate_root = "crates/lys-identity-server/tests/budget_admission.rs",
@@ -54728,6 +54758,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "budget_aggregates",
     crate_root = "crates/lys-identity-server/tests/budget_aggregates.rs",
@@ -56140,6 +56171,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "budget_authority",
     crate_root = "crates/lys-identity-server/tests/budget_authority.rs",
@@ -57552,6 +57584,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "budget_behavior",
     crate_root = "crates/lys-identity-server/tests/budget_behavior.rs",
@@ -58964,6 +58997,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "budget_crossings",
     crate_root = "crates/lys-identity-server/tests/budget_crossings.rs",
@@ -60376,6 +60410,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "budget_feed",
     crate_root = "crates/lys-identity-server/tests/budget_feed.rs",
@@ -61788,6 +61823,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "budget_limits",
     crate_root = "crates/lys-identity-server/tests/budget_limits.rs",
@@ -63200,6 +63236,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "budget_openapi",
     crate_root = "crates/lys-identity-server/tests/budget_openapi.rs",
@@ -64612,6 +64649,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "budget_recovery_security",
     crate_root = "crates/lys-identity-server/tests/budget_recovery_security.rs",
@@ -66024,6 +66062,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "budget_reset_admission",
     crate_root = "crates/lys-identity-server/tests/budget_reset_admission.rs",
@@ -67436,6 +67475,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "budget_teams",
     crate_root = "crates/lys-identity-server/tests/budget_teams.rs",
@@ -68848,6 +68888,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "budgets",
     crate_root = "crates/lys-identity-server/tests/budgets.rs",
@@ -70260,6 +70301,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "budgets_act",
     crate_root = "crates/lys-identity-server/tests/budgets_act.rs",
@@ -71672,6 +71714,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "budgets_feed_entries",
     crate_root = "crates/lys-identity-server/tests/budgets_feed_entries.rs",
@@ -73084,6 +73127,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "budgets_feed_profile_window",
     crate_root = "crates/lys-identity-server/tests/budgets_feed_profile_window.rs",
@@ -74496,6 +74540,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "caller_admission",
     crate_root = "crates/lys-identity-server/tests/caller_admission.rs",
@@ -75908,6 +75953,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "caller_lifecycle",
     crate_root = "crates/lys-identity-server/tests/caller_lifecycle.rs",
@@ -77320,6 +77366,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "canvas",
     crate_root = "crates/lys-identity-server/tests/canvas.rs",
@@ -78732,6 +78779,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "certificates_api",
     crate_root = "crates/lys-identity-server/tests/certificates_api.rs",
@@ -80144,6 +80192,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "certificates_by_agent",
     crate_root = "crates/lys-identity-server/tests/certificates_by_agent.rs",
@@ -81556,6 +81605,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "certificates_issue",
     crate_root = "crates/lys-identity-server/tests/certificates_issue.rs",
@@ -82968,6 +83018,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "certificates_store",
     crate_root = "crates/lys-identity-server/tests/certificates_store.rs",
@@ -84380,6 +84431,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "changes",
     crate_root = "crates/lys-identity-server/tests/changes.rs",
@@ -85792,6 +85844,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "channel_membership",
     crate_root = "crates/lys-identity-server/tests/channel_membership.rs",
@@ -87204,6 +87257,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "channel_membership_admission",
     crate_root = "crates/lys-identity-server/tests/channel_membership_admission.rs",
@@ -88616,6 +88670,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "channel_membership_conformance",
     crate_root = "crates/lys-identity-server/tests/channel_membership_conformance.rs",
@@ -90028,6 +90083,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "channel_membership_counts",
     crate_root = "crates/lys-identity-server/tests/channel_membership_counts.rs",
@@ -91440,6 +91496,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "channel_membership_recovery",
     crate_root = "crates/lys-identity-server/tests/channel_membership_recovery.rs",
@@ -92852,6 +92909,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "clock",
     crate_root = "crates/lys-identity-server/tests/clock.rs",
@@ -94264,6 +94322,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "configuration",
     crate_root = "crates/lys-identity-server/tests/configuration.rs",
@@ -95676,6 +95735,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "connections",
     crate_root = "crates/lys-identity-server/tests/connections.rs",
@@ -97088,6 +97148,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "console_stop_refusals",
     crate_root = "crates/lys-identity-server/tests/console_stop_refusals.rs",
@@ -98500,6 +98561,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "context_stop",
     crate_root = "crates/lys-identity-server/tests/context_stop.rs",
@@ -99912,6 +99974,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "context_stop_format",
     crate_root = "crates/lys-identity-server/tests/context_stop_format.rs",
@@ -101324,6 +101387,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "control_receipts",
     crate_root = "crates/lys-identity-server/tests/control_receipts.rs",
@@ -102736,6 +102800,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "control_recovery",
     crate_root = "crates/lys-identity-server/tests/control_recovery.rs",
@@ -104148,6 +104213,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "dashboard",
     crate_root = "crates/lys-identity-server/tests/dashboard.rs",
@@ -105560,6 +105626,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "dashboard_acted_by_agents",
     crate_root = "crates/lys-identity-server/tests/dashboard_acted_by_agents.rs",
@@ -106972,6 +107039,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "default_claude_start",
     crate_root = "crates/lys-identity-server/tests/default_claude_start.rs",
@@ -108384,6 +108452,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "default_codex_start",
     crate_root = "crates/lys-identity-server/tests/default_codex_start.rs",
@@ -109796,6 +109865,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "dial_capacity",
     crate_root = "crates/lys-identity-server/tests/dial_capacity.rs",
@@ -111208,6 +111278,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "door_handles",
     crate_root = "crates/lys-identity-server/tests/door_handles.rs",
@@ -112620,6 +112691,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "emergency_stop",
     crate_root = "crates/lys-identity-server/tests/emergency_stop.rs",
@@ -114032,6 +114104,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "gate_refusals",
     crate_root = "crates/lys-identity-server/tests/gate_refusals.rs",
@@ -115444,6 +115517,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "goals",
     crate_root = "crates/lys-identity-server/tests/goals.rs",
@@ -116856,6 +116930,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "goals_edits",
     crate_root = "crates/lys-identity-server/tests/goals_edits.rs",
@@ -118268,6 +118343,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "grant_boss",
     crate_root = "crates/lys-identity-server/tests/grant_boss.rs",
@@ -119680,6 +119756,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "grant_cannot_give",
     crate_root = "crates/lys-identity-server/tests/grant_cannot_give.rs",
@@ -121092,6 +121169,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "grant_changes",
     crate_root = "crates/lys-identity-server/tests/grant_changes.rs",
@@ -122504,6 +122582,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "grant_changes_placements",
     crate_root = "crates/lys-identity-server/tests/grant_changes_placements.rs",
@@ -123916,6 +123995,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "grant_checkpoint_reset",
     crate_root = "crates/lys-identity-server/tests/grant_checkpoint_reset.rs",
@@ -125328,6 +125408,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "grant_explanations",
     crate_root = "crates/lys-identity-server/tests/grant_explanations.rs",
@@ -126740,6 +126821,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "grant_model_agents",
     crate_root = "crates/lys-identity-server/tests/grant_model_agents.rs",
@@ -128152,6 +128234,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "grant_resource_projection",
     crate_root = "crates/lys-identity-server/tests/grant_resource_projection.rs",
@@ -129564,6 +129647,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "grant_token_wire",
     crate_root = "crates/lys-identity-server/tests/grant_token_wire.rs",
@@ -130976,6 +131060,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "grants",
     crate_root = "crates/lys-identity-server/tests/grants.rs",
@@ -132388,6 +132473,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "grants_batch",
     crate_root = "crates/lys-identity-server/tests/grants_batch.rs",
@@ -133800,6 +133886,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "grants_engine_down",
     crate_root = "crates/lys-identity-server/tests/grants_engine_down.rs",
@@ -135212,6 +135299,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "grants_held",
     crate_root = "crates/lys-identity-server/tests/grants_held.rs",
@@ -136624,6 +136712,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "grants_mode",
     crate_root = "crates/lys-identity-server/tests/grants_mode.rs",
@@ -138036,6 +138125,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "grants_model",
     crate_root = "crates/lys-identity-server/tests/grants_model.rs",
@@ -139448,6 +139538,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "grants_reach",
     crate_root = "crates/lys-identity-server/tests/grants_reach.rs",
@@ -140860,6 +140951,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "handler_judged_routes",
     crate_root = "crates/lys-identity-server/tests/handler_judged_routes.rs",
@@ -142272,6 +142364,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "harness_catalogue",
     crate_root = "crates/lys-identity-server/tests/harness_catalogue.rs",
@@ -143684,6 +143777,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "harness_installed",
     crate_root = "crates/lys-identity-server/tests/harness_installed.rs",
@@ -145096,6 +145190,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "identity_spicedb",
     crate_root = "crates/lys-identity-server/tests/identity_spicedb.rs",
@@ -146508,6 +146603,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "import_bootstrap",
     crate_root = "crates/lys-identity-server/tests/import_bootstrap.rs",
@@ -147920,6 +148016,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "import_directory",
     crate_root = "crates/lys-identity-server/tests/import_directory.rs",
@@ -149332,6 +149429,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "input_no_screen",
     crate_root = "crates/lys-identity-server/tests/input_no_screen.rs",
@@ -150744,6 +150842,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "issuer_admin",
     crate_root = "crates/lys-identity-server/tests/issuer_admin.rs",
@@ -152156,6 +152255,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "issuer_move",
     crate_root = "crates/lys-identity-server/tests/issuer_move.rs",
@@ -153568,6 +153668,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "kept_feed",
     crate_root = "crates/lys-identity-server/tests/kept_feed.rs",
@@ -154980,6 +155081,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "launch_command_choices",
     crate_root = "crates/lys-identity-server/tests/launch_command_choices.rs",
@@ -156392,6 +156494,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "launch_description",
     crate_root = "crates/lys-identity-server/tests/launch_description.rs",
@@ -157804,6 +157907,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "launch_harness",
     crate_root = "crates/lys-identity-server/tests/launch_harness.rs",
@@ -159216,6 +159320,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "launch_mcp",
     crate_root = "crates/lys-identity-server/tests/launch_mcp.rs",
@@ -160628,6 +160733,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "launch_models",
     crate_root = "crates/lys-identity-server/tests/launch_models.rs",
@@ -162040,6 +162146,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "launch_permissions",
     crate_root = "crates/lys-identity-server/tests/launch_permissions.rs",
@@ -163452,6 +163559,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "launch_skills",
     crate_root = "crates/lys-identity-server/tests/launch_skills.rs",
@@ -164864,6 +164972,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "legacy_budgets",
     crate_root = "crates/lys-identity-server/tests/legacy_budgets.rs",
@@ -166276,6 +166385,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "legacy_memberships",
     crate_root = "crates/lys-identity-server/tests/legacy_memberships.rs",
@@ -167688,6 +167798,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "link_audit_lookup",
     crate_root = "crates/lys-identity-server/tests/link_audit_lookup.rs",
@@ -169100,6 +169211,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "link_audit_signed",
     crate_root = "crates/lys-identity-server/tests/link_audit_signed.rs",
@@ -170512,6 +170624,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "link_audit_standing",
     crate_root = "crates/lys-identity-server/tests/link_audit_standing.rs",
@@ -171924,6 +172037,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "list_paging",
     crate_root = "crates/lys-identity-server/tests/list_paging.rs",
@@ -173336,6 +173450,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "lys_mcp_person_grant_credential_refusals",
     crate_root = "crates/lys-identity-server/tests/lys_mcp_person_grant_credential_refusals.rs",
@@ -174748,6 +174863,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "lys_mcp_person_product_drafts",
     crate_root = "crates/lys-identity-server/tests/lys_mcp_person_product_drafts.rs",
@@ -176160,6 +176276,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "lys_mcp_person_reads",
     crate_root = "crates/lys-identity-server/tests/lys_mcp_person_reads.rs",
@@ -177572,6 +177689,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "lys_mcp_person_refusal_names",
     crate_root = "crates/lys-identity-server/tests/lys_mcp_person_refusal_names.rs",
@@ -178984,6 +179102,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "machine_agents",
     crate_root = "crates/lys-identity-server/tests/machine_agents.rs",
@@ -180396,6 +180515,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "machine_folders",
     crate_root = "crates/lys-identity-server/tests/machine_folders.rs",
@@ -181808,6 +181928,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "machine_join",
     crate_root = "crates/lys-identity-server/tests/machine_join.rs",
@@ -183220,6 +183341,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "machine_local",
     crate_root = "crates/lys-identity-server/tests/machine_local.rs",
@@ -184632,6 +184754,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "machine_pass",
     crate_root = "crates/lys-identity-server/tests/machine_pass.rs",
@@ -186044,6 +186167,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "mail_letters",
     crate_root = "crates/lys-identity-server/tests/mail_letters.rs",
@@ -187456,6 +187580,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "mcp_approvals",
     crate_root = "crates/lys-identity-server/tests/mcp_approvals.rs",
@@ -188868,6 +188993,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "mcp_grant_token",
     crate_root = "crates/lys-identity-server/tests/mcp_grant_token.rs",
@@ -190280,6 +190406,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "mcp_requests",
     crate_root = "crates/lys-identity-server/tests/mcp_requests.rs",
@@ -191692,6 +191819,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "mcp_run_refusals",
     crate_root = "crates/lys-identity-server/tests/mcp_run_refusals.rs",
@@ -193104,6 +193232,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "mcp_token_discovery",
     crate_root = "crates/lys-identity-server/tests/mcp_token_discovery.rs",
@@ -194516,6 +194645,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "memory",
     crate_root = "crates/lys-identity-server/tests/memory.rs",
@@ -195928,6 +196058,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "message_edges",
     crate_root = "crates/lys-identity-server/tests/message_edges.rs",
@@ -197340,6 +197471,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "migration_window",
     crate_root = "crates/lys-identity-server/tests/migration_window.rs",
@@ -198752,6 +198884,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "model_account_handles",
     crate_root = "crates/lys-identity-server/tests/model_account_handles.rs",
@@ -200164,6 +200297,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "model_account_review",
     crate_root = "crates/lys-identity-server/tests/model_account_review.rs",
@@ -201576,6 +201710,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "network",
     crate_root = "crates/lys-identity-server/tests/network.rs",
@@ -202988,6 +203123,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "network_owner",
     crate_root = "crates/lys-identity-server/tests/network_owner.rs",
@@ -204400,6 +204536,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "network_self_service",
     crate_root = "crates/lys-identity-server/tests/network_self_service.rs",
@@ -205812,6 +205949,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "openapi",
     crate_root = "crates/lys-identity-server/tests/openapi.rs",
@@ -207224,6 +207362,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "openapi_cannot_give",
     crate_root = "crates/lys-identity-server/tests/openapi_cannot_give.rs",
@@ -208636,6 +208775,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "openapi_entries",
     crate_root = "crates/lys-identity-server/tests/openapi_entries.rs",
@@ -210048,6 +210188,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "operator",
     crate_root = "crates/lys-identity-server/tests/operator.rs",
@@ -211460,6 +211601,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "operator_session",
     crate_root = "crates/lys-identity-server/tests/operator_session.rs",
@@ -212872,6 +213014,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "organisation_boot",
     crate_root = "crates/lys-identity-server/tests/organisation_boot.rs",
@@ -214284,6 +214427,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "organisation_grants",
     crate_root = "crates/lys-identity-server/tests/organisation_grants.rs",
@@ -215696,6 +215840,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "organisation_reads",
     crate_root = "crates/lys-identity-server/tests/organisation_reads.rs",
@@ -217108,6 +217253,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "organisation_standing",
     crate_root = "crates/lys-identity-server/tests/organisation_standing.rs",
@@ -218520,6 +218666,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "organisations_found",
     crate_root = "crates/lys-identity-server/tests/organisations_found.rs",
@@ -219932,6 +220079,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "organisations_handed",
     crate_root = "crates/lys-identity-server/tests/organisations_handed.rs",
@@ -221344,6 +221492,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "organisations_prove",
     crate_root = "crates/lys-identity-server/tests/organisations_prove.rs",
@@ -222756,6 +222905,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "people_admit",
     crate_root = "crates/lys-identity-server/tests/people_admit.rs",
@@ -224168,6 +224318,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "people_admit_agent",
     crate_root = "crates/lys-identity-server/tests/people_admit_agent.rs",
@@ -225580,6 +225731,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "people_admit_app",
     crate_root = "crates/lys-identity-server/tests/people_admit_app.rs",
@@ -226992,6 +227144,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "people_logins_move",
     crate_root = "crates/lys-identity-server/tests/people_logins_move.rs",
@@ -228404,6 +228557,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "person_reads_connection_cannot_give_or_delegate",
     crate_root = "crates/lys-identity-server/tests/person_reads_connection_cannot_give_or_delegate.rs",
@@ -229816,6 +229970,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "plugins_installed",
     crate_root = "crates/lys-identity-server/tests/plugins_installed.rs",
@@ -231228,6 +231383,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "policy_launch",
     crate_root = "crates/lys-identity-server/tests/policy_launch.rs",
@@ -232640,6 +232796,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "product_drafts",
     crate_root = "crates/lys-identity-server/tests/product_drafts.rs",
@@ -234052,6 +234209,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "profile_folders",
     crate_root = "crates/lys-identity-server/tests/profile_folders.rs",
@@ -235464,6 +235622,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "provider",
     crate_root = "crates/lys-identity-server/tests/provider.rs",
@@ -236876,6 +237035,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "provider_browser_binding",
     crate_root = "crates/lys-identity-server/tests/provider_browser_binding.rs",
@@ -238288,6 +238448,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "provider_grant_binding",
     crate_root = "crates/lys-identity-server/tests/provider_grant_binding.rs",
@@ -239700,6 +239861,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "provider_refresh_restart",
     crate_root = "crates/lys-identity-server/tests/provider_refresh_restart.rs",
@@ -241112,6 +241274,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "provider_rights",
     crate_root = "crates/lys-identity-server/tests/provider_rights.rs",
@@ -242524,6 +242687,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "provisioning",
     crate_root = "crates/lys-identity-server/tests/provisioning.rs",
@@ -243936,6 +244100,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "provisioning_latest_review",
     crate_root = "crates/lys-identity-server/tests/provisioning_latest_review.rs",
@@ -245348,6 +245513,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "provisioning_seat_fields",
     crate_root = "crates/lys-identity-server/tests/provisioning_seat_fields.rs",
@@ -246760,6 +246926,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "provisioning_stall",
     crate_root = "crates/lys-identity-server/tests/provisioning_stall.rs",
@@ -248172,6 +248339,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "provisioning_upgrade_window",
     crate_root = "crates/lys-identity-server/tests/provisioning_upgrade_window.rs",
@@ -249584,6 +249752,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "quiet_peer",
     crate_root = "crates/lys-identity-server/tests/quiet_peer.rs",
@@ -250996,6 +251165,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "read_api",
     crate_root = "crates/lys-identity-server/tests/read_api.rs",
@@ -252408,6 +252578,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "refusals",
     crate_root = "crates/lys-identity-server/tests/refusals.rs",
@@ -253820,6 +253991,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "refusals_follow_retry",
     crate_root = "crates/lys-identity-server/tests/refusals_follow_retry.rs",
@@ -255232,6 +255404,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "register_answers_to",
     crate_root = "crates/lys-identity-server/tests/register_answers_to.rs",
@@ -256644,6 +256817,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "registered_admission",
     crate_root = "crates/lys-identity-server/tests/registered_admission.rs",
@@ -258056,6 +258230,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "rendered_profile",
     crate_root = "crates/lys-identity-server/tests/rendered_profile.rs",
@@ -259468,6 +259643,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "reports_to_reassign",
     crate_root = "crates/lys-identity-server/tests/reports_to_reassign.rs",
@@ -260880,6 +261056,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "requests",
     crate_root = "crates/lys-identity-server/tests/requests.rs",
@@ -262292,6 +262469,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "requests_intent",
     crate_root = "crates/lys-identity-server/tests/requests_intent.rs",
@@ -263704,6 +263882,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "requests_one_action",
     crate_root = "crates/lys-identity-server/tests/requests_one_action.rs",
@@ -265116,6 +265295,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "requests_restart",
     crate_root = "crates/lys-identity-server/tests/requests_restart.rs",
@@ -266528,6 +266708,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "requests_store",
     crate_root = "crates/lys-identity-server/tests/requests_store.rs",
@@ -267940,6 +268121,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "resources",
     crate_root = "crates/lys-identity-server/tests/resources.rs",
@@ -269352,6 +269534,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "restart_api",
     crate_root = "crates/lys-identity-server/tests/restart_api.rs",
@@ -270764,6 +270947,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "reviews",
     crate_root = "crates/lys-identity-server/tests/reviews.rs",
@@ -272176,6 +272360,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "reviews_restart",
     crate_root = "crates/lys-identity-server/tests/reviews_restart.rs",
@@ -273588,6 +273773,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "roles",
     crate_root = "crates/lys-identity-server/tests/roles.rs",
@@ -275000,6 +275186,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "roles_fence",
     crate_root = "crates/lys-identity-server/tests/roles_fence.rs",
@@ -276412,6 +276599,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "roles_refusals",
     crate_root = "crates/lys-identity-server/tests/roles_refusals.rs",
@@ -277824,6 +278012,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "runner_api",
     crate_root = "crates/lys-identity-server/tests/runner_api.rs",
@@ -279236,6 +279425,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "runner_join",
     crate_root = "crates/lys-identity-server/tests/runner_join.rs",
@@ -280648,6 +280838,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "runner_record_admission",
     crate_root = "crates/lys-identity-server/tests/runner_record_admission.rs",
@@ -282060,6 +282251,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "runner_start",
     crate_root = "crates/lys-identity-server/tests/runner_start.rs",
@@ -283472,6 +283664,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "runtime_index",
     crate_root = "crates/lys-identity-server/tests/runtime_index.rs",
@@ -284884,6 +285077,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "runtime_report_refusals",
     crate_root = "crates/lys-identity-server/tests/runtime_report_refusals.rs",
@@ -286296,6 +286490,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "runtime_reports",
     crate_root = "crates/lys-identity-server/tests/runtime_reports.rs",
@@ -287708,6 +287903,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "runtime_restart",
     crate_root = "crates/lys-identity-server/tests/runtime_restart.rs",
@@ -289120,6 +289316,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "schedules",
     crate_root = "crates/lys-identity-server/tests/schedules.rs",
@@ -290532,6 +290729,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "seat_acts",
     crate_root = "crates/lys-identity-server/tests/seat_acts.rs",
@@ -291944,6 +292142,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "seat_import_faults",
     crate_root = "crates/lys-identity-server/tests/seat_import_faults.rs",
@@ -293356,6 +293555,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "seat_import_lifecycle",
     crate_root = "crates/lys-identity-server/tests/seat_import_lifecycle.rs",
@@ -294768,6 +294968,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "seat_import_monitor",
     crate_root = "crates/lys-identity-server/tests/seat_import_monitor.rs",
@@ -296180,6 +296381,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "seat_import_plan",
     crate_root = "crates/lys-identity-server/tests/seat_import_plan.rs",
@@ -297592,6 +297794,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "seat_import_recovery",
     crate_root = "crates/lys-identity-server/tests/seat_import_recovery.rs",
@@ -299004,6 +299207,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "seat_import_references",
     crate_root = "crates/lys-identity-server/tests/seat_import_references.rs",
@@ -300416,6 +300620,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "seat_import_rules",
     crate_root = "crates/lys-identity-server/tests/seat_import_rules.rs",
@@ -301828,6 +302033,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "seat_import_schedules",
     crate_root = "crates/lys-identity-server/tests/seat_import_schedules.rs",
@@ -303240,6 +303446,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "seat_import_sources",
     crate_root = "crates/lys-identity-server/tests/seat_import_sources.rs",
@@ -304652,6 +304859,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "seat_import_upgrade",
     crate_root = "crates/lys-identity-server/tests/seat_import_upgrade.rs",
@@ -306064,6 +306272,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "seat_send",
     crate_root = "crates/lys-identity-server/tests/seat_send.rs",
@@ -307476,6 +307685,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "seat_start_conversation",
     crate_root = "crates/lys-identity-server/tests/seat_start_conversation.rs",
@@ -308888,6 +309098,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "seat_versions",
     crate_root = "crates/lys-identity-server/tests/seat_versions.rs",
@@ -310300,6 +310511,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "seats",
     crate_root = "crates/lys-identity-server/tests/seats.rs",
@@ -311712,6 +311924,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "seats_pty",
     crate_root = "crates/lys-identity-server/tests/seats_pty.rs",
@@ -313124,6 +313337,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "seats_unregistered",
     crate_root = "crates/lys-identity-server/tests/seats_unregistered.rs",
@@ -314536,6 +314750,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "secrets_api",
     crate_root = "crates/lys-identity-server/tests/secrets_api.rs",
@@ -315948,6 +316163,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "secrets_values",
     crate_root = "crates/lys-identity-server/tests/secrets_values.rs",
@@ -317360,6 +317576,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "service_accounts",
     crate_root = "crates/lys-identity-server/tests/service_accounts.rs",
@@ -318772,6 +318989,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "service_accounts_restart",
     crate_root = "crates/lys-identity-server/tests/service_accounts_restart.rs",
@@ -320184,6 +320402,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "service_template",
     crate_root = "crates/lys-identity-server/tests/service_template.rs",
@@ -321596,6 +321815,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "session_stop_start",
     crate_root = "crates/lys-identity-server/tests/session_stop_start.rs",
@@ -323008,6 +323228,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "session_store",
     crate_root = "crates/lys-identity-server/tests/session_store.rs",
@@ -324420,6 +324641,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "sessions_api",
     crate_root = "crates/lys-identity-server/tests/sessions_api.rs",
@@ -325832,6 +326054,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "sessions_restart",
     crate_root = "crates/lys-identity-server/tests/sessions_restart.rs",
@@ -327244,6 +327467,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "setup",
     crate_root = "crates/lys-identity-server/tests/setup.rs",
@@ -328656,6 +328880,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "setup_page",
     crate_root = "crates/lys-identity-server/tests/setup_page.rs",
@@ -330068,6 +330293,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "sign_in_capacity",
     crate_root = "crates/lys-identity-server/tests/sign_in_capacity.rs",
@@ -331480,6 +331706,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "sign_in_help",
     crate_root = "crates/lys-identity-server/tests/sign_in_help.rs",
@@ -332892,6 +333119,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "sign_in_page",
     crate_root = "crates/lys-identity-server/tests/sign_in_page.rs",
@@ -334304,6 +334532,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "sign_in_providers",
     crate_root = "crates/lys-identity-server/tests/sign_in_providers.rs",
@@ -335716,6 +335945,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "sign_in_proxy",
     crate_root = "crates/lys-identity-server/tests/sign_in_proxy.rs",
@@ -337128,6 +337358,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "sign_in_refusal_lines",
     crate_root = "crates/lys-identity-server/tests/sign_in_refusal_lines.rs",
@@ -338540,6 +338771,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "signed_first",
     crate_root = "crates/lys-identity-server/tests/signed_first.rs",
@@ -339952,6 +340184,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "start",
     crate_root = "crates/lys-identity-server/tests/start.rs",
@@ -341364,6 +341597,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "start_checks_seat_fields",
     crate_root = "crates/lys-identity-server/tests/start_checks_seat_fields.rs",
@@ -342776,6 +343010,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "start_command",
     crate_root = "crates/lys-identity-server/tests/start_command.rs",
@@ -344188,6 +344423,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "start_conversation_held",
     crate_root = "crates/lys-identity-server/tests/start_conversation_held.rs",
@@ -345600,6 +345836,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "start_held_liveness",
     crate_root = "crates/lys-identity-server/tests/start_held_liveness.rs",
@@ -347012,6 +347249,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "start_launcher",
     crate_root = "crates/lys-identity-server/tests/start_launcher.rs",
@@ -348424,6 +348662,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "start_records",
     crate_root = "crates/lys-identity-server/tests/start_records.rs",
@@ -349836,6 +350075,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "start_runner_refusals",
     crate_root = "crates/lys-identity-server/tests/start_runner_refusals.rs",
@@ -351248,6 +351488,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "start_stop_budget",
     crate_root = "crates/lys-identity-server/tests/start_stop_budget.rs",
@@ -352660,6 +352901,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "start_stop_exit_proof",
     crate_root = "crates/lys-identity-server/tests/start_stop_exit_proof.rs",
@@ -354072,6 +354314,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "start_stop_ordering",
     crate_root = "crates/lys-identity-server/tests/start_stop_ordering.rs",
@@ -355484,6 +355727,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "stop_everything",
     crate_root = "crates/lys-identity-server/tests/stop_everything.rs",
@@ -356896,6 +357140,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "stops_restart",
     crate_root = "crates/lys-identity-server/tests/stops_restart.rs",
@@ -358308,6 +358553,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "stores_receipt",
     crate_root = "crates/lys-identity-server/tests/stores_receipt.rs",
@@ -359720,6 +359966,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "team_authority",
     crate_root = "crates/lys-identity-server/tests/team_authority.rs",
@@ -361132,6 +361379,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "team_error_wire",
     crate_root = "crates/lys-identity-server/tests/team_error_wire.rs",
@@ -362544,6 +362792,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "teams_nested",
     crate_root = "crates/lys-identity-server/tests/teams_nested.rs",
@@ -363956,6 +364205,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "teams_receipt",
     crate_root = "crates/lys-identity-server/tests/teams_receipt.rs",
@@ -365368,6 +365618,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "teams_restart",
     crate_root = "crates/lys-identity-server/tests/teams_restart.rs",
@@ -366780,6 +367031,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "tree_api",
     crate_root = "crates/lys-identity-server/tests/tree_api.rs",
@@ -368192,6 +368444,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "variables",
     crate_root = "crates/lys-identity-server/tests/variables.rs",
@@ -369604,6 +369857,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "version",
     crate_root = "crates/lys-identity-server/tests/version.rs",
@@ -371016,6 +371270,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "warn_lines",
     crate_root = "crates/lys-identity-server/tests/warn_lines.rs",
@@ -372428,6 +372683,7 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-bin-exe",
     _test_toolchain = ":test-toolchain",
     crate = "words",
     crate_root = "crates/lys-identity-server/tests/words.rs",

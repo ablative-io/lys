@@ -1,0 +1,2 @@
+# Literal include inputs from published src files.
+extra_srcs = ["tests/UTF-8-demo.txt"]

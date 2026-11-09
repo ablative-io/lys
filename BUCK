@@ -3,6 +3,9 @@ load("@build//buck:checks.bzl", "file_check")
 load("@build//buck:drift.bzl", "generated_check")
 
 generated_check(
+    exec_compatible_with = [
+        "build//buck:needs-checkout"
+    ],
     name = "check-generated",
 )
 file_check(
@@ -21,14 +24,6 @@ file_check(
     port_config = "",
     scanner = "toolchains//:ast-grep",
     src = ".config/nextest.toml",
-)
-file_check(
-    kind = "portable",
-    logical = ".github/workflows/ci.yml",
-    name = "check-portable-.github__workflows__ci.yml",
-    port_config = "",
-    scanner = "toolchains//:ast-grep",
-    src = ".github/workflows/ci.yml",
 )
 file_check(
     kind = "length",

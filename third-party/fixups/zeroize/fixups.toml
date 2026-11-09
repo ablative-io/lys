@@ -1,0 +1,2 @@
+# include_str!/include_bytes! input missing from srcs on the remote worker.
+extra_srcs = ["README.md"]
