@@ -2,6 +2,7 @@ load("@prelude//toolchains:cxx.bzl", "system_cxx_toolchain")
 load("@prelude//toolchains:genrule.bzl", "system_genrule_toolchain")
 load("@prelude//toolchains:python.bzl", "system_python_bootstrap_toolchain")
 load(":rust.bzl", "host_rust_toolchain", "runtime_manifest_rust_toolchain", "workspace_rust_toolchain")
+load(":wasm.bzl", "wasm_cxx_toolchain")
 
 # A static musl target (build//buck:linux-x86_64-musl) compiles and links C
 # and C++ with zig's musl; bucksetup writes host_tools.musl_cc and musl_cxx
@@ -13,12 +14,27 @@ _musl_cc = read_root_config("host_tools", "musl_cc", _MUSL_UNSET)
 _musl_cxx = read_root_config("host_tools", "musl_cxx", _MUSL_UNSET)
 
 system_cxx_toolchain(
-    name = "cxx",
+    name = "cxx-host",
     compiler = select({"DEFAULT": read_root_config("host_tools", "cc"), "prelude//abi:musl": _musl_cc}),
     cxx_compiler = select({"DEFAULT": read_root_config("host_tools", "cxx"), "prelude//abi:musl": _musl_cxx}),
     linker = select({"DEFAULT": read_root_config("host_tools", "cxx"), "prelude//abi:musl": _musl_cxx}),
     archiver = read_root_config("host_tools", "ar"),
     link_style = select({"DEFAULT": "shared", "prelude//abi:musl": "static"}),
+)
+
+# A wasm32 cdylib (build//buck:wasm32) links with the recorded Rust
+# toolchain's rust-lld (wasm.bzl); bucksetup writes host_tools.rust_lld.
+wasm_cxx_toolchain(
+    name = "cxx-wasm32",
+    compiler = read_root_config("host_tools", "cc"),
+    cxx_compiler = read_root_config("host_tools", "cxx"),
+    archiver = read_root_config("host_tools", "ar"),
+    linker = read_root_config("host_tools", "rust_lld", "host_tools.rust_lld-is-unset:run-bucksetup"),
+)
+
+toolchain_alias(
+    name = "cxx",
+    actual = select({"DEFAULT": ":cxx-host", "prelude//cpu:wasm32": ":cxx-wasm32"}),
     visibility = ["PUBLIC"],
 )
 
@@ -29,10 +45,19 @@ system_cxx_toolchain(
 # no debug assertions or overflow checks, and std's debuginfo stripped.
 _RELEASE = ["-Copt-level=3", "-Cdebuginfo=0", "-Cstrip=debuginfo", "-Cdebug-assertions=off", "-Coverflow-checks=off"]
 
+# wasm32 code is position-dependent, as Cargo builds it (the target's default
+# relocation model); the prelude asks for pic for a cdylib and its deps, and
+# a later -C wins.
+_WASM32 = ["-Crelocation-model=static"]
+
 _rust_platform = {
-    "rustc_flags": select({"DEFAULT": [], "prelude//abi:musl": ["-Clink-self-contained=no", "--cfg", "libc_unstable_musl_v1_2_3"]}) +
+    "rustc_flags": select({"DEFAULT": [], "prelude//abi:musl": ["-Clink-self-contained=no", "--cfg", "libc_unstable_musl_v1_2_3"], "prelude//cpu:wasm32": _WASM32}) +
                    select({"DEFAULT": [], "build//buck:optimised": _RELEASE}),
-    "target_triple": select({"DEFAULT": None, "prelude//abi:musl": read_root_config("host_tools", "rust_musl_target", _MUSL_UNSET)}),
+    "target_triple": select({
+        "DEFAULT": None,
+        "prelude//abi:musl": read_root_config("host_tools", "rust_musl_target", _MUSL_UNSET),
+        "prelude//cpu:wasm32": "wasm32-unknown-unknown",
+    }),
 }
 system_genrule_toolchain(name = "genrule", visibility = ["PUBLIC"])
 host_rust_toolchain(name = "rust", visibility = ["PUBLIC"], **_rust_platform)

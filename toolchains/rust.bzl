@@ -16,8 +16,10 @@ def _toolchain(ctx, compiler, rustdoc = None):
         ),
     ]
 
+# Third-party crates compile through buckrun too, so each rustc takes one of
+# the machine's build slots (@build//buck/buckrun/slots.go).
 def _impl(ctx):
-    return _toolchain(ctx, RunInfo(args = [read_root_config("host_tools", "rustc")]))
+    return _toolchain(ctx, RunInfo(args = [ctx.attrs._runner[RunInfo], "--exec", read_root_config("host_tools", "rustc"), "--"]))
 
 # Crates declared runtime_manifest in buckgen.json (see @build//buck:thirdparty.bzl).
 def _runtime_manifest_impl(ctx):
@@ -33,7 +35,7 @@ def _workspace_impl(ctx):
     return _toolchain(
         ctx,
         RunInfo(args = [ctx.attrs._runner[RunInfo], "--root", root, "--rustc", read_root_config("host_tools", "rustc"), "--"]),
-        RunInfo(args = [ctx.attrs._runner[RunInfo], "--root", root, "--rustdoc", read_root_config("host_tools", "rustdoc"), "--"]),
+        RunInfo(args = [ctx.attrs._runner[RunInfo], "--root", root, "--test-builder", read_root_config("host_tools", "rustc"), "--rustdoc", read_root_config("host_tools", "rustdoc"), "--"]),
     )
 
 # target_triple and rustc_flags are selected per target platform in BUCK: a

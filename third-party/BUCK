@@ -2871,6 +2871,7 @@ cargo.rust_library(
 
 cargo.rust_library(
     name = "core-foundation-0.10",
+    target_compatible_with = ["prelude//os:macos"],
     srcs = [
         "vendor/core-foundation-0.10.1/src/array.rs",
         "vendor/core-foundation-0.10.1/src/attributed_string.rs",
@@ -2927,6 +2928,7 @@ cargo.rust_library(
 
 cargo.rust_library(
     name = "core-foundation-sys-0.8",
+    target_compatible_with = ["prelude//os:macos"],
     srcs = [
         "vendor/core-foundation-sys-0.8.7/src/array.rs",
         "vendor/core-foundation-sys-0.8.7/src/attributed_string.rs",
@@ -4953,6 +4955,7 @@ cargo.rust_library(
 
 cargo.rust_library(
     name = "fsevent-sys-4",
+    target_compatible_with = ["prelude//os:macos"],
     srcs = [
         "vendor/fsevent-sys-4.1.0/src/core_foundation.rs",
         "vendor/fsevent-sys-4.1.0/src/fsevent.rs",
@@ -7719,6 +7722,7 @@ cargo.rust_library(
 
 cargo.rust_library(
     name = "inotify-0.11",
+    target_compatible_with = ["prelude//os:linux"],
     srcs = [
         "vendor/inotify-0.11.5/src/events.rs",
         "vendor/inotify-0.11.5/src/fd_guard.rs",
@@ -7758,6 +7762,7 @@ cargo.rust_library(
 
 cargo.rust_library(
     name = "inotify-sys-0.1",
+    target_compatible_with = ["prelude//os:linux"],
     srcs = ["vendor/inotify-sys-0.1.8/src/lib.rs"],
     crate = "inotify_sys",
     crate_root = "vendor/inotify-sys-0.1.8/src/lib.rs",
@@ -9869,6 +9874,7 @@ buildscript_run(
 
 cargo.rust_library(
     name = "linux-raw-sys-0.12",
+    target_compatible_with = ["prelude//os:linux"],
     srcs = [
         "vendor/linux-raw-sys-0.12.1/src/aarch64/auxvec.rs",
         "vendor/linux-raw-sys-0.12.1/src/aarch64/bootparam.rs",
@@ -12494,6 +12500,7 @@ cargo.rust_library(
 
 cargo.rust_library(
     name = "openssl-probe-0.2",
+    target_compatible_with = ["prelude//os:linux"],
     srcs = ["vendor/openssl-probe-0.2.1/src/lib.rs"],
     crate = "openssl_probe",
     crate_root = "vendor/openssl-probe-0.2.1/src/lib.rs",
@@ -16386,6 +16393,7 @@ cargo.rust_library(
 
 cargo.rust_library(
     name = "security-framework-3",
+    target_compatible_with = ["prelude//os:macos"],
     srcs = [
         "vendor/security-framework-3.7.0/.cargo-checksum.json",
         "vendor/security-framework-3.7.0/.cargo_vcs_info.json",
@@ -16473,6 +16481,7 @@ cargo.rust_library(
 
 cargo.rust_library(
     name = "security-framework-sys-2",
+    target_compatible_with = ["prelude//os:macos"],
     srcs = [
         "vendor/security-framework-sys-2.17.0/src/access.rs",
         "vendor/security-framework-sys-2.17.0/src/access_control.rs",

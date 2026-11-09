@@ -3,7 +3,9 @@
 # The graph is committed once and builds on each supported host: Reindeer's
 # platform-specific dependencies follow the host's os and cpu (and, for a
 # static musl deployable, build//buck:linux-*-musl, its abi), and a host
-# outside these fails to configure rather than build without them.
+# outside these fails to configure rather than build without them. A wasm32
+# module (build//buck:wasm32, no OS) is the prelude's reindeer platform "wasm32",
+# which Reindeer gives no platform-only dependencies of its own.
 load("@prelude//rust:cargo_package.bzl", "set_reindeer_platforms")
 set_reindeer_platforms(select({
     "prelude//os:linux": select({
@@ -13,5 +15,8 @@ set_reindeer_platforms(select({
     "prelude//os:macos": select({
         "prelude//cpu:arm64": "macos-arm64",
         "prelude//cpu:x86_64": "macos-x86_64",
+    }),
+    "prelude//os:none": select({
+        "prelude//cpu:wasm32": "wasm32",
     }),
 }))
