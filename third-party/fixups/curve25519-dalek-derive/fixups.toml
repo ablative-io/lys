@@ -1,0 +1,2 @@
+# Linux x86_64 only. include_str!/include! input missing from srcs.
+extra_srcs = ["README.md"]

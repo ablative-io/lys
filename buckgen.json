@@ -1,0 +1,32 @@
+{
+  "lys": {
+    "checkout_git": true,
+    "reason": "build.rs stamps the binary with the checkout's HEAD commit and whether it is dirty (build/provenance.rs), read from live Git as Cargo runs it."
+  },
+  "lys-home": {
+    "checkout_git": true,
+    "reason": "build.rs stamps the binary with the checkout's HEAD commit and whether it is dirty (build/provenance.rs), read from live Git as Cargo runs it."
+  },
+  "lys-identity-server": {
+    "checkout_git": true,
+    "reason": "build.rs stamps the binary with the checkout's HEAD commit and whether it is dirty (build/provenance.rs), read from live Git as Cargo runs it. Its seat_import_lifecycle tests run the workspace's lys binary from beside themselves, as a workspace run of Cargo leaves it (workspace_bins).",
+    "workspace_bins": {
+      "lys": [
+        "lys"
+      ]
+    }
+  },
+  "lys-secrets": {
+    "checkout_git": true,
+    "reason": "build.rs stamps the binary with the checkout's HEAD commit and whether it is dirty (build/provenance.rs), read from live Git as Cargo runs it."
+  },
+  "identity-contract": {
+    "workspace_bins": {
+      "lys-identity-server": [
+        "lys-identity-server",
+        "lys-identity-dev-seed"
+      ]
+    },
+    "reason": "dev_scripts runs the development binaries from the directory CARGO_BIN_EXE_dev_issuer names, where a workspace run of Cargo leaves lys-identity-server and lys-identity-dev-seed beside it (workspace_bins)."
+  }
+}

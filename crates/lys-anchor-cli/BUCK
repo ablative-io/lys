@@ -20,14 +20,16 @@ noop_test_toolchain(
 )
 
 rust_library(
+    _rust_toolchain = "toolchains//:rust-workspace",
     crate = "lys_anchor_cli",
     crate_root = "crates/lys-anchor-cli/src/lib.rs",
     doctests = True,
     edition = "2024",
     env = {
+        "BUCKGEN_ROOT_CARGO_MANIFEST_DIR": "crates/lys-anchor-cli",
+        "BUCKGEN_ROOT_CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "CARGO": "cargo",
         "CARGO_CRATE_NAME": "lys_anchor_cli",
-        "CARGO_MANIFEST_DIR": "crates/lys-anchor-cli",
         "CARGO_PKG_AUTHORS": "Tom Whiting \u003ctom@ablative.com.au\u003e",
         "CARGO_PKG_DESCRIPTION": "The `lys-anchor` command-line binary: create, submit to, checkpoint, prove and inspect a lys transparency anchor.",
         "CARGO_PKG_HOMEPAGE": "",
@@ -40,15 +42,14 @@ rust_library(
         "CARGO_PKG_VERSION_MAJOR": "0",
         "CARGO_PKG_VERSION_MINOR": "3",
         "CARGO_PKG_VERSION_PATCH": "3",
-        "CARGO_PKG_VERSION_PRE": "",
-        "CARGO_TARGET_TMPDIR": "buckgen/tmp"
+        "CARGO_PKG_VERSION_PRE": ""
     },
     features = [
         "default"
     ],
     mapped_srcs = {
-        "//buckgen/inputs:input-0": "Cargo.lock",
-        "//buckgen/inputs:input-1": "Cargo.toml",
+        "//:input-Cargo.lock": "Cargo.lock",
+        "//:input-Cargo.toml": "Cargo.toml",
         "Cargo.toml": "crates/lys-anchor-cli/Cargo.toml",
         "src/cli.rs": "crates/lys-anchor-cli/src/cli.rs",
         "src/cli_tests.rs": "crates/lys-anchor-cli/src/cli_tests.rs",
@@ -93,14 +94,16 @@ rust_library(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-workspace",
     _test_toolchain = ":test-toolchain",
     crate = "lys_anchor_cli",
     crate_root = "crates/lys-anchor-cli/src/lib.rs",
     edition = "2024",
     env = {
+        "BUCKGEN_ROOT_CARGO_MANIFEST_DIR": "crates/lys-anchor-cli",
+        "BUCKGEN_ROOT_CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "CARGO": "cargo",
         "CARGO_CRATE_NAME": "lys_anchor_cli",
-        "CARGO_MANIFEST_DIR": "crates/lys-anchor-cli",
         "CARGO_PKG_AUTHORS": "Tom Whiting \u003ctom@ablative.com.au\u003e",
         "CARGO_PKG_DESCRIPTION": "The `lys-anchor` command-line binary: create, submit to, checkpoint, prove and inspect a lys transparency anchor.",
         "CARGO_PKG_HOMEPAGE": "",
@@ -113,15 +116,17 @@ workspace_rust_test(
         "CARGO_PKG_VERSION_MAJOR": "0",
         "CARGO_PKG_VERSION_MINOR": "3",
         "CARGO_PKG_VERSION_PATCH": "3",
-        "CARGO_PKG_VERSION_PRE": "",
-        "CARGO_TARGET_TMPDIR": "buckgen/tmp"
+        "CARGO_PKG_VERSION_PRE": ""
     },
     features = [
         "default"
     ],
+    labels = [
+        "tier-1"
+    ],
     mapped_srcs = {
-        "//buckgen/inputs:input-0": "Cargo.lock",
-        "//buckgen/inputs:input-1": "Cargo.toml",
+        "//:input-Cargo.lock": "Cargo.lock",
+        "//:input-Cargo.toml": "Cargo.toml",
         "Cargo.toml": "crates/lys-anchor-cli/Cargo.toml",
         "src/cli.rs": "crates/lys-anchor-cli/src/cli.rs",
         "src/cli_tests.rs": "crates/lys-anchor-cli/src/cli_tests.rs",
@@ -159,6 +164,16 @@ workspace_rust_test(
         "tempfile": "//third-party:tempfile",
         "thiserror": "//third-party:thiserror"
     },
+    nextest = {
+        "binary": "lys_anchor_cli",
+        "binary_id": "lys-anchor-cli",
+        "dir": "crates/lys-anchor-cli",
+        "kind": "lib",
+        "package": "lys-anchor-cli"
+    },
+    package_bins = {
+        "lys-anchor": ":lys-anchor"
+    },
     srcs = [],
     visibility = [
         "PUBLIC"
@@ -166,14 +181,16 @@ workspace_rust_test(
 )
 
 rust_binary(
+    _rust_toolchain = "toolchains//:rust-workspace",
     crate = "lys_anchor",
     crate_root = "crates/lys-anchor-cli/src/main.rs",
     edition = "2024",
     env = {
+        "BUCKGEN_ROOT_CARGO_MANIFEST_DIR": "crates/lys-anchor-cli",
+        "BUCKGEN_ROOT_CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "CARGO": "cargo",
         "CARGO_BIN_NAME": "lys-anchor",
         "CARGO_CRATE_NAME": "lys_anchor",
-        "CARGO_MANIFEST_DIR": "crates/lys-anchor-cli",
         "CARGO_PKG_AUTHORS": "Tom Whiting \u003ctom@ablative.com.au\u003e",
         "CARGO_PKG_DESCRIPTION": "The `lys-anchor` command-line binary: create, submit to, checkpoint, prove and inspect a lys transparency anchor.",
         "CARGO_PKG_HOMEPAGE": "",
@@ -186,15 +203,14 @@ rust_binary(
         "CARGO_PKG_VERSION_MAJOR": "0",
         "CARGO_PKG_VERSION_MINOR": "3",
         "CARGO_PKG_VERSION_PATCH": "3",
-        "CARGO_PKG_VERSION_PRE": "",
-        "CARGO_TARGET_TMPDIR": "buckgen/tmp"
+        "CARGO_PKG_VERSION_PRE": ""
     },
     features = [
         "default"
     ],
     mapped_srcs = {
-        "//buckgen/inputs:input-0": "Cargo.lock",
-        "//buckgen/inputs:input-1": "Cargo.toml",
+        "//:input-Cargo.lock": "Cargo.lock",
+        "//:input-Cargo.toml": "Cargo.toml",
         "Cargo.toml": "crates/lys-anchor-cli/Cargo.toml",
         "src/cli.rs": "crates/lys-anchor-cli/src/cli.rs",
         "src/cli_tests.rs": "crates/lys-anchor-cli/src/cli_tests.rs",
@@ -240,15 +256,17 @@ rust_binary(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-workspace",
     _test_toolchain = ":test-toolchain",
     crate = "lys_anchor",
     crate_root = "crates/lys-anchor-cli/src/main.rs",
     edition = "2024",
     env = {
+        "BUCKGEN_ROOT_CARGO_MANIFEST_DIR": "crates/lys-anchor-cli",
+        "BUCKGEN_ROOT_CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "CARGO": "cargo",
         "CARGO_BIN_NAME": "lys-anchor",
         "CARGO_CRATE_NAME": "lys_anchor",
-        "CARGO_MANIFEST_DIR": "crates/lys-anchor-cli",
         "CARGO_PKG_AUTHORS": "Tom Whiting \u003ctom@ablative.com.au\u003e",
         "CARGO_PKG_DESCRIPTION": "The `lys-anchor` command-line binary: create, submit to, checkpoint, prove and inspect a lys transparency anchor.",
         "CARGO_PKG_HOMEPAGE": "",
@@ -261,15 +279,17 @@ workspace_rust_test(
         "CARGO_PKG_VERSION_MAJOR": "0",
         "CARGO_PKG_VERSION_MINOR": "3",
         "CARGO_PKG_VERSION_PATCH": "3",
-        "CARGO_PKG_VERSION_PRE": "",
-        "CARGO_TARGET_TMPDIR": "buckgen/tmp"
+        "CARGO_PKG_VERSION_PRE": ""
     },
     features = [
         "default"
     ],
+    labels = [
+        "tier-1"
+    ],
     mapped_srcs = {
-        "//buckgen/inputs:input-0": "Cargo.lock",
-        "//buckgen/inputs:input-1": "Cargo.toml",
+        "//:input-Cargo.lock": "Cargo.lock",
+        "//:input-Cargo.toml": "Cargo.toml",
         "Cargo.toml": "crates/lys-anchor-cli/Cargo.toml",
         "src/cli.rs": "crates/lys-anchor-cli/src/cli.rs",
         "src/cli_tests.rs": "crates/lys-anchor-cli/src/cli_tests.rs",
@@ -308,6 +328,16 @@ workspace_rust_test(
         "tempfile": "//third-party:tempfile",
         "thiserror": "//third-party:thiserror"
     },
+    nextest = {
+        "binary": "lys-anchor",
+        "binary_id": "lys-anchor-cli::bin/lys-anchor",
+        "dir": "crates/lys-anchor-cli",
+        "kind": "bin",
+        "package": "lys-anchor-cli"
+    },
+    package_bins = {
+        "lys-anchor": ":lys-anchor"
+    },
     srcs = [],
     visibility = [
         "PUBLIC"
@@ -316,16 +346,17 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
-    _rust_toolchain = "toolchains//:rust-bin-exe",
+    _rust_toolchain = "toolchains//:rust-workspace",
     _test_toolchain = ":test-toolchain",
     crate = "anchor_cli",
     crate_root = "crates/lys-anchor-cli/tests/anchor_cli.rs",
     edition = "2024",
     env = {
+        "BUCKGEN_ROOT_CARGO_MANIFEST_DIR": "crates/lys-anchor-cli",
+        "BUCKGEN_ROOT_CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "CARGO": "cargo",
         "CARGO_BIN_EXE_lys-anchor": "$(location :lys-anchor)",
         "CARGO_CRATE_NAME": "anchor_cli",
-        "CARGO_MANIFEST_DIR": "crates/lys-anchor-cli",
         "CARGO_PKG_AUTHORS": "Tom Whiting \u003ctom@ablative.com.au\u003e",
         "CARGO_PKG_DESCRIPTION": "The `lys-anchor` command-line binary: create, submit to, checkpoint, prove and inspect a lys transparency anchor.",
         "CARGO_PKG_HOMEPAGE": "",
@@ -338,16 +369,18 @@ workspace_rust_test(
         "CARGO_PKG_VERSION_MAJOR": "0",
         "CARGO_PKG_VERSION_MINOR": "3",
         "CARGO_PKG_VERSION_PATCH": "3",
-        "CARGO_PKG_VERSION_PRE": "",
-        "CARGO_TARGET_TMPDIR": "buckgen/tmp"
+        "CARGO_PKG_VERSION_PRE": ""
     },
     features = [
         "default"
     ],
     framework = True,
+    labels = [
+        "tier-1"
+    ],
     mapped_srcs = {
-        "//buckgen/inputs:input-0": "Cargo.lock",
-        "//buckgen/inputs:input-1": "Cargo.toml",
+        "//:input-Cargo.lock": "Cargo.lock",
+        "//:input-Cargo.toml": "Cargo.toml",
         "Cargo.toml": "crates/lys-anchor-cli/Cargo.toml",
         "src/cli.rs": "crates/lys-anchor-cli/src/cli.rs",
         "src/cli_tests.rs": "crates/lys-anchor-cli/src/cli_tests.rs",
@@ -386,6 +419,16 @@ workspace_rust_test(
         "tempfile": "//third-party:tempfile",
         "thiserror": "//third-party:thiserror"
     },
+    nextest = {
+        "binary": "anchor_cli",
+        "binary_id": "lys-anchor-cli::anchor_cli",
+        "dir": "crates/lys-anchor-cli",
+        "kind": "test",
+        "package": "lys-anchor-cli"
+    },
+    package_bins = {
+        "lys-anchor": ":lys-anchor"
+    },
     srcs = [],
     visibility = [
         "PUBLIC"
@@ -394,6 +437,7 @@ workspace_rust_test(
 load("@build//buck:checks.bzl", "file_check")
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-anchor-cli/Cargo.toml",
     name = "check-length-Cargo.toml",
@@ -403,6 +447,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-anchor-cli/Cargo.toml",
     name = "check-portable-Cargo.toml",
@@ -434,6 +479,7 @@ file_check(
     src = "Cargo.toml",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-anchor-cli/src/cli.rs",
     name = "check-length-src__cli.rs",
@@ -444,6 +490,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-anchor-cli/src/cli.rs",
     name = "check-portable-src__cli.rs",
@@ -452,6 +499,7 @@ file_check(
     src = "src/cli.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-anchor-cli/src/commands/anchor/checkpoint.rs",
     name = "check-length-src__commands__anchor__checkpoint.rs",
@@ -462,6 +510,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-anchor-cli/src/commands/anchor/checkpoint.rs",
     name = "check-portable-src__commands__anchor__checkpoint.rs",
@@ -470,6 +519,7 @@ file_check(
     src = "src/commands/anchor/checkpoint.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-anchor-cli/src/commands/anchor/init.rs",
     name = "check-length-src__commands__anchor__init.rs",
@@ -480,6 +530,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-anchor-cli/src/commands/anchor/init.rs",
     name = "check-portable-src__commands__anchor__init.rs",
@@ -488,6 +539,7 @@ file_check(
     src = "src/commands/anchor/init.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-anchor-cli/src/commands/anchor/mod.rs",
     name = "check-length-src__commands__anchor__mod.rs",
@@ -498,6 +550,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-anchor-cli/src/commands/anchor/mod.rs",
     name = "check-portable-src__commands__anchor__mod.rs",
@@ -506,6 +559,7 @@ file_check(
     src = "src/commands/anchor/mod.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-anchor-cli/src/commands/anchor/open.rs",
     name = "check-length-src__commands__anchor__open.rs",
@@ -516,6 +570,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-anchor-cli/src/commands/anchor/open.rs",
     name = "check-portable-src__commands__anchor__open.rs",
@@ -524,6 +579,7 @@ file_check(
     src = "src/commands/anchor/open.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-anchor-cli/src/commands/anchor/policy.rs",
     name = "check-length-src__commands__anchor__policy.rs",
@@ -534,6 +590,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-anchor-cli/src/commands/anchor/policy.rs",
     name = "check-portable-src__commands__anchor__policy.rs",
@@ -542,6 +599,7 @@ file_check(
     src = "src/commands/anchor/policy.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-anchor-cli/src/commands/anchor/prove.rs",
     name = "check-length-src__commands__anchor__prove.rs",
@@ -552,6 +610,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-anchor-cli/src/commands/anchor/prove.rs",
     name = "check-portable-src__commands__anchor__prove.rs",
@@ -560,6 +619,7 @@ file_check(
     src = "src/commands/anchor/prove.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-anchor-cli/src/commands/anchor/status.rs",
     name = "check-length-src__commands__anchor__status.rs",
@@ -570,6 +630,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-anchor-cli/src/commands/anchor/status.rs",
     name = "check-portable-src__commands__anchor__status.rs",
@@ -578,6 +639,7 @@ file_check(
     src = "src/commands/anchor/status.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-anchor-cli/src/commands/anchor/submit.rs",
     name = "check-length-src__commands__anchor__submit.rs",
@@ -588,6 +650,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-anchor-cli/src/commands/anchor/submit.rs",
     name = "check-portable-src__commands__anchor__submit.rs",
@@ -596,6 +659,7 @@ file_check(
     src = "src/commands/anchor/submit.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-anchor-cli/src/commands/error.rs",
     name = "check-length-src__commands__error.rs",
@@ -606,6 +670,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-anchor-cli/src/commands/error.rs",
     name = "check-portable-src__commands__error.rs",
@@ -614,6 +679,7 @@ file_check(
     src = "src/commands/error.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-anchor-cli/src/commands/files.rs",
     name = "check-length-src__commands__files.rs",
@@ -624,6 +690,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-anchor-cli/src/commands/files.rs",
     name = "check-portable-src__commands__files.rs",
@@ -632,6 +699,7 @@ file_check(
     src = "src/commands/files.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-anchor-cli/src/commands/hex.rs",
     name = "check-length-src__commands__hex.rs",
@@ -642,6 +710,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-anchor-cli/src/commands/hex.rs",
     name = "check-portable-src__commands__hex.rs",
@@ -650,6 +719,7 @@ file_check(
     src = "src/commands/hex.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-anchor-cli/src/commands/mod.rs",
     name = "check-length-src__commands__mod.rs",
@@ -660,6 +730,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-anchor-cli/src/commands/mod.rs",
     name = "check-portable-src__commands__mod.rs",
@@ -668,6 +739,7 @@ file_check(
     src = "src/commands/mod.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-anchor-cli/src/commands/output.rs",
     name = "check-length-src__commands__output.rs",
@@ -678,6 +750,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-anchor-cli/src/commands/output.rs",
     name = "check-portable-src__commands__output.rs",
@@ -686,6 +759,7 @@ file_check(
     src = "src/commands/output.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-anchor-cli/src/dispatch.rs",
     name = "check-length-src__dispatch.rs",
@@ -696,6 +770,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-anchor-cli/src/dispatch.rs",
     name = "check-portable-src__dispatch.rs",
@@ -704,6 +779,7 @@ file_check(
     src = "src/dispatch.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-anchor-cli/src/lib.rs",
     name = "check-length-src__lib.rs",
@@ -714,6 +790,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-anchor-cli/src/lib.rs",
     name = "check-portable-src__lib.rs",
@@ -722,6 +799,7 @@ file_check(
     src = "src/lib.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-anchor-cli/src/main.rs",
     name = "check-length-src__main.rs",
@@ -732,6 +810,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-anchor-cli/src/main.rs",
     name = "check-portable-src__main.rs",

@@ -1,8 +1,24 @@
 vendor = true
 cargo_env = true
 
+# Every supported host; templates/PACKAGE selects the one building.
+[platform.linux-arm64]
+target = "aarch64-unknown-linux-gnu"
+
+[platform.linux-arm64-musl]
+target = "aarch64-unknown-linux-musl"
+
+[platform.linux-x86_64]
+target = "x86_64-unknown-linux-gnu"
+
+[platform.linux-x86_64-musl]
+target = "x86_64-unknown-linux-musl"
+
 [platform.macos-arm64]
 target = "aarch64-apple-darwin"
+
+[platform.macos-x86_64]
+target = "x86_64-apple-darwin"
 
 [buck]
 # Setting [buck] resets Reindeer's rule names; keep the Cargo-flavoured ones.

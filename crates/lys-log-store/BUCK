@@ -20,14 +20,16 @@ noop_test_toolchain(
 )
 
 rust_library(
+    _rust_toolchain = "toolchains//:rust-workspace",
     crate = "lys_log_store",
     crate_root = "crates/lys-log-store/src/lib.rs",
     doctests = True,
     edition = "2024",
     env = {
+        "BUCKGEN_ROOT_CARGO_MANIFEST_DIR": "crates/lys-log-store",
+        "BUCKGEN_ROOT_CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "CARGO": "cargo",
         "CARGO_CRATE_NAME": "lys_log_store",
-        "CARGO_MANIFEST_DIR": "crates/lys-log-store",
         "CARGO_PKG_AUTHORS": "Tom Whiting \u003ctom@ablative.com.au\u003e",
         "CARGO_PKG_DESCRIPTION": "Durable, append-only, write-once storage for a lys transparency log — the storage trait, and a file-backed implementation of it.",
         "CARGO_PKG_HOMEPAGE": "",
@@ -40,15 +42,14 @@ rust_library(
         "CARGO_PKG_VERSION_MAJOR": "0",
         "CARGO_PKG_VERSION_MINOR": "3",
         "CARGO_PKG_VERSION_PATCH": "3",
-        "CARGO_PKG_VERSION_PRE": "",
-        "CARGO_TARGET_TMPDIR": "buckgen/tmp"
+        "CARGO_PKG_VERSION_PRE": ""
     },
     features = [
         "flush-counts"
     ],
     mapped_srcs = {
-        "//buckgen/inputs:input-0": "Cargo.lock",
-        "//buckgen/inputs:input-1": "Cargo.toml",
+        "//:input-Cargo.lock": "Cargo.lock",
+        "//:input-Cargo.toml": "Cargo.toml",
         "Cargo.toml": "crates/lys-log-store/Cargo.toml",
         "examples/restart_timing.rs": "crates/lys-log-store/examples/restart_timing.rs",
         "src/append_tests.rs": "crates/lys-log-store/src/append_tests.rs",
@@ -105,14 +106,16 @@ rust_library(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-workspace",
     _test_toolchain = ":test-toolchain",
     crate = "lys_log_store",
     crate_root = "crates/lys-log-store/src/lib.rs",
     edition = "2024",
     env = {
+        "BUCKGEN_ROOT_CARGO_MANIFEST_DIR": "crates/lys-log-store",
+        "BUCKGEN_ROOT_CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "CARGO": "cargo",
         "CARGO_CRATE_NAME": "lys_log_store",
-        "CARGO_MANIFEST_DIR": "crates/lys-log-store",
         "CARGO_PKG_AUTHORS": "Tom Whiting \u003ctom@ablative.com.au\u003e",
         "CARGO_PKG_DESCRIPTION": "Durable, append-only, write-once storage for a lys transparency log — the storage trait, and a file-backed implementation of it.",
         "CARGO_PKG_HOMEPAGE": "",
@@ -125,15 +128,17 @@ workspace_rust_test(
         "CARGO_PKG_VERSION_MAJOR": "0",
         "CARGO_PKG_VERSION_MINOR": "3",
         "CARGO_PKG_VERSION_PATCH": "3",
-        "CARGO_PKG_VERSION_PRE": "",
-        "CARGO_TARGET_TMPDIR": "buckgen/tmp"
+        "CARGO_PKG_VERSION_PRE": ""
     },
     features = [
         "flush-counts"
     ],
+    labels = [
+        "tier-1"
+    ],
     mapped_srcs = {
-        "//buckgen/inputs:input-0": "Cargo.lock",
-        "//buckgen/inputs:input-1": "Cargo.toml",
+        "//:input-Cargo.lock": "Cargo.lock",
+        "//:input-Cargo.toml": "Cargo.toml",
         "Cargo.toml": "crates/lys-log-store/Cargo.toml",
         "examples/restart_timing.rs": "crates/lys-log-store/examples/restart_timing.rs",
         "src/append_tests.rs": "crates/lys-log-store/src/append_tests.rs",
@@ -183,6 +188,16 @@ workspace_rust_test(
         "tempfile": "//third-party:tempfile",
         "thiserror": "//third-party:thiserror"
     },
+    nextest = {
+        "binary": "lys_log_store",
+        "binary_id": "lys-log-store",
+        "dir": "crates/lys-log-store",
+        "kind": "lib",
+        "package": "lys-log-store"
+    },
+    package_bins = {
+        "examples/restart_timing": ":example-restart_timing"
+    },
     srcs = [],
     visibility = [
         "PUBLIC"
@@ -190,13 +205,15 @@ workspace_rust_test(
 )
 
 rust_binary(
+    _rust_toolchain = "toolchains//:rust-workspace",
     crate = "restart_timing",
     crate_root = "crates/lys-log-store/examples/restart_timing.rs",
     edition = "2024",
     env = {
+        "BUCKGEN_ROOT_CARGO_MANIFEST_DIR": "crates/lys-log-store",
+        "BUCKGEN_ROOT_CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "CARGO": "cargo",
         "CARGO_CRATE_NAME": "restart_timing",
-        "CARGO_MANIFEST_DIR": "crates/lys-log-store",
         "CARGO_PKG_AUTHORS": "Tom Whiting \u003ctom@ablative.com.au\u003e",
         "CARGO_PKG_DESCRIPTION": "Durable, append-only, write-once storage for a lys transparency log — the storage trait, and a file-backed implementation of it.",
         "CARGO_PKG_HOMEPAGE": "",
@@ -209,15 +226,14 @@ rust_binary(
         "CARGO_PKG_VERSION_MAJOR": "0",
         "CARGO_PKG_VERSION_MINOR": "3",
         "CARGO_PKG_VERSION_PATCH": "3",
-        "CARGO_PKG_VERSION_PRE": "",
-        "CARGO_TARGET_TMPDIR": "buckgen/tmp"
+        "CARGO_PKG_VERSION_PRE": ""
     },
     features = [
         "flush-counts"
     ],
     mapped_srcs = {
-        "//buckgen/inputs:input-0": "Cargo.lock",
-        "//buckgen/inputs:input-1": "Cargo.toml",
+        "//:input-Cargo.lock": "Cargo.lock",
+        "//:input-Cargo.toml": "Cargo.toml",
         "Cargo.toml": "crates/lys-log-store/Cargo.toml",
         "examples/restart_timing.rs": "crates/lys-log-store/examples/restart_timing.rs",
         "src/append_tests.rs": "crates/lys-log-store/src/append_tests.rs",
@@ -276,14 +292,16 @@ rust_binary(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-workspace",
     _test_toolchain = ":test-toolchain",
     crate = "tail_witness",
     crate_root = "crates/lys-log-store/tests/tail_witness.rs",
     edition = "2024",
     env = {
+        "BUCKGEN_ROOT_CARGO_MANIFEST_DIR": "crates/lys-log-store",
+        "BUCKGEN_ROOT_CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "CARGO": "cargo",
         "CARGO_CRATE_NAME": "tail_witness",
-        "CARGO_MANIFEST_DIR": "crates/lys-log-store",
         "CARGO_PKG_AUTHORS": "Tom Whiting \u003ctom@ablative.com.au\u003e",
         "CARGO_PKG_DESCRIPTION": "Durable, append-only, write-once storage for a lys transparency log — the storage trait, and a file-backed implementation of it.",
         "CARGO_PKG_HOMEPAGE": "",
@@ -296,16 +314,18 @@ workspace_rust_test(
         "CARGO_PKG_VERSION_MAJOR": "0",
         "CARGO_PKG_VERSION_MINOR": "3",
         "CARGO_PKG_VERSION_PATCH": "3",
-        "CARGO_PKG_VERSION_PRE": "",
-        "CARGO_TARGET_TMPDIR": "buckgen/tmp"
+        "CARGO_PKG_VERSION_PRE": ""
     },
     features = [
         "flush-counts"
     ],
     framework = True,
+    labels = [
+        "tier-1"
+    ],
     mapped_srcs = {
-        "//buckgen/inputs:input-0": "Cargo.lock",
-        "//buckgen/inputs:input-1": "Cargo.toml",
+        "//:input-Cargo.lock": "Cargo.lock",
+        "//:input-Cargo.toml": "Cargo.toml",
         "Cargo.toml": "crates/lys-log-store/Cargo.toml",
         "examples/restart_timing.rs": "crates/lys-log-store/examples/restart_timing.rs",
         "src/append_tests.rs": "crates/lys-log-store/src/append_tests.rs",
@@ -356,6 +376,16 @@ workspace_rust_test(
         "tempfile": "//third-party:tempfile",
         "thiserror": "//third-party:thiserror"
     },
+    nextest = {
+        "binary": "tail_witness",
+        "binary_id": "lys-log-store::tail_witness",
+        "dir": "crates/lys-log-store",
+        "kind": "test",
+        "package": "lys-log-store"
+    },
+    package_bins = {
+        "examples/restart_timing": ":example-restart_timing"
+    },
     srcs = [],
     visibility = [
         "PUBLIC"
@@ -364,6 +394,7 @@ workspace_rust_test(
 load("@build//buck:checks.bzl", "file_check")
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-log-store/Cargo.toml",
     name = "check-length-Cargo.toml",
@@ -373,6 +404,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-log-store/Cargo.toml",
     name = "check-portable-Cargo.toml",
@@ -404,6 +436,7 @@ file_check(
     src = "Cargo.toml",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-log-store/examples/restart_timing.rs",
     name = "check-length-examples__restart_timing.rs",
@@ -414,6 +447,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-log-store/examples/restart_timing.rs",
     name = "check-portable-examples__restart_timing.rs",
@@ -422,6 +456,7 @@ file_check(
     src = "examples/restart_timing.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-log-store/src/durability.rs",
     name = "check-length-src__durability.rs",
@@ -432,6 +467,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-log-store/src/durability.rs",
     name = "check-portable-src__durability.rs",
@@ -440,6 +476,7 @@ file_check(
     src = "src/durability.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-log-store/src/error.rs",
     name = "check-length-src__error.rs",
@@ -450,6 +487,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-log-store/src/error.rs",
     name = "check-portable-src__error.rs",
@@ -458,6 +496,7 @@ file_check(
     src = "src/error.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-log-store/src/file.rs",
     name = "check-length-src__file.rs",
@@ -468,6 +507,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-log-store/src/file.rs",
     name = "check-portable-src__file.rs",
@@ -476,6 +516,7 @@ file_check(
     src = "src/file.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-log-store/src/file/crc32c.rs",
     name = "check-length-src__file__crc32c.rs",
@@ -486,6 +527,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-log-store/src/file/crc32c.rs",
     name = "check-portable-src__file__crc32c.rs",
@@ -494,6 +536,7 @@ file_check(
     src = "src/file/crc32c.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-log-store/src/file/head.rs",
     name = "check-length-src__file__head.rs",
@@ -504,6 +547,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-log-store/src/file/head.rs",
     name = "check-portable-src__file__head.rs",
@@ -512,6 +556,7 @@ file_check(
     src = "src/file/head.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-log-store/src/file/legacy.rs",
     name = "check-length-src__file__legacy.rs",
@@ -522,6 +567,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-log-store/src/file/legacy.rs",
     name = "check-portable-src__file__legacy.rs",
@@ -530,6 +576,7 @@ file_check(
     src = "src/file/legacy.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-log-store/src/file/legacy_leaves.rs",
     name = "check-length-src__file__legacy_leaves.rs",
@@ -540,6 +587,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-log-store/src/file/legacy_leaves.rs",
     name = "check-portable-src__file__legacy_leaves.rs",
@@ -548,6 +596,7 @@ file_check(
     src = "src/file/legacy_leaves.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-log-store/src/file/open.rs",
     name = "check-length-src__file__open.rs",
@@ -558,6 +607,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-log-store/src/file/open.rs",
     name = "check-portable-src__file__open.rs",
@@ -566,6 +616,7 @@ file_check(
     src = "src/file/open.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-log-store/src/file/segment.rs",
     name = "check-length-src__file__segment.rs",
@@ -576,6 +627,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-log-store/src/file/segment.rs",
     name = "check-portable-src__file__segment.rs",
@@ -584,6 +636,7 @@ file_check(
     src = "src/file/segment.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-log-store/src/file/snapshot_slot.rs",
     name = "check-length-src__file__snapshot_slot.rs",
@@ -594,6 +647,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-log-store/src/file/snapshot_slot.rs",
     name = "check-portable-src__file__snapshot_slot.rs",
@@ -602,6 +656,7 @@ file_check(
     src = "src/file/snapshot_slot.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-log-store/src/file/v1.rs",
     name = "check-length-src__file__v1.rs",
@@ -612,6 +667,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-log-store/src/file/v1.rs",
     name = "check-portable-src__file__v1.rs",
@@ -620,6 +676,7 @@ file_check(
     src = "src/file/v1.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-log-store/src/file/witness.rs",
     name = "check-length-src__file__witness.rs",
@@ -630,6 +687,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-log-store/src/file/witness.rs",
     name = "check-portable-src__file__witness.rs",
@@ -638,6 +696,7 @@ file_check(
     src = "src/file/witness.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-log-store/src/frontier.rs",
     name = "check-length-src__frontier.rs",
@@ -648,6 +707,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-log-store/src/frontier.rs",
     name = "check-portable-src__frontier.rs",
@@ -656,6 +716,7 @@ file_check(
     src = "src/frontier.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-log-store/src/frontier_log.rs",
     name = "check-length-src__frontier_log.rs",
@@ -666,6 +727,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-log-store/src/frontier_log.rs",
     name = "check-portable-src__frontier_log.rs",
@@ -674,6 +736,7 @@ file_check(
     src = "src/frontier_log.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-log-store/src/lib.rs",
     name = "check-length-src__lib.rs",
@@ -684,6 +747,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-log-store/src/lib.rs",
     name = "check-portable-src__lib.rs",
@@ -692,6 +756,7 @@ file_check(
     src = "src/lib.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-log-store/src/log.rs",
     name = "check-length-src__log.rs",
@@ -702,6 +767,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-log-store/src/log.rs",
     name = "check-portable-src__log.rs",
@@ -710,6 +776,7 @@ file_check(
     src = "src/log.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-log-store/src/migrate.rs",
     name = "check-length-src__migrate.rs",
@@ -720,6 +787,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-log-store/src/migrate.rs",
     name = "check-portable-src__migrate.rs",
@@ -728,6 +796,7 @@ file_check(
     src = "src/migrate.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-log-store/src/reads.rs",
     name = "check-length-src__reads.rs",
@@ -738,6 +807,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-log-store/src/reads.rs",
     name = "check-portable-src__reads.rs",
@@ -746,6 +816,7 @@ file_check(
     src = "src/reads.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-log-store/src/snapshot.rs",
     name = "check-length-src__snapshot.rs",
@@ -756,6 +827,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-log-store/src/snapshot.rs",
     name = "check-portable-src__snapshot.rs",
@@ -764,6 +836,7 @@ file_check(
     src = "src/snapshot.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-log-store/src/start.rs",
     name = "check-length-src__start.rs",
@@ -774,6 +847,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-log-store/src/start.rs",
     name = "check-portable-src__start.rs",
@@ -782,6 +856,7 @@ file_check(
     src = "src/start.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-log-store/src/store.rs",
     name = "check-length-src__store.rs",
@@ -792,6 +867,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-log-store/src/store.rs",
     name = "check-portable-src__store.rs",
@@ -800,6 +876,7 @@ file_check(
     src = "src/store.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-log-store/src/witness.rs",
     name = "check-length-src__witness.rs",
@@ -810,6 +887,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-log-store/src/witness.rs",
     name = "check-portable-src__witness.rs",

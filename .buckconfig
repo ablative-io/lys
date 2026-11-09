@@ -16,11 +16,11 @@
   build = git
 [external_cell_build]
   git_origin = https://github.com/tomWhiting/build.git
-  commit_hash = 03b8a17f46e4614580d837084ff77977129160be
+  commit_hash = 72769d840b6db8e4b811174ddda2cc201a69473c
 [parser]
   target_platform_detector_spec = target:root//...->prelude//platforms:default target:prelude//...->prelude//platforms:default target:toolchains//...->prelude//platforms:default target:build//...->prelude//platforms:default
 [build]
-  execution_platforms = prelude//platforms:default
+  execution_platforms = build//buck:local-platforms
 [project]
   ignore = .git, .worktrees, target, node_modules, .gate, third-party/.cargo, third-party/target
 [buck2]

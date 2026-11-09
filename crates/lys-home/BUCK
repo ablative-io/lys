@@ -296,6 +296,7 @@ rust_binary(
 
 workspace_buildscript(
     binary = ":build-script-build",
+    checkout_git = True,
     env = {
         "CARGO": "cargo",
         "CARGO_MANIFEST_DIR": "crates/lys-home",
@@ -318,8 +319,8 @@ workspace_buildscript(
     name = "build-script-run",
     package_dir = "crates/lys-home",
     srcs = {
-        "Cargo.lock": "//buckgen/inputs:input-0",
-        "Cargo.toml": "//buckgen/inputs:input-1",
+        "Cargo.lock": "//:input-Cargo.lock",
+        "Cargo.toml": "//:input-Cargo.toml",
         "crates/lys-home/Cargo.toml": "Cargo.toml",
         "crates/lys-home/README.md": "README.md",
         "crates/lys-home/build.rs": "build.rs",
@@ -563,20 +564,22 @@ workspace_buildscript(
         "crates/lys-home/tests/session_lock.rs": "tests/session_lock.rs",
         "crates/lys-home/tests/template_seat_fields.rs": "tests/template_seat_fields.rs",
         "crates/lys-home/tests/version.rs": "tests/version.rs",
-        "docs/harness/catalogue/claude-code.json": "//buckgen/inputs:input-9",
-        "docs/harness/catalogue/codex.json": "//buckgen/inputs:input-10"
+        "docs/harness/catalogue/claude-code.json": "//:input-docs__harness__catalogue__claude-code.json",
+        "docs/harness/catalogue/codex.json": "//:input-docs__harness__catalogue__codex.json"
     },
 )
 
 rust_library(
+    _rust_toolchain = "toolchains//:rust-workspace",
     crate = "lys_home",
     crate_root = "crates/lys-home/src/lib.rs",
     doctests = True,
     edition = "2024",
     env = {
+        "BUCKGEN_ROOT_CARGO_MANIFEST_DIR": "crates/lys-home",
+        "BUCKGEN_ROOT_CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "CARGO": "cargo",
         "CARGO_CRATE_NAME": "lys_home",
-        "CARGO_MANIFEST_DIR": "crates/lys-home",
         "CARGO_PKG_AUTHORS": "Tom Whiting \u003ctom@ablative.com.au\u003e",
         "CARGO_PKG_DESCRIPTION": "The home: a session held under its identity as a Pi-shaped session tree, with content blocks by hash and proxy call records; harness importers and renderers sit beside it.",
         "CARGO_PKG_HOMEPAGE": "",
@@ -590,15 +593,14 @@ rust_library(
         "CARGO_PKG_VERSION_MINOR": "3",
         "CARGO_PKG_VERSION_PATCH": "3",
         "CARGO_PKG_VERSION_PRE": "",
-        "CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "OUT_DIR": "$(location :build-script-run[out_dir])"
     },
     features = [],
     mapped_srcs = {
-        "//buckgen/inputs:input-0": "Cargo.lock",
-        "//buckgen/inputs:input-1": "Cargo.toml",
-        "//buckgen/inputs:input-10": "docs/harness/catalogue/codex.json",
-        "//buckgen/inputs:input-9": "docs/harness/catalogue/claude-code.json",
+        "//:input-Cargo.lock": "Cargo.lock",
+        "//:input-Cargo.toml": "Cargo.toml",
+        "//:input-docs__harness__catalogue__claude-code.json": "docs/harness/catalogue/claude-code.json",
+        "//:input-docs__harness__catalogue__codex.json": "docs/harness/catalogue/codex.json",
         "Cargo.toml": "crates/lys-home/Cargo.toml",
         "README.md": "crates/lys-home/README.md",
         "build.rs": "crates/lys-home/build.rs",
@@ -878,14 +880,16 @@ rust_library(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-workspace",
     _test_toolchain = ":test-toolchain",
     crate = "lys_home",
     crate_root = "crates/lys-home/src/lib.rs",
     edition = "2024",
     env = {
+        "BUCKGEN_ROOT_CARGO_MANIFEST_DIR": "crates/lys-home",
+        "BUCKGEN_ROOT_CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "CARGO": "cargo",
         "CARGO_CRATE_NAME": "lys_home",
-        "CARGO_MANIFEST_DIR": "crates/lys-home",
         "CARGO_PKG_AUTHORS": "Tom Whiting \u003ctom@ablative.com.au\u003e",
         "CARGO_PKG_DESCRIPTION": "The home: a session held under its identity as a Pi-shaped session tree, with content blocks by hash and proxy call records; harness importers and renderers sit beside it.",
         "CARGO_PKG_HOMEPAGE": "",
@@ -899,15 +903,17 @@ workspace_rust_test(
         "CARGO_PKG_VERSION_MINOR": "3",
         "CARGO_PKG_VERSION_PATCH": "3",
         "CARGO_PKG_VERSION_PRE": "",
-        "CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "OUT_DIR": "$(location :build-script-run[out_dir])"
     },
     features = [],
+    labels = [
+        "tier-1"
+    ],
     mapped_srcs = {
-        "//buckgen/inputs:input-0": "Cargo.lock",
-        "//buckgen/inputs:input-1": "Cargo.toml",
-        "//buckgen/inputs:input-10": "docs/harness/catalogue/codex.json",
-        "//buckgen/inputs:input-9": "docs/harness/catalogue/claude-code.json",
+        "//:input-Cargo.lock": "Cargo.lock",
+        "//:input-Cargo.toml": "Cargo.toml",
+        "//:input-docs__harness__catalogue__claude-code.json": "docs/harness/catalogue/claude-code.json",
+        "//:input-docs__harness__catalogue__codex.json": "docs/harness/catalogue/codex.json",
         "Cargo.toml": "crates/lys-home/Cargo.toml",
         "README.md": "crates/lys-home/README.md",
         "build.rs": "crates/lys-home/build.rs",
@@ -1178,6 +1184,17 @@ workspace_rust_test(
         "toml": "//third-party:toml",
         "zeroize": "//third-party:zeroize"
     },
+    nextest = {
+        "binary": "lys_home",
+        "binary_id": "lys-home",
+        "dir": "crates/lys-home",
+        "kind": "lib",
+        "package": "lys-home"
+    },
+    package_bins = {
+        "examples/passthrough": ":example-passthrough",
+        "lys-home": ":lys-home-bin"
+    },
     rustc_flags = [
         "@$(location :build-script-run[rustc_flags])"
     ],
@@ -1188,14 +1205,16 @@ workspace_rust_test(
 )
 
 rust_binary(
+    _rust_toolchain = "toolchains//:rust-workspace",
     crate = "lys_home",
     crate_root = "crates/lys-home/src/main.rs",
     edition = "2024",
     env = {
+        "BUCKGEN_ROOT_CARGO_MANIFEST_DIR": "crates/lys-home",
+        "BUCKGEN_ROOT_CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "CARGO": "cargo",
         "CARGO_BIN_NAME": "lys-home",
         "CARGO_CRATE_NAME": "lys_home",
-        "CARGO_MANIFEST_DIR": "crates/lys-home",
         "CARGO_PKG_AUTHORS": "Tom Whiting \u003ctom@ablative.com.au\u003e",
         "CARGO_PKG_DESCRIPTION": "The home: a session held under its identity as a Pi-shaped session tree, with content blocks by hash and proxy call records; harness importers and renderers sit beside it.",
         "CARGO_PKG_HOMEPAGE": "",
@@ -1209,15 +1228,14 @@ rust_binary(
         "CARGO_PKG_VERSION_MINOR": "3",
         "CARGO_PKG_VERSION_PATCH": "3",
         "CARGO_PKG_VERSION_PRE": "",
-        "CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "OUT_DIR": "$(location :build-script-run[out_dir])"
     },
     features = [],
     mapped_srcs = {
-        "//buckgen/inputs:input-0": "Cargo.lock",
-        "//buckgen/inputs:input-1": "Cargo.toml",
-        "//buckgen/inputs:input-10": "docs/harness/catalogue/codex.json",
-        "//buckgen/inputs:input-9": "docs/harness/catalogue/claude-code.json",
+        "//:input-Cargo.lock": "Cargo.lock",
+        "//:input-Cargo.toml": "Cargo.toml",
+        "//:input-docs__harness__catalogue__claude-code.json": "docs/harness/catalogue/claude-code.json",
+        "//:input-docs__harness__catalogue__codex.json": "docs/harness/catalogue/codex.json",
         "Cargo.toml": "crates/lys-home/Cargo.toml",
         "README.md": "crates/lys-home/README.md",
         "build.rs": "crates/lys-home/build.rs",
@@ -1498,15 +1516,17 @@ rust_binary(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-workspace",
     _test_toolchain = ":test-toolchain",
     crate = "lys_home",
     crate_root = "crates/lys-home/src/main.rs",
     edition = "2024",
     env = {
+        "BUCKGEN_ROOT_CARGO_MANIFEST_DIR": "crates/lys-home",
+        "BUCKGEN_ROOT_CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "CARGO": "cargo",
         "CARGO_BIN_NAME": "lys-home",
         "CARGO_CRATE_NAME": "lys_home",
-        "CARGO_MANIFEST_DIR": "crates/lys-home",
         "CARGO_PKG_AUTHORS": "Tom Whiting \u003ctom@ablative.com.au\u003e",
         "CARGO_PKG_DESCRIPTION": "The home: a session held under its identity as a Pi-shaped session tree, with content blocks by hash and proxy call records; harness importers and renderers sit beside it.",
         "CARGO_PKG_HOMEPAGE": "",
@@ -1520,15 +1540,17 @@ workspace_rust_test(
         "CARGO_PKG_VERSION_MINOR": "3",
         "CARGO_PKG_VERSION_PATCH": "3",
         "CARGO_PKG_VERSION_PRE": "",
-        "CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "OUT_DIR": "$(location :build-script-run[out_dir])"
     },
     features = [],
+    labels = [
+        "tier-1"
+    ],
     mapped_srcs = {
-        "//buckgen/inputs:input-0": "Cargo.lock",
-        "//buckgen/inputs:input-1": "Cargo.toml",
-        "//buckgen/inputs:input-10": "docs/harness/catalogue/codex.json",
-        "//buckgen/inputs:input-9": "docs/harness/catalogue/claude-code.json",
+        "//:input-Cargo.lock": "Cargo.lock",
+        "//:input-Cargo.toml": "Cargo.toml",
+        "//:input-docs__harness__catalogue__claude-code.json": "docs/harness/catalogue/claude-code.json",
+        "//:input-docs__harness__catalogue__codex.json": "docs/harness/catalogue/codex.json",
         "Cargo.toml": "crates/lys-home/Cargo.toml",
         "README.md": "crates/lys-home/README.md",
         "build.rs": "crates/lys-home/build.rs",
@@ -1800,6 +1822,17 @@ workspace_rust_test(
         "toml": "//third-party:toml",
         "zeroize": "//third-party:zeroize"
     },
+    nextest = {
+        "binary": "lys-home",
+        "binary_id": "lys-home::bin/lys-home",
+        "dir": "crates/lys-home",
+        "kind": "bin",
+        "package": "lys-home"
+    },
+    package_bins = {
+        "examples/passthrough": ":example-passthrough",
+        "lys-home": ":lys-home-bin"
+    },
     rustc_flags = [
         "@$(location :build-script-run[rustc_flags])"
     ],
@@ -1810,13 +1843,15 @@ workspace_rust_test(
 )
 
 rust_binary(
+    _rust_toolchain = "toolchains//:rust-workspace",
     crate = "passthrough",
     crate_root = "crates/lys-home/examples/passthrough.rs",
     edition = "2024",
     env = {
+        "BUCKGEN_ROOT_CARGO_MANIFEST_DIR": "crates/lys-home",
+        "BUCKGEN_ROOT_CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "CARGO": "cargo",
         "CARGO_CRATE_NAME": "passthrough",
-        "CARGO_MANIFEST_DIR": "crates/lys-home",
         "CARGO_PKG_AUTHORS": "Tom Whiting \u003ctom@ablative.com.au\u003e",
         "CARGO_PKG_DESCRIPTION": "The home: a session held under its identity as a Pi-shaped session tree, with content blocks by hash and proxy call records; harness importers and renderers sit beside it.",
         "CARGO_PKG_HOMEPAGE": "",
@@ -1830,15 +1865,14 @@ rust_binary(
         "CARGO_PKG_VERSION_MINOR": "3",
         "CARGO_PKG_VERSION_PATCH": "3",
         "CARGO_PKG_VERSION_PRE": "",
-        "CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "OUT_DIR": "$(location :build-script-run[out_dir])"
     },
     features = [],
     mapped_srcs = {
-        "//buckgen/inputs:input-0": "Cargo.lock",
-        "//buckgen/inputs:input-1": "Cargo.toml",
-        "//buckgen/inputs:input-10": "docs/harness/catalogue/codex.json",
-        "//buckgen/inputs:input-9": "docs/harness/catalogue/claude-code.json",
+        "//:input-Cargo.lock": "Cargo.lock",
+        "//:input-Cargo.toml": "Cargo.toml",
+        "//:input-docs__harness__catalogue__claude-code.json": "docs/harness/catalogue/claude-code.json",
+        "//:input-docs__harness__catalogue__codex.json": "docs/harness/catalogue/codex.json",
         "Cargo.toml": "crates/lys-home/Cargo.toml",
         "README.md": "crates/lys-home/README.md",
         "build.rs": "crates/lys-home/build.rs",
@@ -2121,16 +2155,17 @@ rust_binary(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
-    _rust_toolchain = "toolchains//:rust-bin-exe",
+    _rust_toolchain = "toolchains//:rust-workspace",
     _test_toolchain = ":test-toolchain",
     crate = "cached_index",
     crate_root = "crates/lys-home/tests/cached_index.rs",
     edition = "2024",
     env = {
+        "BUCKGEN_ROOT_CARGO_MANIFEST_DIR": "crates/lys-home",
+        "BUCKGEN_ROOT_CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "CARGO": "cargo",
         "CARGO_BIN_EXE_lys-home": "$(location :lys-home-bin)",
         "CARGO_CRATE_NAME": "cached_index",
-        "CARGO_MANIFEST_DIR": "crates/lys-home",
         "CARGO_PKG_AUTHORS": "Tom Whiting \u003ctom@ablative.com.au\u003e",
         "CARGO_PKG_DESCRIPTION": "The home: a session held under its identity as a Pi-shaped session tree, with content blocks by hash and proxy call records; harness importers and renderers sit beside it.",
         "CARGO_PKG_HOMEPAGE": "",
@@ -2144,16 +2179,18 @@ workspace_rust_test(
         "CARGO_PKG_VERSION_MINOR": "3",
         "CARGO_PKG_VERSION_PATCH": "3",
         "CARGO_PKG_VERSION_PRE": "",
-        "CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "OUT_DIR": "$(location :build-script-run[out_dir])"
     },
     features = [],
     framework = True,
+    labels = [
+        "tier-1"
+    ],
     mapped_srcs = {
-        "//buckgen/inputs:input-0": "Cargo.lock",
-        "//buckgen/inputs:input-1": "Cargo.toml",
-        "//buckgen/inputs:input-10": "docs/harness/catalogue/codex.json",
-        "//buckgen/inputs:input-9": "docs/harness/catalogue/claude-code.json",
+        "//:input-Cargo.lock": "Cargo.lock",
+        "//:input-Cargo.toml": "Cargo.toml",
+        "//:input-docs__harness__catalogue__claude-code.json": "docs/harness/catalogue/claude-code.json",
+        "//:input-docs__harness__catalogue__codex.json": "docs/harness/catalogue/codex.json",
         "Cargo.toml": "crates/lys-home/Cargo.toml",
         "README.md": "crates/lys-home/README.md",
         "build.rs": "crates/lys-home/build.rs",
@@ -2425,6 +2462,17 @@ workspace_rust_test(
         "toml": "//third-party:toml",
         "zeroize": "//third-party:zeroize"
     },
+    nextest = {
+        "binary": "cached_index",
+        "binary_id": "lys-home::cached_index",
+        "dir": "crates/lys-home",
+        "kind": "test",
+        "package": "lys-home"
+    },
+    package_bins = {
+        "examples/passthrough": ":example-passthrough",
+        "lys-home": ":lys-home-bin"
+    },
     rustc_flags = [
         "@$(location :build-script-run[rustc_flags])"
     ],
@@ -2436,16 +2484,17 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
-    _rust_toolchain = "toolchains//:rust-bin-exe",
+    _rust_toolchain = "toolchains//:rust-workspace",
     _test_toolchain = ":test-toolchain",
     crate = "claude_code_compaction",
     crate_root = "crates/lys-home/tests/claude_code_compaction.rs",
     edition = "2024",
     env = {
+        "BUCKGEN_ROOT_CARGO_MANIFEST_DIR": "crates/lys-home",
+        "BUCKGEN_ROOT_CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "CARGO": "cargo",
         "CARGO_BIN_EXE_lys-home": "$(location :lys-home-bin)",
         "CARGO_CRATE_NAME": "claude_code_compaction",
-        "CARGO_MANIFEST_DIR": "crates/lys-home",
         "CARGO_PKG_AUTHORS": "Tom Whiting \u003ctom@ablative.com.au\u003e",
         "CARGO_PKG_DESCRIPTION": "The home: a session held under its identity as a Pi-shaped session tree, with content blocks by hash and proxy call records; harness importers and renderers sit beside it.",
         "CARGO_PKG_HOMEPAGE": "",
@@ -2459,16 +2508,18 @@ workspace_rust_test(
         "CARGO_PKG_VERSION_MINOR": "3",
         "CARGO_PKG_VERSION_PATCH": "3",
         "CARGO_PKG_VERSION_PRE": "",
-        "CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "OUT_DIR": "$(location :build-script-run[out_dir])"
     },
     features = [],
     framework = True,
+    labels = [
+        "tier-1"
+    ],
     mapped_srcs = {
-        "//buckgen/inputs:input-0": "Cargo.lock",
-        "//buckgen/inputs:input-1": "Cargo.toml",
-        "//buckgen/inputs:input-10": "docs/harness/catalogue/codex.json",
-        "//buckgen/inputs:input-9": "docs/harness/catalogue/claude-code.json",
+        "//:input-Cargo.lock": "Cargo.lock",
+        "//:input-Cargo.toml": "Cargo.toml",
+        "//:input-docs__harness__catalogue__claude-code.json": "docs/harness/catalogue/claude-code.json",
+        "//:input-docs__harness__catalogue__codex.json": "docs/harness/catalogue/codex.json",
         "Cargo.toml": "crates/lys-home/Cargo.toml",
         "README.md": "crates/lys-home/README.md",
         "build.rs": "crates/lys-home/build.rs",
@@ -2740,6 +2791,17 @@ workspace_rust_test(
         "toml": "//third-party:toml",
         "zeroize": "//third-party:zeroize"
     },
+    nextest = {
+        "binary": "claude_code_compaction",
+        "binary_id": "lys-home::claude_code_compaction",
+        "dir": "crates/lys-home",
+        "kind": "test",
+        "package": "lys-home"
+    },
+    package_bins = {
+        "examples/passthrough": ":example-passthrough",
+        "lys-home": ":lys-home-bin"
+    },
     rustc_flags = [
         "@$(location :build-script-run[rustc_flags])"
     ],
@@ -2751,16 +2813,17 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
-    _rust_toolchain = "toolchains//:rust-bin-exe",
+    _rust_toolchain = "toolchains//:rust-workspace",
     _test_toolchain = ":test-toolchain",
     crate = "claude_code_round_trip",
     crate_root = "crates/lys-home/tests/claude_code_round_trip.rs",
     edition = "2024",
     env = {
+        "BUCKGEN_ROOT_CARGO_MANIFEST_DIR": "crates/lys-home",
+        "BUCKGEN_ROOT_CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "CARGO": "cargo",
         "CARGO_BIN_EXE_lys-home": "$(location :lys-home-bin)",
         "CARGO_CRATE_NAME": "claude_code_round_trip",
-        "CARGO_MANIFEST_DIR": "crates/lys-home",
         "CARGO_PKG_AUTHORS": "Tom Whiting \u003ctom@ablative.com.au\u003e",
         "CARGO_PKG_DESCRIPTION": "The home: a session held under its identity as a Pi-shaped session tree, with content blocks by hash and proxy call records; harness importers and renderers sit beside it.",
         "CARGO_PKG_HOMEPAGE": "",
@@ -2774,16 +2837,18 @@ workspace_rust_test(
         "CARGO_PKG_VERSION_MINOR": "3",
         "CARGO_PKG_VERSION_PATCH": "3",
         "CARGO_PKG_VERSION_PRE": "",
-        "CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "OUT_DIR": "$(location :build-script-run[out_dir])"
     },
     features = [],
     framework = True,
+    labels = [
+        "tier-1"
+    ],
     mapped_srcs = {
-        "//buckgen/inputs:input-0": "Cargo.lock",
-        "//buckgen/inputs:input-1": "Cargo.toml",
-        "//buckgen/inputs:input-10": "docs/harness/catalogue/codex.json",
-        "//buckgen/inputs:input-9": "docs/harness/catalogue/claude-code.json",
+        "//:input-Cargo.lock": "Cargo.lock",
+        "//:input-Cargo.toml": "Cargo.toml",
+        "//:input-docs__harness__catalogue__claude-code.json": "docs/harness/catalogue/claude-code.json",
+        "//:input-docs__harness__catalogue__codex.json": "docs/harness/catalogue/codex.json",
         "Cargo.toml": "crates/lys-home/Cargo.toml",
         "README.md": "crates/lys-home/README.md",
         "build.rs": "crates/lys-home/build.rs",
@@ -3055,6 +3120,17 @@ workspace_rust_test(
         "toml": "//third-party:toml",
         "zeroize": "//third-party:zeroize"
     },
+    nextest = {
+        "binary": "claude_code_round_trip",
+        "binary_id": "lys-home::claude_code_round_trip",
+        "dir": "crates/lys-home",
+        "kind": "test",
+        "package": "lys-home"
+    },
+    package_bins = {
+        "examples/passthrough": ":example-passthrough",
+        "lys-home": ":lys-home-bin"
+    },
     rustc_flags = [
         "@$(location :build-script-run[rustc_flags])"
     ],
@@ -3066,16 +3142,17 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
-    _rust_toolchain = "toolchains//:rust-bin-exe",
+    _rust_toolchain = "toolchains//:rust-workspace",
     _test_toolchain = ":test-toolchain",
     crate = "claude_workspace",
     crate_root = "crates/lys-home/tests/claude_workspace.rs",
     edition = "2024",
     env = {
+        "BUCKGEN_ROOT_CARGO_MANIFEST_DIR": "crates/lys-home",
+        "BUCKGEN_ROOT_CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "CARGO": "cargo",
         "CARGO_BIN_EXE_lys-home": "$(location :lys-home-bin)",
         "CARGO_CRATE_NAME": "claude_workspace",
-        "CARGO_MANIFEST_DIR": "crates/lys-home",
         "CARGO_PKG_AUTHORS": "Tom Whiting \u003ctom@ablative.com.au\u003e",
         "CARGO_PKG_DESCRIPTION": "The home: a session held under its identity as a Pi-shaped session tree, with content blocks by hash and proxy call records; harness importers and renderers sit beside it.",
         "CARGO_PKG_HOMEPAGE": "",
@@ -3089,16 +3166,18 @@ workspace_rust_test(
         "CARGO_PKG_VERSION_MINOR": "3",
         "CARGO_PKG_VERSION_PATCH": "3",
         "CARGO_PKG_VERSION_PRE": "",
-        "CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "OUT_DIR": "$(location :build-script-run[out_dir])"
     },
     features = [],
     framework = True,
+    labels = [
+        "tier-1"
+    ],
     mapped_srcs = {
-        "//buckgen/inputs:input-0": "Cargo.lock",
-        "//buckgen/inputs:input-1": "Cargo.toml",
-        "//buckgen/inputs:input-10": "docs/harness/catalogue/codex.json",
-        "//buckgen/inputs:input-9": "docs/harness/catalogue/claude-code.json",
+        "//:input-Cargo.lock": "Cargo.lock",
+        "//:input-Cargo.toml": "Cargo.toml",
+        "//:input-docs__harness__catalogue__claude-code.json": "docs/harness/catalogue/claude-code.json",
+        "//:input-docs__harness__catalogue__codex.json": "docs/harness/catalogue/codex.json",
         "Cargo.toml": "crates/lys-home/Cargo.toml",
         "README.md": "crates/lys-home/README.md",
         "build.rs": "crates/lys-home/build.rs",
@@ -3370,6 +3449,17 @@ workspace_rust_test(
         "toml": "//third-party:toml",
         "zeroize": "//third-party:zeroize"
     },
+    nextest = {
+        "binary": "claude_workspace",
+        "binary_id": "lys-home::claude_workspace",
+        "dir": "crates/lys-home",
+        "kind": "test",
+        "package": "lys-home"
+    },
+    package_bins = {
+        "examples/passthrough": ":example-passthrough",
+        "lys-home": ":lys-home-bin"
+    },
     rustc_flags = [
         "@$(location :build-script-run[rustc_flags])"
     ],
@@ -3381,16 +3471,17 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
-    _rust_toolchain = "toolchains//:rust-bin-exe",
+    _rust_toolchain = "toolchains//:rust-workspace",
     _test_toolchain = ":test-toolchain",
     crate = "codex_rendering",
     crate_root = "crates/lys-home/tests/codex_rendering.rs",
     edition = "2024",
     env = {
+        "BUCKGEN_ROOT_CARGO_MANIFEST_DIR": "crates/lys-home",
+        "BUCKGEN_ROOT_CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "CARGO": "cargo",
         "CARGO_BIN_EXE_lys-home": "$(location :lys-home-bin)",
         "CARGO_CRATE_NAME": "codex_rendering",
-        "CARGO_MANIFEST_DIR": "crates/lys-home",
         "CARGO_PKG_AUTHORS": "Tom Whiting \u003ctom@ablative.com.au\u003e",
         "CARGO_PKG_DESCRIPTION": "The home: a session held under its identity as a Pi-shaped session tree, with content blocks by hash and proxy call records; harness importers and renderers sit beside it.",
         "CARGO_PKG_HOMEPAGE": "",
@@ -3404,16 +3495,18 @@ workspace_rust_test(
         "CARGO_PKG_VERSION_MINOR": "3",
         "CARGO_PKG_VERSION_PATCH": "3",
         "CARGO_PKG_VERSION_PRE": "",
-        "CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "OUT_DIR": "$(location :build-script-run[out_dir])"
     },
     features = [],
     framework = True,
+    labels = [
+        "tier-1"
+    ],
     mapped_srcs = {
-        "//buckgen/inputs:input-0": "Cargo.lock",
-        "//buckgen/inputs:input-1": "Cargo.toml",
-        "//buckgen/inputs:input-10": "docs/harness/catalogue/codex.json",
-        "//buckgen/inputs:input-9": "docs/harness/catalogue/claude-code.json",
+        "//:input-Cargo.lock": "Cargo.lock",
+        "//:input-Cargo.toml": "Cargo.toml",
+        "//:input-docs__harness__catalogue__claude-code.json": "docs/harness/catalogue/claude-code.json",
+        "//:input-docs__harness__catalogue__codex.json": "docs/harness/catalogue/codex.json",
         "Cargo.toml": "crates/lys-home/Cargo.toml",
         "README.md": "crates/lys-home/README.md",
         "build.rs": "crates/lys-home/build.rs",
@@ -3685,6 +3778,17 @@ workspace_rust_test(
         "toml": "//third-party:toml",
         "zeroize": "//third-party:zeroize"
     },
+    nextest = {
+        "binary": "codex_rendering",
+        "binary_id": "lys-home::codex_rendering",
+        "dir": "crates/lys-home",
+        "kind": "test",
+        "package": "lys-home"
+    },
+    package_bins = {
+        "examples/passthrough": ":example-passthrough",
+        "lys-home": ":lys-home-bin"
+    },
     rustc_flags = [
         "@$(location :build-script-run[rustc_flags])"
     ],
@@ -3696,16 +3800,17 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
-    _rust_toolchain = "toolchains//:rust-bin-exe",
+    _rust_toolchain = "toolchains//:rust-workspace",
     _test_toolchain = ":test-toolchain",
     crate = "codex_translation",
     crate_root = "crates/lys-home/tests/codex_translation.rs",
     edition = "2024",
     env = {
+        "BUCKGEN_ROOT_CARGO_MANIFEST_DIR": "crates/lys-home",
+        "BUCKGEN_ROOT_CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "CARGO": "cargo",
         "CARGO_BIN_EXE_lys-home": "$(location :lys-home-bin)",
         "CARGO_CRATE_NAME": "codex_translation",
-        "CARGO_MANIFEST_DIR": "crates/lys-home",
         "CARGO_PKG_AUTHORS": "Tom Whiting \u003ctom@ablative.com.au\u003e",
         "CARGO_PKG_DESCRIPTION": "The home: a session held under its identity as a Pi-shaped session tree, with content blocks by hash and proxy call records; harness importers and renderers sit beside it.",
         "CARGO_PKG_HOMEPAGE": "",
@@ -3719,16 +3824,18 @@ workspace_rust_test(
         "CARGO_PKG_VERSION_MINOR": "3",
         "CARGO_PKG_VERSION_PATCH": "3",
         "CARGO_PKG_VERSION_PRE": "",
-        "CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "OUT_DIR": "$(location :build-script-run[out_dir])"
     },
     features = [],
     framework = True,
+    labels = [
+        "tier-1"
+    ],
     mapped_srcs = {
-        "//buckgen/inputs:input-0": "Cargo.lock",
-        "//buckgen/inputs:input-1": "Cargo.toml",
-        "//buckgen/inputs:input-10": "docs/harness/catalogue/codex.json",
-        "//buckgen/inputs:input-9": "docs/harness/catalogue/claude-code.json",
+        "//:input-Cargo.lock": "Cargo.lock",
+        "//:input-Cargo.toml": "Cargo.toml",
+        "//:input-docs__harness__catalogue__claude-code.json": "docs/harness/catalogue/claude-code.json",
+        "//:input-docs__harness__catalogue__codex.json": "docs/harness/catalogue/codex.json",
         "Cargo.toml": "crates/lys-home/Cargo.toml",
         "README.md": "crates/lys-home/README.md",
         "build.rs": "crates/lys-home/build.rs",
@@ -4000,6 +4107,17 @@ workspace_rust_test(
         "toml": "//third-party:toml",
         "zeroize": "//third-party:zeroize"
     },
+    nextest = {
+        "binary": "codex_translation",
+        "binary_id": "lys-home::codex_translation",
+        "dir": "crates/lys-home",
+        "kind": "test",
+        "package": "lys-home"
+    },
+    package_bins = {
+        "examples/passthrough": ":example-passthrough",
+        "lys-home": ":lys-home-bin"
+    },
     rustc_flags = [
         "@$(location :build-script-run[rustc_flags])"
     ],
@@ -4011,16 +4129,17 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
-    _rust_toolchain = "toolchains//:rust-bin-exe",
+    _rust_toolchain = "toolchains//:rust-workspace",
     _test_toolchain = ":test-toolchain",
     crate = "fewshot_write",
     crate_root = "crates/lys-home/tests/fewshot_write.rs",
     edition = "2024",
     env = {
+        "BUCKGEN_ROOT_CARGO_MANIFEST_DIR": "crates/lys-home",
+        "BUCKGEN_ROOT_CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "CARGO": "cargo",
         "CARGO_BIN_EXE_lys-home": "$(location :lys-home-bin)",
         "CARGO_CRATE_NAME": "fewshot_write",
-        "CARGO_MANIFEST_DIR": "crates/lys-home",
         "CARGO_PKG_AUTHORS": "Tom Whiting \u003ctom@ablative.com.au\u003e",
         "CARGO_PKG_DESCRIPTION": "The home: a session held under its identity as a Pi-shaped session tree, with content blocks by hash and proxy call records; harness importers and renderers sit beside it.",
         "CARGO_PKG_HOMEPAGE": "",
@@ -4034,16 +4153,18 @@ workspace_rust_test(
         "CARGO_PKG_VERSION_MINOR": "3",
         "CARGO_PKG_VERSION_PATCH": "3",
         "CARGO_PKG_VERSION_PRE": "",
-        "CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "OUT_DIR": "$(location :build-script-run[out_dir])"
     },
     features = [],
     framework = True,
+    labels = [
+        "tier-1"
+    ],
     mapped_srcs = {
-        "//buckgen/inputs:input-0": "Cargo.lock",
-        "//buckgen/inputs:input-1": "Cargo.toml",
-        "//buckgen/inputs:input-10": "docs/harness/catalogue/codex.json",
-        "//buckgen/inputs:input-9": "docs/harness/catalogue/claude-code.json",
+        "//:input-Cargo.lock": "Cargo.lock",
+        "//:input-Cargo.toml": "Cargo.toml",
+        "//:input-docs__harness__catalogue__claude-code.json": "docs/harness/catalogue/claude-code.json",
+        "//:input-docs__harness__catalogue__codex.json": "docs/harness/catalogue/codex.json",
         "Cargo.toml": "crates/lys-home/Cargo.toml",
         "README.md": "crates/lys-home/README.md",
         "build.rs": "crates/lys-home/build.rs",
@@ -4315,6 +4436,17 @@ workspace_rust_test(
         "toml": "//third-party:toml",
         "zeroize": "//third-party:zeroize"
     },
+    nextest = {
+        "binary": "fewshot_write",
+        "binary_id": "lys-home::fewshot_write",
+        "dir": "crates/lys-home",
+        "kind": "test",
+        "package": "lys-home"
+    },
+    package_bins = {
+        "examples/passthrough": ":example-passthrough",
+        "lys-home": ":lys-home-bin"
+    },
     rustc_flags = [
         "@$(location :build-script-run[rustc_flags])"
     ],
@@ -4326,16 +4458,17 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
-    _rust_toolchain = "toolchains//:rust-bin-exe",
+    _rust_toolchain = "toolchains//:rust-workspace",
     _test_toolchain = ":test-toolchain",
     crate = "fork",
     crate_root = "crates/lys-home/tests/fork.rs",
     edition = "2024",
     env = {
+        "BUCKGEN_ROOT_CARGO_MANIFEST_DIR": "crates/lys-home",
+        "BUCKGEN_ROOT_CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "CARGO": "cargo",
         "CARGO_BIN_EXE_lys-home": "$(location :lys-home-bin)",
         "CARGO_CRATE_NAME": "fork",
-        "CARGO_MANIFEST_DIR": "crates/lys-home",
         "CARGO_PKG_AUTHORS": "Tom Whiting \u003ctom@ablative.com.au\u003e",
         "CARGO_PKG_DESCRIPTION": "The home: a session held under its identity as a Pi-shaped session tree, with content blocks by hash and proxy call records; harness importers and renderers sit beside it.",
         "CARGO_PKG_HOMEPAGE": "",
@@ -4349,16 +4482,18 @@ workspace_rust_test(
         "CARGO_PKG_VERSION_MINOR": "3",
         "CARGO_PKG_VERSION_PATCH": "3",
         "CARGO_PKG_VERSION_PRE": "",
-        "CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "OUT_DIR": "$(location :build-script-run[out_dir])"
     },
     features = [],
     framework = True,
+    labels = [
+        "tier-1"
+    ],
     mapped_srcs = {
-        "//buckgen/inputs:input-0": "Cargo.lock",
-        "//buckgen/inputs:input-1": "Cargo.toml",
-        "//buckgen/inputs:input-10": "docs/harness/catalogue/codex.json",
-        "//buckgen/inputs:input-9": "docs/harness/catalogue/claude-code.json",
+        "//:input-Cargo.lock": "Cargo.lock",
+        "//:input-Cargo.toml": "Cargo.toml",
+        "//:input-docs__harness__catalogue__claude-code.json": "docs/harness/catalogue/claude-code.json",
+        "//:input-docs__harness__catalogue__codex.json": "docs/harness/catalogue/codex.json",
         "Cargo.toml": "crates/lys-home/Cargo.toml",
         "README.md": "crates/lys-home/README.md",
         "build.rs": "crates/lys-home/build.rs",
@@ -4630,6 +4765,17 @@ workspace_rust_test(
         "toml": "//third-party:toml",
         "zeroize": "//third-party:zeroize"
     },
+    nextest = {
+        "binary": "fork",
+        "binary_id": "lys-home::fork",
+        "dir": "crates/lys-home",
+        "kind": "test",
+        "package": "lys-home"
+    },
+    package_bins = {
+        "examples/passthrough": ":example-passthrough",
+        "lys-home": ":lys-home-bin"
+    },
     rustc_flags = [
         "@$(location :build-script-run[rustc_flags])"
     ],
@@ -4641,16 +4787,17 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
-    _rust_toolchain = "toolchains//:rust-bin-exe",
+    _rust_toolchain = "toolchains//:rust-workspace",
     _test_toolchain = ":test-toolchain",
     crate = "given_record",
     crate_root = "crates/lys-home/tests/given_record.rs",
     edition = "2024",
     env = {
+        "BUCKGEN_ROOT_CARGO_MANIFEST_DIR": "crates/lys-home",
+        "BUCKGEN_ROOT_CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "CARGO": "cargo",
         "CARGO_BIN_EXE_lys-home": "$(location :lys-home-bin)",
         "CARGO_CRATE_NAME": "given_record",
-        "CARGO_MANIFEST_DIR": "crates/lys-home",
         "CARGO_PKG_AUTHORS": "Tom Whiting \u003ctom@ablative.com.au\u003e",
         "CARGO_PKG_DESCRIPTION": "The home: a session held under its identity as a Pi-shaped session tree, with content blocks by hash and proxy call records; harness importers and renderers sit beside it.",
         "CARGO_PKG_HOMEPAGE": "",
@@ -4664,16 +4811,18 @@ workspace_rust_test(
         "CARGO_PKG_VERSION_MINOR": "3",
         "CARGO_PKG_VERSION_PATCH": "3",
         "CARGO_PKG_VERSION_PRE": "",
-        "CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "OUT_DIR": "$(location :build-script-run[out_dir])"
     },
     features = [],
     framework = True,
+    labels = [
+        "tier-1"
+    ],
     mapped_srcs = {
-        "//buckgen/inputs:input-0": "Cargo.lock",
-        "//buckgen/inputs:input-1": "Cargo.toml",
-        "//buckgen/inputs:input-10": "docs/harness/catalogue/codex.json",
-        "//buckgen/inputs:input-9": "docs/harness/catalogue/claude-code.json",
+        "//:input-Cargo.lock": "Cargo.lock",
+        "//:input-Cargo.toml": "Cargo.toml",
+        "//:input-docs__harness__catalogue__claude-code.json": "docs/harness/catalogue/claude-code.json",
+        "//:input-docs__harness__catalogue__codex.json": "docs/harness/catalogue/codex.json",
         "Cargo.toml": "crates/lys-home/Cargo.toml",
         "README.md": "crates/lys-home/README.md",
         "build.rs": "crates/lys-home/build.rs",
@@ -4945,6 +5094,17 @@ workspace_rust_test(
         "toml": "//third-party:toml",
         "zeroize": "//third-party:zeroize"
     },
+    nextest = {
+        "binary": "given_record",
+        "binary_id": "lys-home::given_record",
+        "dir": "crates/lys-home",
+        "kind": "test",
+        "package": "lys-home"
+    },
+    package_bins = {
+        "examples/passthrough": ":example-passthrough",
+        "lys-home": ":lys-home-bin"
+    },
     rustc_flags = [
         "@$(location :build-script-run[rustc_flags])"
     ],
@@ -4956,16 +5116,17 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
-    _rust_toolchain = "toolchains//:rust-bin-exe",
+    _rust_toolchain = "toolchains//:rust-workspace",
     _test_toolchain = ":test-toolchain",
     crate = "given_statement",
     crate_root = "crates/lys-home/tests/given_statement.rs",
     edition = "2024",
     env = {
+        "BUCKGEN_ROOT_CARGO_MANIFEST_DIR": "crates/lys-home",
+        "BUCKGEN_ROOT_CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "CARGO": "cargo",
         "CARGO_BIN_EXE_lys-home": "$(location :lys-home-bin)",
         "CARGO_CRATE_NAME": "given_statement",
-        "CARGO_MANIFEST_DIR": "crates/lys-home",
         "CARGO_PKG_AUTHORS": "Tom Whiting \u003ctom@ablative.com.au\u003e",
         "CARGO_PKG_DESCRIPTION": "The home: a session held under its identity as a Pi-shaped session tree, with content blocks by hash and proxy call records; harness importers and renderers sit beside it.",
         "CARGO_PKG_HOMEPAGE": "",
@@ -4979,16 +5140,18 @@ workspace_rust_test(
         "CARGO_PKG_VERSION_MINOR": "3",
         "CARGO_PKG_VERSION_PATCH": "3",
         "CARGO_PKG_VERSION_PRE": "",
-        "CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "OUT_DIR": "$(location :build-script-run[out_dir])"
     },
     features = [],
     framework = True,
+    labels = [
+        "tier-1"
+    ],
     mapped_srcs = {
-        "//buckgen/inputs:input-0": "Cargo.lock",
-        "//buckgen/inputs:input-1": "Cargo.toml",
-        "//buckgen/inputs:input-10": "docs/harness/catalogue/codex.json",
-        "//buckgen/inputs:input-9": "docs/harness/catalogue/claude-code.json",
+        "//:input-Cargo.lock": "Cargo.lock",
+        "//:input-Cargo.toml": "Cargo.toml",
+        "//:input-docs__harness__catalogue__claude-code.json": "docs/harness/catalogue/claude-code.json",
+        "//:input-docs__harness__catalogue__codex.json": "docs/harness/catalogue/codex.json",
         "Cargo.toml": "crates/lys-home/Cargo.toml",
         "README.md": "crates/lys-home/README.md",
         "build.rs": "crates/lys-home/build.rs",
@@ -5260,6 +5423,17 @@ workspace_rust_test(
         "toml": "//third-party:toml",
         "zeroize": "//third-party:zeroize"
     },
+    nextest = {
+        "binary": "given_statement",
+        "binary_id": "lys-home::given_statement",
+        "dir": "crates/lys-home",
+        "kind": "test",
+        "package": "lys-home"
+    },
+    package_bins = {
+        "examples/passthrough": ":example-passthrough",
+        "lys-home": ":lys-home-bin"
+    },
     rustc_flags = [
         "@$(location :build-script-run[rustc_flags])"
     ],
@@ -5271,16 +5445,17 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
-    _rust_toolchain = "toolchains//:rust-bin-exe",
+    _rust_toolchain = "toolchains//:rust-workspace",
     _test_toolchain = ":test-toolchain",
     crate = "home_fetch",
     crate_root = "crates/lys-home/tests/home_fetch.rs",
     edition = "2024",
     env = {
+        "BUCKGEN_ROOT_CARGO_MANIFEST_DIR": "crates/lys-home",
+        "BUCKGEN_ROOT_CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "CARGO": "cargo",
         "CARGO_BIN_EXE_lys-home": "$(location :lys-home-bin)",
         "CARGO_CRATE_NAME": "home_fetch",
-        "CARGO_MANIFEST_DIR": "crates/lys-home",
         "CARGO_PKG_AUTHORS": "Tom Whiting \u003ctom@ablative.com.au\u003e",
         "CARGO_PKG_DESCRIPTION": "The home: a session held under its identity as a Pi-shaped session tree, with content blocks by hash and proxy call records; harness importers and renderers sit beside it.",
         "CARGO_PKG_HOMEPAGE": "",
@@ -5294,16 +5469,18 @@ workspace_rust_test(
         "CARGO_PKG_VERSION_MINOR": "3",
         "CARGO_PKG_VERSION_PATCH": "3",
         "CARGO_PKG_VERSION_PRE": "",
-        "CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "OUT_DIR": "$(location :build-script-run[out_dir])"
     },
     features = [],
     framework = True,
+    labels = [
+        "tier-1"
+    ],
     mapped_srcs = {
-        "//buckgen/inputs:input-0": "Cargo.lock",
-        "//buckgen/inputs:input-1": "Cargo.toml",
-        "//buckgen/inputs:input-10": "docs/harness/catalogue/codex.json",
-        "//buckgen/inputs:input-9": "docs/harness/catalogue/claude-code.json",
+        "//:input-Cargo.lock": "Cargo.lock",
+        "//:input-Cargo.toml": "Cargo.toml",
+        "//:input-docs__harness__catalogue__claude-code.json": "docs/harness/catalogue/claude-code.json",
+        "//:input-docs__harness__catalogue__codex.json": "docs/harness/catalogue/codex.json",
         "Cargo.toml": "crates/lys-home/Cargo.toml",
         "README.md": "crates/lys-home/README.md",
         "build.rs": "crates/lys-home/build.rs",
@@ -5575,6 +5752,17 @@ workspace_rust_test(
         "toml": "//third-party:toml",
         "zeroize": "//third-party:zeroize"
     },
+    nextest = {
+        "binary": "home_fetch",
+        "binary_id": "lys-home::home_fetch",
+        "dir": "crates/lys-home",
+        "kind": "test",
+        "package": "lys-home"
+    },
+    package_bins = {
+        "examples/passthrough": ":example-passthrough",
+        "lys-home": ":lys-home-bin"
+    },
     rustc_flags = [
         "@$(location :build-script-run[rustc_flags])"
     ],
@@ -5586,16 +5774,17 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
-    _rust_toolchain = "toolchains//:rust-bin-exe",
+    _rust_toolchain = "toolchains//:rust-workspace",
     _test_toolchain = ":test-toolchain",
     crate = "home_move",
     crate_root = "crates/lys-home/tests/home_move.rs",
     edition = "2024",
     env = {
+        "BUCKGEN_ROOT_CARGO_MANIFEST_DIR": "crates/lys-home",
+        "BUCKGEN_ROOT_CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "CARGO": "cargo",
         "CARGO_BIN_EXE_lys-home": "$(location :lys-home-bin)",
         "CARGO_CRATE_NAME": "home_move",
-        "CARGO_MANIFEST_DIR": "crates/lys-home",
         "CARGO_PKG_AUTHORS": "Tom Whiting \u003ctom@ablative.com.au\u003e",
         "CARGO_PKG_DESCRIPTION": "The home: a session held under its identity as a Pi-shaped session tree, with content blocks by hash and proxy call records; harness importers and renderers sit beside it.",
         "CARGO_PKG_HOMEPAGE": "",
@@ -5609,16 +5798,18 @@ workspace_rust_test(
         "CARGO_PKG_VERSION_MINOR": "3",
         "CARGO_PKG_VERSION_PATCH": "3",
         "CARGO_PKG_VERSION_PRE": "",
-        "CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "OUT_DIR": "$(location :build-script-run[out_dir])"
     },
     features = [],
     framework = True,
+    labels = [
+        "tier-1"
+    ],
     mapped_srcs = {
-        "//buckgen/inputs:input-0": "Cargo.lock",
-        "//buckgen/inputs:input-1": "Cargo.toml",
-        "//buckgen/inputs:input-10": "docs/harness/catalogue/codex.json",
-        "//buckgen/inputs:input-9": "docs/harness/catalogue/claude-code.json",
+        "//:input-Cargo.lock": "Cargo.lock",
+        "//:input-Cargo.toml": "Cargo.toml",
+        "//:input-docs__harness__catalogue__claude-code.json": "docs/harness/catalogue/claude-code.json",
+        "//:input-docs__harness__catalogue__codex.json": "docs/harness/catalogue/codex.json",
         "Cargo.toml": "crates/lys-home/Cargo.toml",
         "README.md": "crates/lys-home/README.md",
         "build.rs": "crates/lys-home/build.rs",
@@ -5890,6 +6081,17 @@ workspace_rust_test(
         "toml": "//third-party:toml",
         "zeroize": "//third-party:zeroize"
     },
+    nextest = {
+        "binary": "home_move",
+        "binary_id": "lys-home::home_move",
+        "dir": "crates/lys-home",
+        "kind": "test",
+        "package": "lys-home"
+    },
+    package_bins = {
+        "examples/passthrough": ":example-passthrough",
+        "lys-home": ":lys-home-bin"
+    },
     rustc_flags = [
         "@$(location :build-script-run[rustc_flags])"
     ],
@@ -5901,16 +6103,17 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
-    _rust_toolchain = "toolchains//:rust-bin-exe",
+    _rust_toolchain = "toolchains//:rust-workspace",
     _test_toolchain = ":test-toolchain",
     crate = "home_ship",
     crate_root = "crates/lys-home/tests/home_ship.rs",
     edition = "2024",
     env = {
+        "BUCKGEN_ROOT_CARGO_MANIFEST_DIR": "crates/lys-home",
+        "BUCKGEN_ROOT_CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "CARGO": "cargo",
         "CARGO_BIN_EXE_lys-home": "$(location :lys-home-bin)",
         "CARGO_CRATE_NAME": "home_ship",
-        "CARGO_MANIFEST_DIR": "crates/lys-home",
         "CARGO_PKG_AUTHORS": "Tom Whiting \u003ctom@ablative.com.au\u003e",
         "CARGO_PKG_DESCRIPTION": "The home: a session held under its identity as a Pi-shaped session tree, with content blocks by hash and proxy call records; harness importers and renderers sit beside it.",
         "CARGO_PKG_HOMEPAGE": "",
@@ -5924,16 +6127,18 @@ workspace_rust_test(
         "CARGO_PKG_VERSION_MINOR": "3",
         "CARGO_PKG_VERSION_PATCH": "3",
         "CARGO_PKG_VERSION_PRE": "",
-        "CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "OUT_DIR": "$(location :build-script-run[out_dir])"
     },
     features = [],
     framework = True,
+    labels = [
+        "tier-1"
+    ],
     mapped_srcs = {
-        "//buckgen/inputs:input-0": "Cargo.lock",
-        "//buckgen/inputs:input-1": "Cargo.toml",
-        "//buckgen/inputs:input-10": "docs/harness/catalogue/codex.json",
-        "//buckgen/inputs:input-9": "docs/harness/catalogue/claude-code.json",
+        "//:input-Cargo.lock": "Cargo.lock",
+        "//:input-Cargo.toml": "Cargo.toml",
+        "//:input-docs__harness__catalogue__claude-code.json": "docs/harness/catalogue/claude-code.json",
+        "//:input-docs__harness__catalogue__codex.json": "docs/harness/catalogue/codex.json",
         "Cargo.toml": "crates/lys-home/Cargo.toml",
         "README.md": "crates/lys-home/README.md",
         "build.rs": "crates/lys-home/build.rs",
@@ -6205,6 +6410,17 @@ workspace_rust_test(
         "toml": "//third-party:toml",
         "zeroize": "//third-party:zeroize"
     },
+    nextest = {
+        "binary": "home_ship",
+        "binary_id": "lys-home::home_ship",
+        "dir": "crates/lys-home",
+        "kind": "test",
+        "package": "lys-home"
+    },
+    package_bins = {
+        "examples/passthrough": ":example-passthrough",
+        "lys-home": ":lys-home-bin"
+    },
     rustc_flags = [
         "@$(location :build-script-run[rustc_flags])"
     ],
@@ -6216,16 +6432,17 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
-    _rust_toolchain = "toolchains//:rust-bin-exe",
+    _rust_toolchain = "toolchains//:rust-workspace",
     _test_toolchain = ":test-toolchain",
     crate = "import_bytes",
     crate_root = "crates/lys-home/tests/import_bytes.rs",
     edition = "2024",
     env = {
+        "BUCKGEN_ROOT_CARGO_MANIFEST_DIR": "crates/lys-home",
+        "BUCKGEN_ROOT_CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "CARGO": "cargo",
         "CARGO_BIN_EXE_lys-home": "$(location :lys-home-bin)",
         "CARGO_CRATE_NAME": "import_bytes",
-        "CARGO_MANIFEST_DIR": "crates/lys-home",
         "CARGO_PKG_AUTHORS": "Tom Whiting \u003ctom@ablative.com.au\u003e",
         "CARGO_PKG_DESCRIPTION": "The home: a session held under its identity as a Pi-shaped session tree, with content blocks by hash and proxy call records; harness importers and renderers sit beside it.",
         "CARGO_PKG_HOMEPAGE": "",
@@ -6239,16 +6456,18 @@ workspace_rust_test(
         "CARGO_PKG_VERSION_MINOR": "3",
         "CARGO_PKG_VERSION_PATCH": "3",
         "CARGO_PKG_VERSION_PRE": "",
-        "CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "OUT_DIR": "$(location :build-script-run[out_dir])"
     },
     features = [],
     framework = True,
+    labels = [
+        "tier-1"
+    ],
     mapped_srcs = {
-        "//buckgen/inputs:input-0": "Cargo.lock",
-        "//buckgen/inputs:input-1": "Cargo.toml",
-        "//buckgen/inputs:input-10": "docs/harness/catalogue/codex.json",
-        "//buckgen/inputs:input-9": "docs/harness/catalogue/claude-code.json",
+        "//:input-Cargo.lock": "Cargo.lock",
+        "//:input-Cargo.toml": "Cargo.toml",
+        "//:input-docs__harness__catalogue__claude-code.json": "docs/harness/catalogue/claude-code.json",
+        "//:input-docs__harness__catalogue__codex.json": "docs/harness/catalogue/codex.json",
         "Cargo.toml": "crates/lys-home/Cargo.toml",
         "README.md": "crates/lys-home/README.md",
         "build.rs": "crates/lys-home/build.rs",
@@ -6520,6 +6739,17 @@ workspace_rust_test(
         "toml": "//third-party:toml",
         "zeroize": "//third-party:zeroize"
     },
+    nextest = {
+        "binary": "import_bytes",
+        "binary_id": "lys-home::import_bytes",
+        "dir": "crates/lys-home",
+        "kind": "test",
+        "package": "lys-home"
+    },
+    package_bins = {
+        "examples/passthrough": ":example-passthrough",
+        "lys-home": ":lys-home-bin"
+    },
     rustc_flags = [
         "@$(location :build-script-run[rustc_flags])"
     ],
@@ -6531,16 +6761,17 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
-    _rust_toolchain = "toolchains//:rust-bin-exe",
+    _rust_toolchain = "toolchains//:rust-workspace",
     _test_toolchain = ":test-toolchain",
     crate = "lantern_cli",
     crate_root = "crates/lys-home/tests/lantern_cli.rs",
     edition = "2024",
     env = {
+        "BUCKGEN_ROOT_CARGO_MANIFEST_DIR": "crates/lys-home",
+        "BUCKGEN_ROOT_CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "CARGO": "cargo",
         "CARGO_BIN_EXE_lys-home": "$(location :lys-home-bin)",
         "CARGO_CRATE_NAME": "lantern_cli",
-        "CARGO_MANIFEST_DIR": "crates/lys-home",
         "CARGO_PKG_AUTHORS": "Tom Whiting \u003ctom@ablative.com.au\u003e",
         "CARGO_PKG_DESCRIPTION": "The home: a session held under its identity as a Pi-shaped session tree, with content blocks by hash and proxy call records; harness importers and renderers sit beside it.",
         "CARGO_PKG_HOMEPAGE": "",
@@ -6554,16 +6785,18 @@ workspace_rust_test(
         "CARGO_PKG_VERSION_MINOR": "3",
         "CARGO_PKG_VERSION_PATCH": "3",
         "CARGO_PKG_VERSION_PRE": "",
-        "CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "OUT_DIR": "$(location :build-script-run[out_dir])"
     },
     features = [],
     framework = True,
+    labels = [
+        "tier-1"
+    ],
     mapped_srcs = {
-        "//buckgen/inputs:input-0": "Cargo.lock",
-        "//buckgen/inputs:input-1": "Cargo.toml",
-        "//buckgen/inputs:input-10": "docs/harness/catalogue/codex.json",
-        "//buckgen/inputs:input-9": "docs/harness/catalogue/claude-code.json",
+        "//:input-Cargo.lock": "Cargo.lock",
+        "//:input-Cargo.toml": "Cargo.toml",
+        "//:input-docs__harness__catalogue__claude-code.json": "docs/harness/catalogue/claude-code.json",
+        "//:input-docs__harness__catalogue__codex.json": "docs/harness/catalogue/codex.json",
         "Cargo.toml": "crates/lys-home/Cargo.toml",
         "README.md": "crates/lys-home/README.md",
         "build.rs": "crates/lys-home/build.rs",
@@ -6835,6 +7068,17 @@ workspace_rust_test(
         "toml": "//third-party:toml",
         "zeroize": "//third-party:zeroize"
     },
+    nextest = {
+        "binary": "lantern_cli",
+        "binary_id": "lys-home::lantern_cli",
+        "dir": "crates/lys-home",
+        "kind": "test",
+        "package": "lys-home"
+    },
+    package_bins = {
+        "examples/passthrough": ":example-passthrough",
+        "lys-home": ":lys-home-bin"
+    },
     rustc_flags = [
         "@$(location :build-script-run[rustc_flags])"
     ],
@@ -6846,16 +7090,17 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
-    _rust_toolchain = "toolchains//:rust-bin-exe",
+    _rust_toolchain = "toolchains//:rust-workspace",
     _test_toolchain = ":test-toolchain",
     crate = "lantern_home",
     crate_root = "crates/lys-home/tests/lantern_home.rs",
     edition = "2024",
     env = {
+        "BUCKGEN_ROOT_CARGO_MANIFEST_DIR": "crates/lys-home",
+        "BUCKGEN_ROOT_CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "CARGO": "cargo",
         "CARGO_BIN_EXE_lys-home": "$(location :lys-home-bin)",
         "CARGO_CRATE_NAME": "lantern_home",
-        "CARGO_MANIFEST_DIR": "crates/lys-home",
         "CARGO_PKG_AUTHORS": "Tom Whiting \u003ctom@ablative.com.au\u003e",
         "CARGO_PKG_DESCRIPTION": "The home: a session held under its identity as a Pi-shaped session tree, with content blocks by hash and proxy call records; harness importers and renderers sit beside it.",
         "CARGO_PKG_HOMEPAGE": "",
@@ -6869,16 +7114,18 @@ workspace_rust_test(
         "CARGO_PKG_VERSION_MINOR": "3",
         "CARGO_PKG_VERSION_PATCH": "3",
         "CARGO_PKG_VERSION_PRE": "",
-        "CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "OUT_DIR": "$(location :build-script-run[out_dir])"
     },
     features = [],
     framework = True,
+    labels = [
+        "tier-1"
+    ],
     mapped_srcs = {
-        "//buckgen/inputs:input-0": "Cargo.lock",
-        "//buckgen/inputs:input-1": "Cargo.toml",
-        "//buckgen/inputs:input-10": "docs/harness/catalogue/codex.json",
-        "//buckgen/inputs:input-9": "docs/harness/catalogue/claude-code.json",
+        "//:input-Cargo.lock": "Cargo.lock",
+        "//:input-Cargo.toml": "Cargo.toml",
+        "//:input-docs__harness__catalogue__claude-code.json": "docs/harness/catalogue/claude-code.json",
+        "//:input-docs__harness__catalogue__codex.json": "docs/harness/catalogue/codex.json",
         "Cargo.toml": "crates/lys-home/Cargo.toml",
         "README.md": "crates/lys-home/README.md",
         "build.rs": "crates/lys-home/build.rs",
@@ -7150,6 +7397,17 @@ workspace_rust_test(
         "toml": "//third-party:toml",
         "zeroize": "//third-party:zeroize"
     },
+    nextest = {
+        "binary": "lantern_home",
+        "binary_id": "lys-home::lantern_home",
+        "dir": "crates/lys-home",
+        "kind": "test",
+        "package": "lys-home"
+    },
+    package_bins = {
+        "examples/passthrough": ":example-passthrough",
+        "lys-home": ":lys-home-bin"
+    },
     rustc_flags = [
         "@$(location :build-script-run[rustc_flags])"
     ],
@@ -7161,16 +7419,17 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
-    _rust_toolchain = "toolchains//:rust-bin-exe",
+    _rust_toolchain = "toolchains//:rust-workspace",
     _test_toolchain = ":test-toolchain",
     crate = "launch_judge",
     crate_root = "crates/lys-home/tests/launch_judge.rs",
     edition = "2024",
     env = {
+        "BUCKGEN_ROOT_CARGO_MANIFEST_DIR": "crates/lys-home",
+        "BUCKGEN_ROOT_CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "CARGO": "cargo",
         "CARGO_BIN_EXE_lys-home": "$(location :lys-home-bin)",
         "CARGO_CRATE_NAME": "launch_judge",
-        "CARGO_MANIFEST_DIR": "crates/lys-home",
         "CARGO_PKG_AUTHORS": "Tom Whiting \u003ctom@ablative.com.au\u003e",
         "CARGO_PKG_DESCRIPTION": "The home: a session held under its identity as a Pi-shaped session tree, with content blocks by hash and proxy call records; harness importers and renderers sit beside it.",
         "CARGO_PKG_HOMEPAGE": "",
@@ -7184,16 +7443,18 @@ workspace_rust_test(
         "CARGO_PKG_VERSION_MINOR": "3",
         "CARGO_PKG_VERSION_PATCH": "3",
         "CARGO_PKG_VERSION_PRE": "",
-        "CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "OUT_DIR": "$(location :build-script-run[out_dir])"
     },
     features = [],
     framework = True,
+    labels = [
+        "tier-1"
+    ],
     mapped_srcs = {
-        "//buckgen/inputs:input-0": "Cargo.lock",
-        "//buckgen/inputs:input-1": "Cargo.toml",
-        "//buckgen/inputs:input-10": "docs/harness/catalogue/codex.json",
-        "//buckgen/inputs:input-9": "docs/harness/catalogue/claude-code.json",
+        "//:input-Cargo.lock": "Cargo.lock",
+        "//:input-Cargo.toml": "Cargo.toml",
+        "//:input-docs__harness__catalogue__claude-code.json": "docs/harness/catalogue/claude-code.json",
+        "//:input-docs__harness__catalogue__codex.json": "docs/harness/catalogue/codex.json",
         "Cargo.toml": "crates/lys-home/Cargo.toml",
         "README.md": "crates/lys-home/README.md",
         "build.rs": "crates/lys-home/build.rs",
@@ -7465,6 +7726,17 @@ workspace_rust_test(
         "toml": "//third-party:toml",
         "zeroize": "//third-party:zeroize"
     },
+    nextest = {
+        "binary": "launch_judge",
+        "binary_id": "lys-home::launch_judge",
+        "dir": "crates/lys-home",
+        "kind": "test",
+        "package": "lys-home"
+    },
+    package_bins = {
+        "examples/passthrough": ":example-passthrough",
+        "lys-home": ":lys-home-bin"
+    },
     rustc_flags = [
         "@$(location :build-script-run[rustc_flags])"
     ],
@@ -7476,16 +7748,17 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
-    _rust_toolchain = "toolchains//:rust-bin-exe",
+    _rust_toolchain = "toolchains//:rust-workspace",
     _test_toolchain = ":test-toolchain",
     crate = "launch_template",
     crate_root = "crates/lys-home/tests/launch_template.rs",
     edition = "2024",
     env = {
+        "BUCKGEN_ROOT_CARGO_MANIFEST_DIR": "crates/lys-home",
+        "BUCKGEN_ROOT_CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "CARGO": "cargo",
         "CARGO_BIN_EXE_lys-home": "$(location :lys-home-bin)",
         "CARGO_CRATE_NAME": "launch_template",
-        "CARGO_MANIFEST_DIR": "crates/lys-home",
         "CARGO_PKG_AUTHORS": "Tom Whiting \u003ctom@ablative.com.au\u003e",
         "CARGO_PKG_DESCRIPTION": "The home: a session held under its identity as a Pi-shaped session tree, with content blocks by hash and proxy call records; harness importers and renderers sit beside it.",
         "CARGO_PKG_HOMEPAGE": "",
@@ -7499,16 +7772,18 @@ workspace_rust_test(
         "CARGO_PKG_VERSION_MINOR": "3",
         "CARGO_PKG_VERSION_PATCH": "3",
         "CARGO_PKG_VERSION_PRE": "",
-        "CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "OUT_DIR": "$(location :build-script-run[out_dir])"
     },
     features = [],
     framework = True,
+    labels = [
+        "tier-1"
+    ],
     mapped_srcs = {
-        "//buckgen/inputs:input-0": "Cargo.lock",
-        "//buckgen/inputs:input-1": "Cargo.toml",
-        "//buckgen/inputs:input-10": "docs/harness/catalogue/codex.json",
-        "//buckgen/inputs:input-9": "docs/harness/catalogue/claude-code.json",
+        "//:input-Cargo.lock": "Cargo.lock",
+        "//:input-Cargo.toml": "Cargo.toml",
+        "//:input-docs__harness__catalogue__claude-code.json": "docs/harness/catalogue/claude-code.json",
+        "//:input-docs__harness__catalogue__codex.json": "docs/harness/catalogue/codex.json",
         "Cargo.toml": "crates/lys-home/Cargo.toml",
         "README.md": "crates/lys-home/README.md",
         "build.rs": "crates/lys-home/build.rs",
@@ -7780,6 +8055,17 @@ workspace_rust_test(
         "toml": "//third-party:toml",
         "zeroize": "//third-party:zeroize"
     },
+    nextest = {
+        "binary": "launch_template",
+        "binary_id": "lys-home::launch_template",
+        "dir": "crates/lys-home",
+        "kind": "test",
+        "package": "lys-home"
+    },
+    package_bins = {
+        "examples/passthrough": ":example-passthrough",
+        "lys-home": ":lys-home-bin"
+    },
     rustc_flags = [
         "@$(location :build-script-run[rustc_flags])"
     ],
@@ -7791,16 +8077,17 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
-    _rust_toolchain = "toolchains//:rust-bin-exe",
+    _rust_toolchain = "toolchains//:rust-workspace",
     _test_toolchain = ":test-toolchain",
     crate = "lys_mcp",
     crate_root = "crates/lys-home/tests/lys_mcp.rs",
     edition = "2024",
     env = {
+        "BUCKGEN_ROOT_CARGO_MANIFEST_DIR": "crates/lys-home",
+        "BUCKGEN_ROOT_CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "CARGO": "cargo",
         "CARGO_BIN_EXE_lys-home": "$(location :lys-home-bin)",
         "CARGO_CRATE_NAME": "lys_mcp",
-        "CARGO_MANIFEST_DIR": "crates/lys-home",
         "CARGO_PKG_AUTHORS": "Tom Whiting \u003ctom@ablative.com.au\u003e",
         "CARGO_PKG_DESCRIPTION": "The home: a session held under its identity as a Pi-shaped session tree, with content blocks by hash and proxy call records; harness importers and renderers sit beside it.",
         "CARGO_PKG_HOMEPAGE": "",
@@ -7814,16 +8101,18 @@ workspace_rust_test(
         "CARGO_PKG_VERSION_MINOR": "3",
         "CARGO_PKG_VERSION_PATCH": "3",
         "CARGO_PKG_VERSION_PRE": "",
-        "CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "OUT_DIR": "$(location :build-script-run[out_dir])"
     },
     features = [],
     framework = True,
+    labels = [
+        "tier-1"
+    ],
     mapped_srcs = {
-        "//buckgen/inputs:input-0": "Cargo.lock",
-        "//buckgen/inputs:input-1": "Cargo.toml",
-        "//buckgen/inputs:input-10": "docs/harness/catalogue/codex.json",
-        "//buckgen/inputs:input-9": "docs/harness/catalogue/claude-code.json",
+        "//:input-Cargo.lock": "Cargo.lock",
+        "//:input-Cargo.toml": "Cargo.toml",
+        "//:input-docs__harness__catalogue__claude-code.json": "docs/harness/catalogue/claude-code.json",
+        "//:input-docs__harness__catalogue__codex.json": "docs/harness/catalogue/codex.json",
         "Cargo.toml": "crates/lys-home/Cargo.toml",
         "README.md": "crates/lys-home/README.md",
         "build.rs": "crates/lys-home/build.rs",
@@ -8095,6 +8384,17 @@ workspace_rust_test(
         "toml": "//third-party:toml",
         "zeroize": "//third-party:zeroize"
     },
+    nextest = {
+        "binary": "lys_mcp",
+        "binary_id": "lys-home::lys_mcp",
+        "dir": "crates/lys-home",
+        "kind": "test",
+        "package": "lys-home"
+    },
+    package_bins = {
+        "examples/passthrough": ":example-passthrough",
+        "lys-home": ":lys-home-bin"
+    },
     rustc_flags = [
         "@$(location :build-script-run[rustc_flags])"
     ],
@@ -8106,16 +8406,17 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
-    _rust_toolchain = "toolchains//:rust-bin-exe",
+    _rust_toolchain = "toolchains//:rust-workspace",
     _test_toolchain = ":test-toolchain",
     crate = "lys_mcp_environment",
     crate_root = "crates/lys-home/tests/lys_mcp_environment.rs",
     edition = "2024",
     env = {
+        "BUCKGEN_ROOT_CARGO_MANIFEST_DIR": "crates/lys-home",
+        "BUCKGEN_ROOT_CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "CARGO": "cargo",
         "CARGO_BIN_EXE_lys-home": "$(location :lys-home-bin)",
         "CARGO_CRATE_NAME": "lys_mcp_environment",
-        "CARGO_MANIFEST_DIR": "crates/lys-home",
         "CARGO_PKG_AUTHORS": "Tom Whiting \u003ctom@ablative.com.au\u003e",
         "CARGO_PKG_DESCRIPTION": "The home: a session held under its identity as a Pi-shaped session tree, with content blocks by hash and proxy call records; harness importers and renderers sit beside it.",
         "CARGO_PKG_HOMEPAGE": "",
@@ -8129,16 +8430,18 @@ workspace_rust_test(
         "CARGO_PKG_VERSION_MINOR": "3",
         "CARGO_PKG_VERSION_PATCH": "3",
         "CARGO_PKG_VERSION_PRE": "",
-        "CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "OUT_DIR": "$(location :build-script-run[out_dir])"
     },
     features = [],
     framework = True,
+    labels = [
+        "tier-1"
+    ],
     mapped_srcs = {
-        "//buckgen/inputs:input-0": "Cargo.lock",
-        "//buckgen/inputs:input-1": "Cargo.toml",
-        "//buckgen/inputs:input-10": "docs/harness/catalogue/codex.json",
-        "//buckgen/inputs:input-9": "docs/harness/catalogue/claude-code.json",
+        "//:input-Cargo.lock": "Cargo.lock",
+        "//:input-Cargo.toml": "Cargo.toml",
+        "//:input-docs__harness__catalogue__claude-code.json": "docs/harness/catalogue/claude-code.json",
+        "//:input-docs__harness__catalogue__codex.json": "docs/harness/catalogue/codex.json",
         "Cargo.toml": "crates/lys-home/Cargo.toml",
         "README.md": "crates/lys-home/README.md",
         "build.rs": "crates/lys-home/build.rs",
@@ -8410,6 +8713,17 @@ workspace_rust_test(
         "toml": "//third-party:toml",
         "zeroize": "//third-party:zeroize"
     },
+    nextest = {
+        "binary": "lys_mcp_environment",
+        "binary_id": "lys-home::lys_mcp_environment",
+        "dir": "crates/lys-home",
+        "kind": "test",
+        "package": "lys-home"
+    },
+    package_bins = {
+        "examples/passthrough": ":example-passthrough",
+        "lys-home": ":lys-home-bin"
+    },
     rustc_flags = [
         "@$(location :build-script-run[rustc_flags])"
     ],
@@ -8421,16 +8735,17 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
-    _rust_toolchain = "toolchains//:rust-bin-exe",
+    _rust_toolchain = "toolchains//:rust-workspace",
     _test_toolchain = ":test-toolchain",
     crate = "model_proxy_rendering",
     crate_root = "crates/lys-home/tests/model_proxy_rendering.rs",
     edition = "2024",
     env = {
+        "BUCKGEN_ROOT_CARGO_MANIFEST_DIR": "crates/lys-home",
+        "BUCKGEN_ROOT_CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "CARGO": "cargo",
         "CARGO_BIN_EXE_lys-home": "$(location :lys-home-bin)",
         "CARGO_CRATE_NAME": "model_proxy_rendering",
-        "CARGO_MANIFEST_DIR": "crates/lys-home",
         "CARGO_PKG_AUTHORS": "Tom Whiting \u003ctom@ablative.com.au\u003e",
         "CARGO_PKG_DESCRIPTION": "The home: a session held under its identity as a Pi-shaped session tree, with content blocks by hash and proxy call records; harness importers and renderers sit beside it.",
         "CARGO_PKG_HOMEPAGE": "",
@@ -8444,16 +8759,18 @@ workspace_rust_test(
         "CARGO_PKG_VERSION_MINOR": "3",
         "CARGO_PKG_VERSION_PATCH": "3",
         "CARGO_PKG_VERSION_PRE": "",
-        "CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "OUT_DIR": "$(location :build-script-run[out_dir])"
     },
     features = [],
     framework = True,
+    labels = [
+        "tier-1"
+    ],
     mapped_srcs = {
-        "//buckgen/inputs:input-0": "Cargo.lock",
-        "//buckgen/inputs:input-1": "Cargo.toml",
-        "//buckgen/inputs:input-10": "docs/harness/catalogue/codex.json",
-        "//buckgen/inputs:input-9": "docs/harness/catalogue/claude-code.json",
+        "//:input-Cargo.lock": "Cargo.lock",
+        "//:input-Cargo.toml": "Cargo.toml",
+        "//:input-docs__harness__catalogue__claude-code.json": "docs/harness/catalogue/claude-code.json",
+        "//:input-docs__harness__catalogue__codex.json": "docs/harness/catalogue/codex.json",
         "Cargo.toml": "crates/lys-home/Cargo.toml",
         "README.md": "crates/lys-home/README.md",
         "build.rs": "crates/lys-home/build.rs",
@@ -8725,6 +9042,17 @@ workspace_rust_test(
         "toml": "//third-party:toml",
         "zeroize": "//third-party:zeroize"
     },
+    nextest = {
+        "binary": "model_proxy_rendering",
+        "binary_id": "lys-home::model_proxy_rendering",
+        "dir": "crates/lys-home",
+        "kind": "test",
+        "package": "lys-home"
+    },
+    package_bins = {
+        "examples/passthrough": ":example-passthrough",
+        "lys-home": ":lys-home-bin"
+    },
     rustc_flags = [
         "@$(location :build-script-run[rustc_flags])"
     ],
@@ -8736,16 +9064,17 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
-    _rust_toolchain = "toolchains//:rust-bin-exe",
+    _rust_toolchain = "toolchains//:rust-workspace",
     _test_toolchain = ":test-toolchain",
     crate = "session_lock",
     crate_root = "crates/lys-home/tests/session_lock.rs",
     edition = "2024",
     env = {
+        "BUCKGEN_ROOT_CARGO_MANIFEST_DIR": "crates/lys-home",
+        "BUCKGEN_ROOT_CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "CARGO": "cargo",
         "CARGO_BIN_EXE_lys-home": "$(location :lys-home-bin)",
         "CARGO_CRATE_NAME": "session_lock",
-        "CARGO_MANIFEST_DIR": "crates/lys-home",
         "CARGO_PKG_AUTHORS": "Tom Whiting \u003ctom@ablative.com.au\u003e",
         "CARGO_PKG_DESCRIPTION": "The home: a session held under its identity as a Pi-shaped session tree, with content blocks by hash and proxy call records; harness importers and renderers sit beside it.",
         "CARGO_PKG_HOMEPAGE": "",
@@ -8759,16 +9088,18 @@ workspace_rust_test(
         "CARGO_PKG_VERSION_MINOR": "3",
         "CARGO_PKG_VERSION_PATCH": "3",
         "CARGO_PKG_VERSION_PRE": "",
-        "CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "OUT_DIR": "$(location :build-script-run[out_dir])"
     },
     features = [],
     framework = True,
+    labels = [
+        "tier-1"
+    ],
     mapped_srcs = {
-        "//buckgen/inputs:input-0": "Cargo.lock",
-        "//buckgen/inputs:input-1": "Cargo.toml",
-        "//buckgen/inputs:input-10": "docs/harness/catalogue/codex.json",
-        "//buckgen/inputs:input-9": "docs/harness/catalogue/claude-code.json",
+        "//:input-Cargo.lock": "Cargo.lock",
+        "//:input-Cargo.toml": "Cargo.toml",
+        "//:input-docs__harness__catalogue__claude-code.json": "docs/harness/catalogue/claude-code.json",
+        "//:input-docs__harness__catalogue__codex.json": "docs/harness/catalogue/codex.json",
         "Cargo.toml": "crates/lys-home/Cargo.toml",
         "README.md": "crates/lys-home/README.md",
         "build.rs": "crates/lys-home/build.rs",
@@ -9040,6 +9371,17 @@ workspace_rust_test(
         "toml": "//third-party:toml",
         "zeroize": "//third-party:zeroize"
     },
+    nextest = {
+        "binary": "session_lock",
+        "binary_id": "lys-home::session_lock",
+        "dir": "crates/lys-home",
+        "kind": "test",
+        "package": "lys-home"
+    },
+    package_bins = {
+        "examples/passthrough": ":example-passthrough",
+        "lys-home": ":lys-home-bin"
+    },
     rustc_flags = [
         "@$(location :build-script-run[rustc_flags])"
     ],
@@ -9051,16 +9393,17 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
-    _rust_toolchain = "toolchains//:rust-bin-exe",
+    _rust_toolchain = "toolchains//:rust-workspace",
     _test_toolchain = ":test-toolchain",
     crate = "template_seat_fields",
     crate_root = "crates/lys-home/tests/template_seat_fields.rs",
     edition = "2024",
     env = {
+        "BUCKGEN_ROOT_CARGO_MANIFEST_DIR": "crates/lys-home",
+        "BUCKGEN_ROOT_CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "CARGO": "cargo",
         "CARGO_BIN_EXE_lys-home": "$(location :lys-home-bin)",
         "CARGO_CRATE_NAME": "template_seat_fields",
-        "CARGO_MANIFEST_DIR": "crates/lys-home",
         "CARGO_PKG_AUTHORS": "Tom Whiting \u003ctom@ablative.com.au\u003e",
         "CARGO_PKG_DESCRIPTION": "The home: a session held under its identity as a Pi-shaped session tree, with content blocks by hash and proxy call records; harness importers and renderers sit beside it.",
         "CARGO_PKG_HOMEPAGE": "",
@@ -9074,16 +9417,18 @@ workspace_rust_test(
         "CARGO_PKG_VERSION_MINOR": "3",
         "CARGO_PKG_VERSION_PATCH": "3",
         "CARGO_PKG_VERSION_PRE": "",
-        "CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "OUT_DIR": "$(location :build-script-run[out_dir])"
     },
     features = [],
     framework = True,
+    labels = [
+        "tier-1"
+    ],
     mapped_srcs = {
-        "//buckgen/inputs:input-0": "Cargo.lock",
-        "//buckgen/inputs:input-1": "Cargo.toml",
-        "//buckgen/inputs:input-10": "docs/harness/catalogue/codex.json",
-        "//buckgen/inputs:input-9": "docs/harness/catalogue/claude-code.json",
+        "//:input-Cargo.lock": "Cargo.lock",
+        "//:input-Cargo.toml": "Cargo.toml",
+        "//:input-docs__harness__catalogue__claude-code.json": "docs/harness/catalogue/claude-code.json",
+        "//:input-docs__harness__catalogue__codex.json": "docs/harness/catalogue/codex.json",
         "Cargo.toml": "crates/lys-home/Cargo.toml",
         "README.md": "crates/lys-home/README.md",
         "build.rs": "crates/lys-home/build.rs",
@@ -9355,6 +9700,17 @@ workspace_rust_test(
         "toml": "//third-party:toml",
         "zeroize": "//third-party:zeroize"
     },
+    nextest = {
+        "binary": "template_seat_fields",
+        "binary_id": "lys-home::template_seat_fields",
+        "dir": "crates/lys-home",
+        "kind": "test",
+        "package": "lys-home"
+    },
+    package_bins = {
+        "examples/passthrough": ":example-passthrough",
+        "lys-home": ":lys-home-bin"
+    },
     rustc_flags = [
         "@$(location :build-script-run[rustc_flags])"
     ],
@@ -9366,16 +9722,17 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
-    _rust_toolchain = "toolchains//:rust-bin-exe",
+    _rust_toolchain = "toolchains//:rust-workspace",
     _test_toolchain = ":test-toolchain",
     crate = "version",
     crate_root = "crates/lys-home/tests/version.rs",
     edition = "2024",
     env = {
+        "BUCKGEN_ROOT_CARGO_MANIFEST_DIR": "crates/lys-home",
+        "BUCKGEN_ROOT_CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "CARGO": "cargo",
         "CARGO_BIN_EXE_lys-home": "$(location :lys-home-bin)",
         "CARGO_CRATE_NAME": "version",
-        "CARGO_MANIFEST_DIR": "crates/lys-home",
         "CARGO_PKG_AUTHORS": "Tom Whiting \u003ctom@ablative.com.au\u003e",
         "CARGO_PKG_DESCRIPTION": "The home: a session held under its identity as a Pi-shaped session tree, with content blocks by hash and proxy call records; harness importers and renderers sit beside it.",
         "CARGO_PKG_HOMEPAGE": "",
@@ -9389,16 +9746,18 @@ workspace_rust_test(
         "CARGO_PKG_VERSION_MINOR": "3",
         "CARGO_PKG_VERSION_PATCH": "3",
         "CARGO_PKG_VERSION_PRE": "",
-        "CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "OUT_DIR": "$(location :build-script-run[out_dir])"
     },
     features = [],
     framework = True,
+    labels = [
+        "tier-1"
+    ],
     mapped_srcs = {
-        "//buckgen/inputs:input-0": "Cargo.lock",
-        "//buckgen/inputs:input-1": "Cargo.toml",
-        "//buckgen/inputs:input-10": "docs/harness/catalogue/codex.json",
-        "//buckgen/inputs:input-9": "docs/harness/catalogue/claude-code.json",
+        "//:input-Cargo.lock": "Cargo.lock",
+        "//:input-Cargo.toml": "Cargo.toml",
+        "//:input-docs__harness__catalogue__claude-code.json": "docs/harness/catalogue/claude-code.json",
+        "//:input-docs__harness__catalogue__codex.json": "docs/harness/catalogue/codex.json",
         "Cargo.toml": "crates/lys-home/Cargo.toml",
         "README.md": "crates/lys-home/README.md",
         "build.rs": "crates/lys-home/build.rs",
@@ -9670,6 +10029,17 @@ workspace_rust_test(
         "toml": "//third-party:toml",
         "zeroize": "//third-party:zeroize"
     },
+    nextest = {
+        "binary": "version",
+        "binary_id": "lys-home::version",
+        "dir": "crates/lys-home",
+        "kind": "test",
+        "package": "lys-home"
+    },
+    package_bins = {
+        "examples/passthrough": ":example-passthrough",
+        "lys-home": ":lys-home-bin"
+    },
     rustc_flags = [
         "@$(location :build-script-run[rustc_flags])"
     ],
@@ -9678,9 +10048,41 @@ workspace_rust_test(
         "PUBLIC"
     ],
 )
+export_file(
+    name = "input-tests__fixtures__claude-settings-full.json",
+    src = "tests/fixtures/claude-settings-full.json",
+    visibility = [
+        "PUBLIC"
+    ],
+)
+
+export_file(
+    name = "input-tests__fixtures__codex-argv-full.txt",
+    src = "tests/fixtures/codex-argv-full.txt",
+    visibility = [
+        "PUBLIC"
+    ],
+)
+
+export_file(
+    name = "input-tests__fixtures__launch__template.json",
+    src = "tests/fixtures/launch/template.json",
+    visibility = [
+        "PUBLIC"
+    ],
+)
+
+export_file(
+    name = "input-tests__rendering__runner_admission.rs",
+    src = "tests/rendering/runner_admission.rs",
+    visibility = [
+        "PUBLIC"
+    ],
+)
 load("@build//buck:checks.bzl", "file_check")
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-home/Cargo.toml",
     name = "check-length-Cargo.toml",
@@ -9690,6 +10092,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-home/Cargo.toml",
     name = "check-portable-Cargo.toml",
@@ -9721,6 +10124,7 @@ file_check(
     src = "Cargo.toml",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-home/build.rs",
     name = "check-length-build.rs",
@@ -9731,6 +10135,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-home/build.rs",
     name = "check-portable-build.rs",
@@ -9739,6 +10144,7 @@ file_check(
     src = "build.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-home/build/provenance.rs",
     name = "check-length-build__provenance.rs",
@@ -9749,6 +10155,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-home/build/provenance.rs",
     name = "check-portable-build__provenance.rs",
@@ -9757,6 +10164,7 @@ file_check(
     src = "build/provenance.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-home/examples/passthrough.rs",
     name = "check-length-examples__passthrough.rs",
@@ -9767,6 +10175,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-home/examples/passthrough.rs",
     name = "check-portable-examples__passthrough.rs",
@@ -9775,6 +10184,7 @@ file_check(
     src = "examples/passthrough.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-home/src/cli.rs",
     name = "check-length-src__cli.rs",
@@ -9785,6 +10195,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-home/src/cli.rs",
     name = "check-portable-src__cli.rs",
@@ -9793,6 +10204,7 @@ file_check(
     src = "src/cli.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-home/src/cli/fewshot.rs",
     name = "check-length-src__cli__fewshot.rs",
@@ -9803,6 +10215,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-home/src/cli/fewshot.rs",
     name = "check-portable-src__cli__fewshot.rs",
@@ -9811,6 +10224,7 @@ file_check(
     src = "src/cli/fewshot.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-home/src/cli/given.rs",
     name = "check-length-src__cli__given.rs",
@@ -9821,6 +10235,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-home/src/cli/given.rs",
     name = "check-portable-src__cli__given.rs",
@@ -9829,6 +10244,7 @@ file_check(
     src = "src/cli/given.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-home/src/cli/resume.rs",
     name = "check-length-src__cli__resume.rs",
@@ -9839,6 +10255,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-home/src/cli/resume.rs",
     name = "check-portable-src__cli__resume.rs",
@@ -9847,6 +10264,7 @@ file_check(
     src = "src/cli/resume.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-home/src/cli_fork.rs",
     name = "check-length-src__cli_fork.rs",
@@ -9857,6 +10275,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-home/src/cli_fork.rs",
     name = "check-portable-src__cli_fork.rs",
@@ -9865,6 +10284,7 @@ file_check(
     src = "src/cli_fork.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-home/src/cli_lantern.rs",
     name = "check-length-src__cli_lantern.rs",
@@ -9875,6 +10295,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-home/src/cli_lantern.rs",
     name = "check-portable-src__cli_lantern.rs",
@@ -9883,6 +10304,7 @@ file_check(
     src = "src/cli_lantern.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-home/src/cli_move.rs",
     name = "check-length-src__cli_move.rs",
@@ -9893,6 +10315,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-home/src/cli_move.rs",
     name = "check-portable-src__cli_move.rs",
@@ -9901,6 +10324,7 @@ file_check(
     src = "src/cli_move.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-home/src/cli_translate.rs",
     name = "check-length-src__cli_translate.rs",
@@ -9911,6 +10335,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-home/src/cli_translate.rs",
     name = "check-portable-src__cli_translate.rs",
@@ -9919,6 +10344,7 @@ file_check(
     src = "src/cli_translate.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-home/src/error.rs",
     name = "check-length-src__error.rs",
@@ -9929,6 +10355,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-home/src/error.rs",
     name = "check-portable-src__error.rs",
@@ -9937,6 +10364,7 @@ file_check(
     src = "src/error.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-home/src/error/fork.rs",
     name = "check-length-src__error__fork.rs",
@@ -9947,6 +10375,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-home/src/error/fork.rs",
     name = "check-portable-src__error__fork.rs",
@@ -9955,6 +10384,7 @@ file_check(
     src = "src/error/fork.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-home/src/error/moving.rs",
     name = "check-length-src__error__moving.rs",
@@ -9965,6 +10395,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-home/src/error/moving.rs",
     name = "check-portable-src__error__moving.rs",
@@ -9973,6 +10404,7 @@ file_check(
     src = "src/error/moving.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-home/src/error/translate.rs",
     name = "check-length-src__error__translate.rs",
@@ -9983,6 +10415,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-home/src/error/translate.rs",
     name = "check-portable-src__error__translate.rs",
@@ -9991,6 +10424,7 @@ file_check(
     src = "src/error/translate.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-home/src/harness/claude_code/compaction.rs",
     name = "check-length-src__harness__claude_code__compaction.rs",
@@ -10001,6 +10435,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-home/src/harness/claude_code/compaction.rs",
     name = "check-portable-src__harness__claude_code__compaction.rs",
@@ -10009,6 +10444,7 @@ file_check(
     src = "src/harness/claude_code/compaction.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-home/src/harness/claude_code/events.rs",
     name = "check-length-src__harness__claude_code__events.rs",
@@ -10019,6 +10455,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-home/src/harness/claude_code/events.rs",
     name = "check-portable-src__harness__claude_code__events.rs",
@@ -10027,6 +10464,7 @@ file_check(
     src = "src/harness/claude_code/events.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-home/src/harness/claude_code/given.rs",
     name = "check-length-src__harness__claude_code__given.rs",
@@ -10037,6 +10475,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-home/src/harness/claude_code/given.rs",
     name = "check-portable-src__harness__claude_code__given.rs",
@@ -10045,6 +10484,7 @@ file_check(
     src = "src/harness/claude_code/given.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-home/src/harness/claude_code/given_path.rs",
     name = "check-length-src__harness__claude_code__given_path.rs",
@@ -10055,6 +10495,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-home/src/harness/claude_code/given_path.rs",
     name = "check-portable-src__harness__claude_code__given_path.rs",
@@ -10063,6 +10504,7 @@ file_check(
     src = "src/harness/claude_code/given_path.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-home/src/harness/claude_code/import.rs",
     name = "check-length-src__harness__claude_code__import.rs",
@@ -10073,6 +10515,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-home/src/harness/claude_code/import.rs",
     name = "check-portable-src__harness__claude_code__import.rs",
@@ -10081,6 +10524,7 @@ file_check(
     src = "src/harness/claude_code/import.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-home/src/harness/claude_code/import/content.rs",
     name = "check-length-src__harness__claude_code__import__content.rs",
@@ -10091,6 +10535,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-home/src/harness/claude_code/import/content.rs",
     name = "check-portable-src__harness__claude_code__import__content.rs",
@@ -10099,6 +10544,7 @@ file_check(
     src = "src/harness/claude_code/import/content.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-home/src/harness/claude_code/installed_plugins.rs",
     name = "check-length-src__harness__claude_code__installed_plugins.rs",
@@ -10109,6 +10555,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-home/src/harness/claude_code/installed_plugins.rs",
     name = "check-portable-src__harness__claude_code__installed_plugins.rs",
@@ -10117,6 +10564,7 @@ file_check(
     src = "src/harness/claude_code/installed_plugins.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-home/src/harness/claude_code/launch.rs",
     name = "check-length-src__harness__claude_code__launch.rs",
@@ -10127,6 +10575,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-home/src/harness/claude_code/launch.rs",
     name = "check-portable-src__harness__claude_code__launch.rs",
@@ -10135,6 +10584,7 @@ file_check(
     src = "src/harness/claude_code/launch.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-home/src/harness/claude_code/launch_env.rs",
     name = "check-length-src__harness__claude_code__launch_env.rs",
@@ -10145,6 +10595,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-home/src/harness/claude_code/launch_env.rs",
     name = "check-portable-src__harness__claude_code__launch_env.rs",
@@ -10153,6 +10604,7 @@ file_check(
     src = "src/harness/claude_code/launch_env.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-home/src/harness/claude_code/mod.rs",
     name = "check-length-src__harness__claude_code__mod.rs",
@@ -10163,6 +10615,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-home/src/harness/claude_code/mod.rs",
     name = "check-portable-src__harness__claude_code__mod.rs",
@@ -10171,6 +10624,7 @@ file_check(
     src = "src/harness/claude_code/mod.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-home/src/harness/claude_code/names.rs",
     name = "check-length-src__harness__claude_code__names.rs",
@@ -10181,6 +10635,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-home/src/harness/claude_code/names.rs",
     name = "check-portable-src__harness__claude_code__names.rs",
@@ -10189,6 +10644,7 @@ file_check(
     src = "src/harness/claude_code/names.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-home/src/harness/claude_code/paths.rs",
     name = "check-length-src__harness__claude_code__paths.rs",
@@ -10199,6 +10655,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-home/src/harness/claude_code/paths.rs",
     name = "check-portable-src__harness__claude_code__paths.rs",
@@ -10207,6 +10664,7 @@ file_check(
     src = "src/harness/claude_code/paths.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-home/src/harness/claude_code/render.rs",
     name = "check-length-src__harness__claude_code__render.rs",
@@ -10217,6 +10675,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-home/src/harness/claude_code/render.rs",
     name = "check-portable-src__harness__claude_code__render.rs",
@@ -10225,6 +10684,7 @@ file_check(
     src = "src/harness/claude_code/render.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-home/src/harness/claude_code/render/ids.rs",
     name = "check-length-src__harness__claude_code__render__ids.rs",
@@ -10235,6 +10695,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-home/src/harness/claude_code/render/ids.rs",
     name = "check-portable-src__harness__claude_code__render__ids.rs",
@@ -10243,6 +10704,7 @@ file_check(
     src = "src/harness/claude_code/render/ids.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-home/src/harness/claude_code/render_fields.rs",
     name = "check-length-src__harness__claude_code__render_fields.rs",
@@ -10253,6 +10715,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-home/src/harness/claude_code/render_fields.rs",
     name = "check-portable-src__harness__claude_code__render_fields.rs",
@@ -10261,6 +10724,7 @@ file_check(
     src = "src/harness/claude_code/render_fields.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-home/src/harness/claude_code/render_write.rs",
     name = "check-length-src__harness__claude_code__render_write.rs",
@@ -10271,6 +10735,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-home/src/harness/claude_code/render_write.rs",
     name = "check-portable-src__harness__claude_code__render_write.rs",
@@ -10279,6 +10744,7 @@ file_check(
     src = "src/harness/claude_code/render_write.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-home/src/harness/claude_code/seed.rs",
     name = "check-length-src__harness__claude_code__seed.rs",
@@ -10289,6 +10755,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-home/src/harness/claude_code/seed.rs",
     name = "check-portable-src__harness__claude_code__seed.rs",
@@ -10297,6 +10764,7 @@ file_check(
     src = "src/harness/claude_code/seed.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-home/src/harness/claude_code/template.rs",
     name = "check-length-src__harness__claude_code__template.rs",
@@ -10307,6 +10775,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-home/src/harness/claude_code/template.rs",
     name = "check-portable-src__harness__claude_code__template.rs",
@@ -10315,6 +10784,7 @@ file_check(
     src = "src/harness/claude_code/template.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-home/src/harness/codex/account.rs",
     name = "check-length-src__harness__codex__account.rs",
@@ -10325,6 +10795,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-home/src/harness/codex/account.rs",
     name = "check-portable-src__harness__codex__account.rs",
@@ -10333,6 +10804,7 @@ file_check(
     src = "src/harness/codex/account.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-home/src/harness/codex/beside.rs",
     name = "check-length-src__harness__codex__beside.rs",
@@ -10343,6 +10815,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-home/src/harness/codex/beside.rs",
     name = "check-portable-src__harness__codex__beside.rs",
@@ -10351,6 +10824,7 @@ file_check(
     src = "src/harness/codex/beside.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-home/src/harness/codex/launch.rs",
     name = "check-length-src__harness__codex__launch.rs",
@@ -10361,6 +10835,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-home/src/harness/codex/launch.rs",
     name = "check-portable-src__harness__codex__launch.rs",
@@ -10369,6 +10844,7 @@ file_check(
     src = "src/harness/codex/launch.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-home/src/harness/codex/launch_template.rs",
     name = "check-length-src__harness__codex__launch_template.rs",
@@ -10379,6 +10855,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-home/src/harness/codex/launch_template.rs",
     name = "check-portable-src__harness__codex__launch_template.rs",
@@ -10387,6 +10864,7 @@ file_check(
     src = "src/harness/codex/launch_template.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-home/src/harness/codex/leaf.rs",
     name = "check-length-src__harness__codex__leaf.rs",
@@ -10397,6 +10875,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-home/src/harness/codex/leaf.rs",
     name = "check-portable-src__harness__codex__leaf.rs",
@@ -10405,6 +10884,7 @@ file_check(
     src = "src/harness/codex/leaf.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-home/src/harness/codex/mod.rs",
     name = "check-length-src__harness__codex__mod.rs",
@@ -10415,6 +10895,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-home/src/harness/codex/mod.rs",
     name = "check-portable-src__harness__codex__mod.rs",
@@ -10423,6 +10904,7 @@ file_check(
     src = "src/harness/codex/mod.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-home/src/harness/codex/parts.rs",
     name = "check-length-src__harness__codex__parts.rs",
@@ -10433,6 +10915,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-home/src/harness/codex/parts.rs",
     name = "check-portable-src__harness__codex__parts.rs",
@@ -10441,6 +10924,7 @@ file_check(
     src = "src/harness/codex/parts.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-home/src/harness/codex/rollout.rs",
     name = "check-length-src__harness__codex__rollout.rs",
@@ -10451,6 +10935,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-home/src/harness/codex/rollout.rs",
     name = "check-portable-src__harness__codex__rollout.rs",
@@ -10459,6 +10944,7 @@ file_check(
     src = "src/harness/codex/rollout.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-home/src/harness/codex/zone.rs",
     name = "check-length-src__harness__codex__zone.rs",
@@ -10469,6 +10955,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-home/src/harness/codex/zone.rs",
     name = "check-portable-src__harness__codex__zone.rs",
@@ -10477,6 +10964,7 @@ file_check(
     src = "src/harness/codex/zone.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-home/src/harness/description.rs",
     name = "check-length-src__harness__description.rs",
@@ -10487,6 +10975,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-home/src/harness/description.rs",
     name = "check-portable-src__harness__description.rs",
@@ -10495,6 +10984,7 @@ file_check(
     src = "src/harness/description.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-home/src/harness/launch_fields.rs",
     name = "check-length-src__harness__launch_fields.rs",
@@ -10505,6 +10995,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-home/src/harness/launch_fields.rs",
     name = "check-portable-src__harness__launch_fields.rs",
@@ -10513,6 +11004,7 @@ file_check(
     src = "src/harness/launch_fields.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-home/src/harness/launch_fields/seat.rs",
     name = "check-length-src__harness__launch_fields__seat.rs",
@@ -10523,6 +11015,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-home/src/harness/launch_fields/seat.rs",
     name = "check-portable-src__harness__launch_fields__seat.rs",
@@ -10531,6 +11024,7 @@ file_check(
     src = "src/harness/launch_fields/seat.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-home/src/harness/lys_mcp.rs",
     name = "check-length-src__harness__lys_mcp.rs",
@@ -10541,6 +11035,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-home/src/harness/lys_mcp.rs",
     name = "check-portable-src__harness__lys_mcp.rs",
@@ -10549,6 +11044,7 @@ file_check(
     src = "src/harness/lys_mcp.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-home/src/harness/mod.rs",
     name = "check-length-src__harness__mod.rs",
@@ -10559,6 +11055,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-home/src/harness/mod.rs",
     name = "check-portable-src__harness__mod.rs",
@@ -10567,6 +11064,7 @@ file_check(
     src = "src/harness/mod.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-home/src/harness/rendering.rs",
     name = "check-length-src__harness__rendering.rs",
@@ -10577,6 +11075,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-home/src/harness/rendering.rs",
     name = "check-portable-src__harness__rendering.rs",
@@ -10585,6 +11084,7 @@ file_check(
     src = "src/harness/rendering.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-home/src/harness/rendering_launch.rs",
     name = "check-length-src__harness__rendering_launch.rs",
@@ -10595,6 +11095,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-home/src/harness/rendering_launch.rs",
     name = "check-portable-src__harness__rendering_launch.rs",
@@ -10603,6 +11104,7 @@ file_check(
     src = "src/harness/rendering_launch.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-home/src/harness/rendering_permissions.rs",
     name = "check-length-src__harness__rendering_permissions.rs",
@@ -10613,6 +11115,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-home/src/harness/rendering_permissions.rs",
     name = "check-portable-src__harness__rendering_permissions.rs",
@@ -10621,6 +11124,7 @@ file_check(
     src = "src/harness/rendering_permissions.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-home/src/harness/seat_program.rs",
     name = "check-length-src__harness__seat_program.rs",
@@ -10631,6 +11135,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-home/src/harness/seat_program.rs",
     name = "check-portable-src__harness__seat_program.rs",
@@ -10639,6 +11144,7 @@ file_check(
     src = "src/harness/seat_program.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-home/src/harness/skills.rs",
     name = "check-length-src__harness__skills.rs",
@@ -10649,6 +11155,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-home/src/harness/skills.rs",
     name = "check-portable-src__harness__skills.rs",
@@ -10657,6 +11164,7 @@ file_check(
     src = "src/harness/skills.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-home/src/home_move/fetch.rs",
     name = "check-length-src__home_move__fetch.rs",
@@ -10667,6 +11175,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-home/src/home_move/fetch.rs",
     name = "check-portable-src__home_move__fetch.rs",
@@ -10675,6 +11184,7 @@ file_check(
     src = "src/home_move/fetch.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-home/src/home_move/git.rs",
     name = "check-length-src__home_move__git.rs",
@@ -10685,6 +11195,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-home/src/home_move/git.rs",
     name = "check-portable-src__home_move__git.rs",
@@ -10693,6 +11204,7 @@ file_check(
     src = "src/home_move/git.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-home/src/home_move/mod.rs",
     name = "check-length-src__home_move__mod.rs",
@@ -10703,6 +11215,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-home/src/home_move/mod.rs",
     name = "check-portable-src__home_move__mod.rs",
@@ -10711,6 +11224,7 @@ file_check(
     src = "src/home_move/mod.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-home/src/home_move/remote.rs",
     name = "check-length-src__home_move__remote.rs",
@@ -10721,6 +11235,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-home/src/home_move/remote.rs",
     name = "check-portable-src__home_move__remote.rs",
@@ -10729,6 +11244,7 @@ file_check(
     src = "src/home_move/remote.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-home/src/home_move/ship.rs",
     name = "check-length-src__home_move__ship.rs",
@@ -10739,6 +11255,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-home/src/home_move/ship.rs",
     name = "check-portable-src__home_move__ship.rs",
@@ -10747,6 +11264,7 @@ file_check(
     src = "src/home_move/ship.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-home/src/home_move/undo.rs",
     name = "check-length-src__home_move__undo.rs",
@@ -10757,6 +11275,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-home/src/home_move/undo.rs",
     name = "check-portable-src__home_move__undo.rs",
@@ -10765,6 +11284,7 @@ file_check(
     src = "src/home_move/undo.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-home/src/lib.rs",
     name = "check-length-src__lib.rs",
@@ -10775,6 +11295,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-home/src/lib.rs",
     name = "check-portable-src__lib.rs",
@@ -10783,6 +11304,7 @@ file_check(
     src = "src/lib.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-home/src/main.rs",
     name = "check-length-src__main.rs",
@@ -10793,6 +11315,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-home/src/main.rs",
     name = "check-portable-src__main.rs",
@@ -10801,6 +11324,7 @@ file_check(
     src = "src/main.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-home/src/proxy/account.rs",
     name = "check-length-src__proxy__account.rs",
@@ -10811,6 +11335,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-home/src/proxy/account.rs",
     name = "check-portable-src__proxy__account.rs",
@@ -10819,6 +11344,7 @@ file_check(
     src = "src/proxy/account.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-home/src/proxy/account_runs.rs",
     name = "check-length-src__proxy__account_runs.rs",
@@ -10829,6 +11355,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-home/src/proxy/account_runs.rs",
     name = "check-portable-src__proxy__account_runs.rs",
@@ -10837,6 +11364,7 @@ file_check(
     src = "src/proxy/account_runs.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-home/src/proxy/capture.rs",
     name = "check-length-src__proxy__capture.rs",
@@ -10847,6 +11375,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-home/src/proxy/capture.rs",
     name = "check-portable-src__proxy__capture.rs",
@@ -10855,6 +11384,7 @@ file_check(
     src = "src/proxy/capture.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-home/src/proxy/decode.rs",
     name = "check-length-src__proxy__decode.rs",
@@ -10865,6 +11395,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-home/src/proxy/decode.rs",
     name = "check-portable-src__proxy__decode.rs",
@@ -10873,6 +11404,7 @@ file_check(
     src = "src/proxy/decode.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-home/src/proxy/error.rs",
     name = "check-length-src__proxy__error.rs",
@@ -10883,6 +11415,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-home/src/proxy/error.rs",
     name = "check-portable-src__proxy__error.rs",
@@ -10891,6 +11424,7 @@ file_check(
     src = "src/proxy/error.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-home/src/proxy/forward.rs",
     name = "check-length-src__proxy__forward.rs",
@@ -10901,6 +11435,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-home/src/proxy/forward.rs",
     name = "check-portable-src__proxy__forward.rs",
@@ -10909,6 +11444,7 @@ file_check(
     src = "src/proxy/forward.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-home/src/proxy/handing.rs",
     name = "check-length-src__proxy__handing.rs",
@@ -10919,6 +11455,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-home/src/proxy/handing.rs",
     name = "check-portable-src__proxy__handing.rs",
@@ -10927,6 +11464,7 @@ file_check(
     src = "src/proxy/handing.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-home/src/proxy/handling.rs",
     name = "check-length-src__proxy__handling.rs",
@@ -10937,6 +11475,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-home/src/proxy/handling.rs",
     name = "check-portable-src__proxy__handling.rs",
@@ -10945,6 +11484,7 @@ file_check(
     src = "src/proxy/handling.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-home/src/proxy/headers.rs",
     name = "check-length-src__proxy__headers.rs",
@@ -10955,6 +11495,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-home/src/proxy/headers.rs",
     name = "check-portable-src__proxy__headers.rs",
@@ -10963,6 +11504,7 @@ file_check(
     src = "src/proxy/headers.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-home/src/proxy/journal.rs",
     name = "check-length-src__proxy__journal.rs",
@@ -10973,6 +11515,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-home/src/proxy/journal.rs",
     name = "check-portable-src__proxy__journal.rs",
@@ -10981,6 +11524,7 @@ file_check(
     src = "src/proxy/journal.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-home/src/proxy/journal/store.rs",
     name = "check-length-src__proxy__journal__store.rs",
@@ -10991,6 +11535,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-home/src/proxy/journal/store.rs",
     name = "check-portable-src__proxy__journal__store.rs",
@@ -10999,6 +11544,7 @@ file_check(
     src = "src/proxy/journal/store.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-home/src/proxy/link.rs",
     name = "check-length-src__proxy__link.rs",
@@ -11009,6 +11555,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-home/src/proxy/link.rs",
     name = "check-portable-src__proxy__link.rs",
@@ -11017,6 +11564,7 @@ file_check(
     src = "src/proxy/link.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-home/src/proxy/mod.rs",
     name = "check-length-src__proxy__mod.rs",
@@ -11027,6 +11575,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-home/src/proxy/mod.rs",
     name = "check-portable-src__proxy__mod.rs",
@@ -11035,6 +11584,7 @@ file_check(
     src = "src/proxy/mod.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-home/src/proxy/pass_through.rs",
     name = "check-length-src__proxy__pass_through.rs",
@@ -11045,6 +11595,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-home/src/proxy/pass_through.rs",
     name = "check-portable-src__proxy__pass_through.rs",
@@ -11053,6 +11604,7 @@ file_check(
     src = "src/proxy/pass_through.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-home/src/proxy/persist.rs",
     name = "check-length-src__proxy__persist.rs",
@@ -11063,6 +11615,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-home/src/proxy/persist.rs",
     name = "check-portable-src__proxy__persist.rs",
@@ -11071,6 +11624,7 @@ file_check(
     src = "src/proxy/persist.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-home/src/proxy/spool.rs",
     name = "check-length-src__proxy__spool.rs",
@@ -11081,6 +11635,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-home/src/proxy/spool.rs",
     name = "check-portable-src__proxy__spool.rs",
@@ -11089,6 +11644,7 @@ file_check(
     src = "src/proxy/spool.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-home/src/proxy/stream.rs",
     name = "check-length-src__proxy__stream.rs",
@@ -11099,6 +11655,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-home/src/proxy/stream.rs",
     name = "check-portable-src__proxy__stream.rs",
@@ -11107,6 +11664,7 @@ file_check(
     src = "src/proxy/stream.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-home/src/proxy/stream_chat.rs",
     name = "check-length-src__proxy__stream_chat.rs",
@@ -11117,6 +11675,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-home/src/proxy/stream_chat.rs",
     name = "check-portable-src__proxy__stream_chat.rs",
@@ -11125,6 +11684,7 @@ file_check(
     src = "src/proxy/stream_chat.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-home/src/proxy/stream_messages.rs",
     name = "check-length-src__proxy__stream_messages.rs",
@@ -11135,6 +11695,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-home/src/proxy/stream_messages.rs",
     name = "check-portable-src__proxy__stream_messages.rs",
@@ -11143,6 +11704,7 @@ file_check(
     src = "src/proxy/stream_messages.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-home/src/proxy/stream_responses.rs",
     name = "check-length-src__proxy__stream_responses.rs",
@@ -11153,6 +11715,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-home/src/proxy/stream_responses.rs",
     name = "check-portable-src__proxy__stream_responses.rs",
@@ -11161,6 +11724,7 @@ file_check(
     src = "src/proxy/stream_responses.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-home/src/proxy/stream_sse.rs",
     name = "check-length-src__proxy__stream_sse.rs",
@@ -11171,6 +11735,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-home/src/proxy/stream_sse.rs",
     name = "check-portable-src__proxy__stream_sse.rs",
@@ -11179,6 +11744,7 @@ file_check(
     src = "src/proxy/stream_sse.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-home/src/proxy/usage.rs",
     name = "check-length-src__proxy__usage.rs",
@@ -11189,6 +11755,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-home/src/proxy/usage.rs",
     name = "check-portable-src__proxy__usage.rs",
@@ -11197,6 +11764,7 @@ file_check(
     src = "src/proxy/usage.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-home/src/record/batch.rs",
     name = "check-length-src__record__batch.rs",
@@ -11207,6 +11775,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-home/src/record/batch.rs",
     name = "check-portable-src__record__batch.rs",
@@ -11215,6 +11784,7 @@ file_check(
     src = "src/record/batch.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-home/src/record/beside.rs",
     name = "check-length-src__record__beside.rs",
@@ -11225,6 +11795,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-home/src/record/beside.rs",
     name = "check-portable-src__record__beside.rs",
@@ -11233,6 +11804,7 @@ file_check(
     src = "src/record/beside.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-home/src/record/block_rows.rs",
     name = "check-length-src__record__block_rows.rs",
@@ -11243,6 +11815,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-home/src/record/block_rows.rs",
     name = "check-portable-src__record__block_rows.rs",
@@ -11251,6 +11824,7 @@ file_check(
     src = "src/record/block_rows.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-home/src/record/blocks.rs",
     name = "check-length-src__record__blocks.rs",
@@ -11261,6 +11835,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-home/src/record/blocks.rs",
     name = "check-portable-src__record__blocks.rs",
@@ -11269,6 +11844,7 @@ file_check(
     src = "src/record/blocks.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-home/src/record/call.rs",
     name = "check-length-src__record__call.rs",
@@ -11279,6 +11855,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-home/src/record/call.rs",
     name = "check-portable-src__record__call.rs",
@@ -11287,6 +11864,7 @@ file_check(
     src = "src/record/call.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-home/src/record/call/captured.rs",
     name = "check-length-src__record__call__captured.rs",
@@ -11297,6 +11875,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-home/src/record/call/captured.rs",
     name = "check-portable-src__record__call__captured.rs",
@@ -11305,6 +11884,7 @@ file_check(
     src = "src/record/call/captured.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-home/src/record/call/coding.rs",
     name = "check-length-src__record__call__coding.rs",
@@ -11315,6 +11895,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-home/src/record/call/coding.rs",
     name = "check-portable-src__record__call__coding.rs",
@@ -11323,6 +11904,7 @@ file_check(
     src = "src/record/call/coding.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-home/src/record/call/ingest.rs",
     name = "check-length-src__record__call__ingest.rs",
@@ -11333,6 +11915,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-home/src/record/call/ingest.rs",
     name = "check-portable-src__record__call__ingest.rs",
@@ -11341,6 +11924,7 @@ file_check(
     src = "src/record/call/ingest.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-home/src/record/call/parts.rs",
     name = "check-length-src__record__call__parts.rs",
@@ -11351,6 +11935,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-home/src/record/call/parts.rs",
     name = "check-portable-src__record__call__parts.rs",
@@ -11359,6 +11944,7 @@ file_check(
     src = "src/record/call/parts.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-home/src/record/call/reported.rs",
     name = "check-length-src__record__call__reported.rs",
@@ -11369,6 +11955,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-home/src/record/call/reported.rs",
     name = "check-portable-src__record__call__reported.rs",
@@ -11377,6 +11964,7 @@ file_check(
     src = "src/record/call/reported.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-home/src/record/call/whole.rs",
     name = "check-length-src__record__call__whole.rs",
@@ -11387,6 +11975,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-home/src/record/call/whole.rs",
     name = "check-portable-src__record__call__whole.rs",
@@ -11395,6 +11984,7 @@ file_check(
     src = "src/record/call/whole.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-home/src/record/call_map.rs",
     name = "check-length-src__record__call_map.rs",
@@ -11405,6 +11995,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-home/src/record/call_map.rs",
     name = "check-portable-src__record__call_map.rs",
@@ -11413,6 +12004,7 @@ file_check(
     src = "src/record/call_map.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-home/src/record/canon.rs",
     name = "check-length-src__record__canon.rs",
@@ -11423,6 +12015,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-home/src/record/canon.rs",
     name = "check-portable-src__record__canon.rs",
@@ -11431,6 +12024,7 @@ file_check(
     src = "src/record/canon.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-home/src/record/canon/turns.rs",
     name = "check-length-src__record__canon__turns.rs",
@@ -11441,6 +12035,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-home/src/record/canon/turns.rs",
     name = "check-portable-src__record__canon__turns.rs",
@@ -11449,6 +12044,7 @@ file_check(
     src = "src/record/canon/turns.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-home/src/record/compactions.rs",
     name = "check-length-src__record__compactions.rs",
@@ -11459,6 +12055,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-home/src/record/compactions.rs",
     name = "check-portable-src__record__compactions.rs",
@@ -11467,6 +12064,7 @@ file_check(
     src = "src/record/compactions.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-home/src/record/entries.rs",
     name = "check-length-src__record__entries.rs",
@@ -11477,6 +12075,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-home/src/record/entries.rs",
     name = "check-portable-src__record__entries.rs",
@@ -11485,6 +12084,7 @@ file_check(
     src = "src/record/entries.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-home/src/record/epilogue.rs",
     name = "check-length-src__record__epilogue.rs",
@@ -11495,6 +12095,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-home/src/record/epilogue.rs",
     name = "check-portable-src__record__epilogue.rs",
@@ -11503,6 +12104,7 @@ file_check(
     src = "src/record/epilogue.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-home/src/record/fork.rs",
     name = "check-length-src__record__fork.rs",
@@ -11513,6 +12115,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-home/src/record/fork.rs",
     name = "check-portable-src__record__fork.rs",
@@ -11521,6 +12124,7 @@ file_check(
     src = "src/record/fork.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-home/src/record/fork_cut.rs",
     name = "check-length-src__record__fork_cut.rs",
@@ -11531,6 +12135,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-home/src/record/fork_cut.rs",
     name = "check-portable-src__record__fork_cut.rs",
@@ -11539,6 +12144,7 @@ file_check(
     src = "src/record/fork_cut.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-home/src/record/fork_report.rs",
     name = "check-length-src__record__fork_report.rs",
@@ -11549,6 +12155,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-home/src/record/fork_report.rs",
     name = "check-portable-src__record__fork_report.rs",
@@ -11557,6 +12164,7 @@ file_check(
     src = "src/record/fork_report.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-home/src/record/given.rs",
     name = "check-length-src__record__given.rs",
@@ -11567,6 +12175,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-home/src/record/given.rs",
     name = "check-portable-src__record__given.rs",
@@ -11575,6 +12184,7 @@ file_check(
     src = "src/record/given.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-home/src/record/given_statement.rs",
     name = "check-length-src__record__given_statement.rs",
@@ -11585,6 +12195,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-home/src/record/given_statement.rs",
     name = "check-portable-src__record__given_statement.rs",
@@ -11593,6 +12204,7 @@ file_check(
     src = "src/record/given_statement.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-home/src/record/handover.rs",
     name = "check-length-src__record__handover.rs",
@@ -11603,6 +12215,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-home/src/record/handover.rs",
     name = "check-portable-src__record__handover.rs",
@@ -11611,6 +12224,7 @@ file_check(
     src = "src/record/handover.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-home/src/record/handover_tests/successor.rs",
     name = "check-length-src__record__handover_tests__successor.rs",
@@ -11621,6 +12235,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-home/src/record/handover_tests/successor.rs",
     name = "check-portable-src__record__handover_tests__successor.rs",
@@ -11629,6 +12244,7 @@ file_check(
     src = "src/record/handover_tests/successor.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-home/src/record/helpers.rs",
     name = "check-length-src__record__helpers.rs",
@@ -11639,6 +12255,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-home/src/record/helpers.rs",
     name = "check-portable-src__record__helpers.rs",
@@ -11647,6 +12264,7 @@ file_check(
     src = "src/record/helpers.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-home/src/record/hold.rs",
     name = "check-length-src__record__hold.rs",
@@ -11657,6 +12275,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-home/src/record/hold.rs",
     name = "check-portable-src__record__hold.rs",
@@ -11665,6 +12284,7 @@ file_check(
     src = "src/record/hold.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-home/src/record/home.rs",
     name = "check-length-src__record__home.rs",
@@ -11675,6 +12295,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-home/src/record/home.rs",
     name = "check-portable-src__record__home.rs",
@@ -11683,6 +12304,7 @@ file_check(
     src = "src/record/home.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-home/src/record/index.rs",
     name = "check-length-src__record__index.rs",
@@ -11693,6 +12315,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-home/src/record/index.rs",
     name = "check-portable-src__record__index.rs",
@@ -11701,6 +12324,7 @@ file_check(
     src = "src/record/index.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-home/src/record/index/head.rs",
     name = "check-length-src__record__index__head.rs",
@@ -11711,6 +12335,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-home/src/record/index/head.rs",
     name = "check-portable-src__record__index__head.rs",
@@ -11719,6 +12344,7 @@ file_check(
     src = "src/record/index/head.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-home/src/record/index/reads.rs",
     name = "check-length-src__record__index__reads.rs",
@@ -11729,6 +12355,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-home/src/record/index/reads.rs",
     name = "check-portable-src__record__index__reads.rs",
@@ -11737,6 +12364,7 @@ file_check(
     src = "src/record/index/reads.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-home/src/record/io_counts.rs",
     name = "check-length-src__record__io_counts.rs",
@@ -11747,6 +12375,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-home/src/record/io_counts.rs",
     name = "check-portable-src__record__io_counts.rs",
@@ -11755,6 +12384,7 @@ file_check(
     src = "src/record/io_counts.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-home/src/record/lantern.rs",
     name = "check-length-src__record__lantern.rs",
@@ -11765,6 +12395,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-home/src/record/lantern.rs",
     name = "check-portable-src__record__lantern.rs",
@@ -11773,6 +12404,7 @@ file_check(
     src = "src/record/lantern.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-home/src/record/lock.rs",
     name = "check-length-src__record__lock.rs",
@@ -11783,6 +12415,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-home/src/record/lock.rs",
     name = "check-portable-src__record__lock.rs",
@@ -11791,6 +12424,7 @@ file_check(
     src = "src/record/lock.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-home/src/record/loss.rs",
     name = "check-length-src__record__loss.rs",
@@ -11801,6 +12435,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-home/src/record/loss.rs",
     name = "check-portable-src__record__loss.rs",
@@ -11809,6 +12444,7 @@ file_check(
     src = "src/record/loss.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-home/src/record/mod.rs",
     name = "check-length-src__record__mod.rs",
@@ -11819,6 +12455,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-home/src/record/mod.rs",
     name = "check-portable-src__record__mod.rs",
@@ -11827,6 +12464,7 @@ file_check(
     src = "src/record/mod.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-home/src/record/reader.rs",
     name = "check-length-src__record__reader.rs",
@@ -11837,6 +12475,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-home/src/record/reader.rs",
     name = "check-portable-src__record__reader.rs",
@@ -11845,6 +12484,7 @@ file_check(
     src = "src/record/reader.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-home/src/record/reads.rs",
     name = "check-length-src__record__reads.rs",
@@ -11855,6 +12495,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-home/src/record/reads.rs",
     name = "check-portable-src__record__reads.rs",
@@ -11863,6 +12504,7 @@ file_check(
     src = "src/record/reads.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-home/src/record/recall.rs",
     name = "check-length-src__record__recall.rs",
@@ -11873,6 +12515,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-home/src/record/recall.rs",
     name = "check-portable-src__record__recall.rs",
@@ -11881,6 +12524,7 @@ file_check(
     src = "src/record/recall.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-home/src/record/session.rs",
     name = "check-length-src__record__session.rs",
@@ -11891,6 +12535,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-home/src/record/session.rs",
     name = "check-portable-src__record__session.rs",
@@ -11899,6 +12544,7 @@ file_check(
     src = "src/record/session.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-home/src/record/staged.rs",
     name = "check-length-src__record__staged.rs",
@@ -11909,6 +12555,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-home/src/record/staged.rs",
     name = "check-portable-src__record__staged.rs",
@@ -11917,6 +12564,7 @@ file_check(
     src = "src/record/staged.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-home/src/record/templates.rs",
     name = "check-length-src__record__templates.rs",
@@ -11927,6 +12575,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-home/src/record/templates.rs",
     name = "check-portable-src__record__templates.rs",
@@ -11935,6 +12584,7 @@ file_check(
     src = "src/record/templates.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-home/src/record/tracked.rs",
     name = "check-length-src__record__tracked.rs",
@@ -11945,6 +12595,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-home/src/record/tracked.rs",
     name = "check-portable-src__record__tracked.rs",
@@ -11953,6 +12604,7 @@ file_check(
     src = "src/record/tracked.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-home/src/record/verify.rs",
     name = "check-length-src__record__verify.rs",
@@ -11963,6 +12615,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-home/src/record/verify.rs",
     name = "check-portable-src__record__verify.rs",

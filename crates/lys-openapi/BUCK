@@ -20,14 +20,16 @@ noop_test_toolchain(
 )
 
 rust_library(
+    _rust_toolchain = "toolchains//:rust-workspace",
     crate = "lys_openapi",
     crate_root = "crates/lys-openapi/src/lib.rs",
     doctests = True,
     edition = "2024",
     env = {
+        "BUCKGEN_ROOT_CARGO_MANIFEST_DIR": "crates/lys-openapi",
+        "BUCKGEN_ROOT_CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "CARGO": "cargo",
         "CARGO_CRATE_NAME": "lys_openapi",
-        "CARGO_MANIFEST_DIR": "crates/lys-openapi",
         "CARGO_PKG_AUTHORS": "Tom Whiting \u003ctom@ablative.com.au\u003e",
         "CARGO_PKG_DESCRIPTION": "The OpenAPI 3.1 document of a lys service, generated from its route table and the types its routes take and answer.",
         "CARGO_PKG_HOMEPAGE": "",
@@ -40,13 +42,12 @@ rust_library(
         "CARGO_PKG_VERSION_MAJOR": "0",
         "CARGO_PKG_VERSION_MINOR": "3",
         "CARGO_PKG_VERSION_PATCH": "3",
-        "CARGO_PKG_VERSION_PRE": "",
-        "CARGO_TARGET_TMPDIR": "buckgen/tmp"
+        "CARGO_PKG_VERSION_PRE": ""
     },
     features = [],
     mapped_srcs = {
-        "//buckgen/inputs:input-0": "Cargo.lock",
-        "//buckgen/inputs:input-1": "Cargo.toml",
+        "//:input-Cargo.lock": "Cargo.lock",
+        "//:input-Cargo.toml": "Cargo.toml",
         "Cargo.toml": "crates/lys-openapi/Cargo.toml",
         "src/lib.rs": "crates/lys-openapi/src/lib.rs"
     },
@@ -64,14 +65,16 @@ rust_library(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-workspace",
     _test_toolchain = ":test-toolchain",
     crate = "lys_openapi",
     crate_root = "crates/lys-openapi/src/lib.rs",
     edition = "2024",
     env = {
+        "BUCKGEN_ROOT_CARGO_MANIFEST_DIR": "crates/lys-openapi",
+        "BUCKGEN_ROOT_CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "CARGO": "cargo",
         "CARGO_CRATE_NAME": "lys_openapi",
-        "CARGO_MANIFEST_DIR": "crates/lys-openapi",
         "CARGO_PKG_AUTHORS": "Tom Whiting \u003ctom@ablative.com.au\u003e",
         "CARGO_PKG_DESCRIPTION": "The OpenAPI 3.1 document of a lys service, generated from its route table and the types its routes take and answer.",
         "CARGO_PKG_HOMEPAGE": "",
@@ -84,13 +87,15 @@ workspace_rust_test(
         "CARGO_PKG_VERSION_MAJOR": "0",
         "CARGO_PKG_VERSION_MINOR": "3",
         "CARGO_PKG_VERSION_PATCH": "3",
-        "CARGO_PKG_VERSION_PRE": "",
-        "CARGO_TARGET_TMPDIR": "buckgen/tmp"
+        "CARGO_PKG_VERSION_PRE": ""
     },
     features = [],
+    labels = [
+        "tier-1"
+    ],
     mapped_srcs = {
-        "//buckgen/inputs:input-0": "Cargo.lock",
-        "//buckgen/inputs:input-1": "Cargo.toml",
+        "//:input-Cargo.lock": "Cargo.lock",
+        "//:input-Cargo.toml": "Cargo.toml",
         "Cargo.toml": "crates/lys-openapi/Cargo.toml",
         "src/lib.rs": "crates/lys-openapi/src/lib.rs"
     },
@@ -100,6 +105,13 @@ workspace_rust_test(
         "serde_json": "//third-party:serde_json",
         "utoipa": "//third-party:utoipa"
     },
+    nextest = {
+        "binary": "lys_openapi",
+        "binary_id": "lys-openapi",
+        "dir": "crates/lys-openapi",
+        "kind": "lib",
+        "package": "lys-openapi"
+    },
     srcs = [],
     visibility = [
         "PUBLIC"
@@ -108,6 +120,7 @@ workspace_rust_test(
 load("@build//buck:checks.bzl", "file_check")
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-openapi/Cargo.toml",
     name = "check-length-Cargo.toml",
@@ -117,6 +130,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-openapi/Cargo.toml",
     name = "check-portable-Cargo.toml",
@@ -148,6 +162,7 @@ file_check(
     src = "Cargo.toml",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-openapi/src/lib.rs",
     name = "check-length-src__lib.rs",
@@ -158,6 +173,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-openapi/src/lib.rs",
     name = "check-portable-src__lib.rs",

@@ -19,15 +19,28 @@ noop_test_toolchain(
     ],
 )
 
+load("@build//buck:runtime.bzl", "cargo_bin_dir")
+
+cargo_bin_dir(
+    bins = {
+        "dev_issuer": ":dev_issuer",
+        "lys-identity-dev-seed": "//crates/lys-identity-server:lys-identity-dev-seed",
+        "lys-identity-server": "//crates/lys-identity-server:lys-identity-server-bin"
+    },
+    name = "cargo-bin-dir",
+)
+
 rust_library(
+    _rust_toolchain = "toolchains//:rust-workspace",
     crate = "identity_contract",
     crate_root = "tests/identity_contract/src/lib.rs",
     doctests = True,
     edition = "2024",
     env = {
+        "BUCKGEN_ROOT_CARGO_MANIFEST_DIR": "tests/identity_contract",
+        "BUCKGEN_ROOT_CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "CARGO": "cargo",
         "CARGO_CRATE_NAME": "identity_contract",
-        "CARGO_MANIFEST_DIR": "tests/identity_contract",
         "CARGO_PKG_AUTHORS": "Tom Whiting \u003ctom@ablative.com.au\u003e",
         "CARGO_PKG_DESCRIPTION": "The directory's contract tests: registration, signed events, admission, link audit and lifecycle.",
         "CARGO_PKG_HOMEPAGE": "",
@@ -40,13 +53,12 @@ rust_library(
         "CARGO_PKG_VERSION_MAJOR": "0",
         "CARGO_PKG_VERSION_MINOR": "3",
         "CARGO_PKG_VERSION_PATCH": "3",
-        "CARGO_PKG_VERSION_PRE": "",
-        "CARGO_TARGET_TMPDIR": "buckgen/tmp"
+        "CARGO_PKG_VERSION_PRE": ""
     },
     features = [],
     mapped_srcs = {
-        "//buckgen/inputs:input-0": "Cargo.lock",
-        "//buckgen/inputs:input-1": "Cargo.toml",
+        "//:input-Cargo.lock": "Cargo.lock",
+        "//:input-Cargo.toml": "Cargo.toml",
         "Cargo.toml": "tests/identity_contract/Cargo.toml",
         "src/app_custody.rs": "tests/identity_contract/src/app_custody.rs",
         "src/apps.rs": "tests/identity_contract/src/apps.rs",
@@ -106,14 +118,16 @@ rust_library(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-workspace",
     _test_toolchain = ":test-toolchain",
     crate = "identity_contract",
     crate_root = "tests/identity_contract/src/lib.rs",
     edition = "2024",
     env = {
+        "BUCKGEN_ROOT_CARGO_MANIFEST_DIR": "tests/identity_contract",
+        "BUCKGEN_ROOT_CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "CARGO": "cargo",
         "CARGO_CRATE_NAME": "identity_contract",
-        "CARGO_MANIFEST_DIR": "tests/identity_contract",
         "CARGO_PKG_AUTHORS": "Tom Whiting \u003ctom@ablative.com.au\u003e",
         "CARGO_PKG_DESCRIPTION": "The directory's contract tests: registration, signed events, admission, link audit and lifecycle.",
         "CARGO_PKG_HOMEPAGE": "",
@@ -126,13 +140,15 @@ workspace_rust_test(
         "CARGO_PKG_VERSION_MAJOR": "0",
         "CARGO_PKG_VERSION_MINOR": "3",
         "CARGO_PKG_VERSION_PATCH": "3",
-        "CARGO_PKG_VERSION_PRE": "",
-        "CARGO_TARGET_TMPDIR": "buckgen/tmp"
+        "CARGO_PKG_VERSION_PRE": ""
     },
     features = [],
+    labels = [
+        "tier-1"
+    ],
     mapped_srcs = {
-        "//buckgen/inputs:input-0": "Cargo.lock",
-        "//buckgen/inputs:input-1": "Cargo.toml",
+        "//:input-Cargo.lock": "Cargo.lock",
+        "//:input-Cargo.toml": "Cargo.toml",
         "Cargo.toml": "tests/identity_contract/Cargo.toml",
         "src/app_custody.rs": "tests/identity_contract/src/app_custody.rs",
         "src/apps.rs": "tests/identity_contract/src/apps.rs",
@@ -185,6 +201,18 @@ workspace_rust_test(
         "tempfile": "//third-party:tempfile",
         "tokio": "//third-party:tokio"
     },
+    nextest = {
+        "binary": "identity_contract",
+        "binary_id": "identity-contract",
+        "dir": "tests/identity_contract",
+        "kind": "lib",
+        "package": "identity-contract"
+    },
+    package_bins = {
+        "dev_issuer": ":dev_issuer",
+        "lys-identity-dev-seed": "//crates/lys-identity-server:lys-identity-dev-seed",
+        "lys-identity-server": "//crates/lys-identity-server:lys-identity-server-bin"
+    },
     srcs = [],
     visibility = [
         "PUBLIC"
@@ -192,14 +220,16 @@ workspace_rust_test(
 )
 
 rust_binary(
+    _rust_toolchain = "toolchains//:rust-workspace",
     crate = "dev_issuer",
     crate_root = "tests/identity_contract/src/bin/dev_issuer.rs",
     edition = "2024",
     env = {
+        "BUCKGEN_ROOT_CARGO_MANIFEST_DIR": "tests/identity_contract",
+        "BUCKGEN_ROOT_CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "CARGO": "cargo",
         "CARGO_BIN_NAME": "dev_issuer",
         "CARGO_CRATE_NAME": "dev_issuer",
-        "CARGO_MANIFEST_DIR": "tests/identity_contract",
         "CARGO_PKG_AUTHORS": "Tom Whiting \u003ctom@ablative.com.au\u003e",
         "CARGO_PKG_DESCRIPTION": "The directory's contract tests: registration, signed events, admission, link audit and lifecycle.",
         "CARGO_PKG_HOMEPAGE": "",
@@ -212,13 +242,12 @@ rust_binary(
         "CARGO_PKG_VERSION_MAJOR": "0",
         "CARGO_PKG_VERSION_MINOR": "3",
         "CARGO_PKG_VERSION_PATCH": "3",
-        "CARGO_PKG_VERSION_PRE": "",
-        "CARGO_TARGET_TMPDIR": "buckgen/tmp"
+        "CARGO_PKG_VERSION_PRE": ""
     },
     features = [],
     mapped_srcs = {
-        "//buckgen/inputs:input-0": "Cargo.lock",
-        "//buckgen/inputs:input-1": "Cargo.toml",
+        "//:input-Cargo.lock": "Cargo.lock",
+        "//:input-Cargo.toml": "Cargo.toml",
         "Cargo.toml": "tests/identity_contract/Cargo.toml",
         "src/app_custody.rs": "tests/identity_contract/src/app_custody.rs",
         "src/apps.rs": "tests/identity_contract/src/apps.rs",
@@ -279,15 +308,17 @@ rust_binary(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-workspace",
     _test_toolchain = ":test-toolchain",
     crate = "dev_issuer",
     crate_root = "tests/identity_contract/src/bin/dev_issuer.rs",
     edition = "2024",
     env = {
+        "BUCKGEN_ROOT_CARGO_MANIFEST_DIR": "tests/identity_contract",
+        "BUCKGEN_ROOT_CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "CARGO": "cargo",
         "CARGO_BIN_NAME": "dev_issuer",
         "CARGO_CRATE_NAME": "dev_issuer",
-        "CARGO_MANIFEST_DIR": "tests/identity_contract",
         "CARGO_PKG_AUTHORS": "Tom Whiting \u003ctom@ablative.com.au\u003e",
         "CARGO_PKG_DESCRIPTION": "The directory's contract tests: registration, signed events, admission, link audit and lifecycle.",
         "CARGO_PKG_HOMEPAGE": "",
@@ -300,13 +331,15 @@ workspace_rust_test(
         "CARGO_PKG_VERSION_MAJOR": "0",
         "CARGO_PKG_VERSION_MINOR": "3",
         "CARGO_PKG_VERSION_PATCH": "3",
-        "CARGO_PKG_VERSION_PRE": "",
-        "CARGO_TARGET_TMPDIR": "buckgen/tmp"
+        "CARGO_PKG_VERSION_PRE": ""
     },
     features = [],
+    labels = [
+        "tier-1"
+    ],
     mapped_srcs = {
-        "//buckgen/inputs:input-0": "Cargo.lock",
-        "//buckgen/inputs:input-1": "Cargo.toml",
+        "//:input-Cargo.lock": "Cargo.lock",
+        "//:input-Cargo.toml": "Cargo.toml",
         "Cargo.toml": "tests/identity_contract/Cargo.toml",
         "src/app_custody.rs": "tests/identity_contract/src/app_custody.rs",
         "src/apps.rs": "tests/identity_contract/src/apps.rs",
@@ -360,6 +393,18 @@ workspace_rust_test(
         "tempfile": "//third-party:tempfile",
         "tokio": "//third-party:tokio"
     },
+    nextest = {
+        "binary": "dev_issuer",
+        "binary_id": "identity-contract::bin/dev_issuer",
+        "dir": "tests/identity_contract",
+        "kind": "bin",
+        "package": "identity-contract"
+    },
+    package_bins = {
+        "dev_issuer": ":dev_issuer",
+        "lys-identity-dev-seed": "//crates/lys-identity-server:lys-identity-dev-seed",
+        "lys-identity-server": "//crates/lys-identity-server:lys-identity-server-bin"
+    },
     srcs = [],
     visibility = [
         "PUBLIC"
@@ -368,16 +413,17 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
-    _rust_toolchain = "toolchains//:rust-bin-exe",
+    _rust_toolchain = "toolchains//:rust-workspace",
     _test_toolchain = ":test-toolchain",
     crate = "admission",
     crate_root = "tests/identity_contract/tests/admission.rs",
     edition = "2024",
     env = {
+        "BUCKGEN_ROOT_CARGO_MANIFEST_DIR": "tests/identity_contract",
+        "BUCKGEN_ROOT_CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "CARGO": "cargo",
-        "CARGO_BIN_EXE_dev_issuer": "$(location :dev_issuer)",
+        "CARGO_BIN_EXE_dev_issuer": "$(location :cargo-bin-dir)/dev_issuer",
         "CARGO_CRATE_NAME": "admission",
-        "CARGO_MANIFEST_DIR": "tests/identity_contract",
         "CARGO_PKG_AUTHORS": "Tom Whiting \u003ctom@ablative.com.au\u003e",
         "CARGO_PKG_DESCRIPTION": "The directory's contract tests: registration, signed events, admission, link audit and lifecycle.",
         "CARGO_PKG_HOMEPAGE": "",
@@ -390,14 +436,16 @@ workspace_rust_test(
         "CARGO_PKG_VERSION_MAJOR": "0",
         "CARGO_PKG_VERSION_MINOR": "3",
         "CARGO_PKG_VERSION_PATCH": "3",
-        "CARGO_PKG_VERSION_PRE": "",
-        "CARGO_TARGET_TMPDIR": "buckgen/tmp"
+        "CARGO_PKG_VERSION_PRE": ""
     },
     features = [],
     framework = True,
+    labels = [
+        "tier-1"
+    ],
     mapped_srcs = {
-        "//buckgen/inputs:input-0": "Cargo.lock",
-        "//buckgen/inputs:input-1": "Cargo.toml",
+        "//:input-Cargo.lock": "Cargo.lock",
+        "//:input-Cargo.toml": "Cargo.toml",
         "Cargo.toml": "tests/identity_contract/Cargo.toml",
         "src/app_custody.rs": "tests/identity_contract/src/app_custody.rs",
         "src/apps.rs": "tests/identity_contract/src/apps.rs",
@@ -451,6 +499,18 @@ workspace_rust_test(
         "tempfile": "//third-party:tempfile",
         "tokio": "//third-party:tokio"
     },
+    nextest = {
+        "binary": "admission",
+        "binary_id": "identity-contract::admission",
+        "dir": "tests/identity_contract",
+        "kind": "test",
+        "package": "identity-contract"
+    },
+    package_bins = {
+        "dev_issuer": ":dev_issuer",
+        "lys-identity-dev-seed": "//crates/lys-identity-server:lys-identity-dev-seed",
+        "lys-identity-server": "//crates/lys-identity-server:lys-identity-server-bin"
+    },
     srcs = [],
     visibility = [
         "PUBLIC"
@@ -459,16 +519,17 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
-    _rust_toolchain = "toolchains//:rust-bin-exe",
+    _rust_toolchain = "toolchains//:rust-workspace",
     _test_toolchain = ":test-toolchain",
     crate = "agent_signed_actor",
     crate_root = "tests/identity_contract/tests/agent_signed_actor.rs",
     edition = "2024",
     env = {
+        "BUCKGEN_ROOT_CARGO_MANIFEST_DIR": "tests/identity_contract",
+        "BUCKGEN_ROOT_CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "CARGO": "cargo",
-        "CARGO_BIN_EXE_dev_issuer": "$(location :dev_issuer)",
+        "CARGO_BIN_EXE_dev_issuer": "$(location :cargo-bin-dir)/dev_issuer",
         "CARGO_CRATE_NAME": "agent_signed_actor",
-        "CARGO_MANIFEST_DIR": "tests/identity_contract",
         "CARGO_PKG_AUTHORS": "Tom Whiting \u003ctom@ablative.com.au\u003e",
         "CARGO_PKG_DESCRIPTION": "The directory's contract tests: registration, signed events, admission, link audit and lifecycle.",
         "CARGO_PKG_HOMEPAGE": "",
@@ -481,14 +542,16 @@ workspace_rust_test(
         "CARGO_PKG_VERSION_MAJOR": "0",
         "CARGO_PKG_VERSION_MINOR": "3",
         "CARGO_PKG_VERSION_PATCH": "3",
-        "CARGO_PKG_VERSION_PRE": "",
-        "CARGO_TARGET_TMPDIR": "buckgen/tmp"
+        "CARGO_PKG_VERSION_PRE": ""
     },
     features = [],
     framework = True,
+    labels = [
+        "tier-1"
+    ],
     mapped_srcs = {
-        "//buckgen/inputs:input-0": "Cargo.lock",
-        "//buckgen/inputs:input-1": "Cargo.toml",
+        "//:input-Cargo.lock": "Cargo.lock",
+        "//:input-Cargo.toml": "Cargo.toml",
         "Cargo.toml": "tests/identity_contract/Cargo.toml",
         "src/app_custody.rs": "tests/identity_contract/src/app_custody.rs",
         "src/apps.rs": "tests/identity_contract/src/apps.rs",
@@ -542,6 +605,18 @@ workspace_rust_test(
         "tempfile": "//third-party:tempfile",
         "tokio": "//third-party:tokio"
     },
+    nextest = {
+        "binary": "agent_signed_actor",
+        "binary_id": "identity-contract::agent_signed_actor",
+        "dir": "tests/identity_contract",
+        "kind": "test",
+        "package": "identity-contract"
+    },
+    package_bins = {
+        "dev_issuer": ":dev_issuer",
+        "lys-identity-dev-seed": "//crates/lys-identity-server:lys-identity-dev-seed",
+        "lys-identity-server": "//crates/lys-identity-server:lys-identity-server-bin"
+    },
     srcs = [],
     visibility = [
         "PUBLIC"
@@ -550,16 +625,17 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
-    _rust_toolchain = "toolchains//:rust-bin-exe",
+    _rust_toolchain = "toolchains//:rust-workspace",
     _test_toolchain = ":test-toolchain",
     crate = "dev_scripts",
     crate_root = "tests/identity_contract/tests/dev_scripts.rs",
     edition = "2024",
     env = {
+        "BUCKGEN_ROOT_CARGO_MANIFEST_DIR": "tests/identity_contract",
+        "BUCKGEN_ROOT_CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "CARGO": "cargo",
-        "CARGO_BIN_EXE_dev_issuer": "$(location :dev_issuer)",
+        "CARGO_BIN_EXE_dev_issuer": "$(location :cargo-bin-dir)/dev_issuer",
         "CARGO_CRATE_NAME": "dev_scripts",
-        "CARGO_MANIFEST_DIR": "tests/identity_contract",
         "CARGO_PKG_AUTHORS": "Tom Whiting \u003ctom@ablative.com.au\u003e",
         "CARGO_PKG_DESCRIPTION": "The directory's contract tests: registration, signed events, admission, link audit and lifecycle.",
         "CARGO_PKG_HOMEPAGE": "",
@@ -572,14 +648,16 @@ workspace_rust_test(
         "CARGO_PKG_VERSION_MAJOR": "0",
         "CARGO_PKG_VERSION_MINOR": "3",
         "CARGO_PKG_VERSION_PATCH": "3",
-        "CARGO_PKG_VERSION_PRE": "",
-        "CARGO_TARGET_TMPDIR": "buckgen/tmp"
+        "CARGO_PKG_VERSION_PRE": ""
     },
     features = [],
     framework = True,
+    labels = [
+        "tier-1"
+    ],
     mapped_srcs = {
-        "//buckgen/inputs:input-0": "Cargo.lock",
-        "//buckgen/inputs:input-1": "Cargo.toml",
+        "//:input-Cargo.lock": "Cargo.lock",
+        "//:input-Cargo.toml": "Cargo.toml",
         "Cargo.toml": "tests/identity_contract/Cargo.toml",
         "src/app_custody.rs": "tests/identity_contract/src/app_custody.rs",
         "src/apps.rs": "tests/identity_contract/src/apps.rs",
@@ -633,6 +711,18 @@ workspace_rust_test(
         "tempfile": "//third-party:tempfile",
         "tokio": "//third-party:tokio"
     },
+    nextest = {
+        "binary": "dev_scripts",
+        "binary_id": "identity-contract::dev_scripts",
+        "dir": "tests/identity_contract",
+        "kind": "test",
+        "package": "identity-contract"
+    },
+    package_bins = {
+        "dev_issuer": ":dev_issuer",
+        "lys-identity-dev-seed": "//crates/lys-identity-server:lys-identity-dev-seed",
+        "lys-identity-server": "//crates/lys-identity-server:lys-identity-server-bin"
+    },
     srcs = [],
     visibility = [
         "PUBLIC"
@@ -641,16 +731,17 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
-    _rust_toolchain = "toolchains//:rust-bin-exe",
+    _rust_toolchain = "toolchains//:rust-workspace",
     _test_toolchain = ":test-toolchain",
     crate = "events",
     crate_root = "tests/identity_contract/tests/events.rs",
     edition = "2024",
     env = {
+        "BUCKGEN_ROOT_CARGO_MANIFEST_DIR": "tests/identity_contract",
+        "BUCKGEN_ROOT_CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "CARGO": "cargo",
-        "CARGO_BIN_EXE_dev_issuer": "$(location :dev_issuer)",
+        "CARGO_BIN_EXE_dev_issuer": "$(location :cargo-bin-dir)/dev_issuer",
         "CARGO_CRATE_NAME": "events",
-        "CARGO_MANIFEST_DIR": "tests/identity_contract",
         "CARGO_PKG_AUTHORS": "Tom Whiting \u003ctom@ablative.com.au\u003e",
         "CARGO_PKG_DESCRIPTION": "The directory's contract tests: registration, signed events, admission, link audit and lifecycle.",
         "CARGO_PKG_HOMEPAGE": "",
@@ -663,14 +754,16 @@ workspace_rust_test(
         "CARGO_PKG_VERSION_MAJOR": "0",
         "CARGO_PKG_VERSION_MINOR": "3",
         "CARGO_PKG_VERSION_PATCH": "3",
-        "CARGO_PKG_VERSION_PRE": "",
-        "CARGO_TARGET_TMPDIR": "buckgen/tmp"
+        "CARGO_PKG_VERSION_PRE": ""
     },
     features = [],
     framework = True,
+    labels = [
+        "tier-1"
+    ],
     mapped_srcs = {
-        "//buckgen/inputs:input-0": "Cargo.lock",
-        "//buckgen/inputs:input-1": "Cargo.toml",
+        "//:input-Cargo.lock": "Cargo.lock",
+        "//:input-Cargo.toml": "Cargo.toml",
         "Cargo.toml": "tests/identity_contract/Cargo.toml",
         "src/app_custody.rs": "tests/identity_contract/src/app_custody.rs",
         "src/apps.rs": "tests/identity_contract/src/apps.rs",
@@ -724,6 +817,18 @@ workspace_rust_test(
         "tempfile": "//third-party:tempfile",
         "tokio": "//third-party:tokio"
     },
+    nextest = {
+        "binary": "events",
+        "binary_id": "identity-contract::events",
+        "dir": "tests/identity_contract",
+        "kind": "test",
+        "package": "identity-contract"
+    },
+    package_bins = {
+        "dev_issuer": ":dev_issuer",
+        "lys-identity-dev-seed": "//crates/lys-identity-server:lys-identity-dev-seed",
+        "lys-identity-server": "//crates/lys-identity-server:lys-identity-server-bin"
+    },
     srcs = [],
     visibility = [
         "PUBLIC"
@@ -732,16 +837,17 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
-    _rust_toolchain = "toolchains//:rust-bin-exe",
+    _rust_toolchain = "toolchains//:rust-workspace",
     _test_toolchain = ":test-toolchain",
     crate = "harness_lifetime",
     crate_root = "tests/identity_contract/tests/harness_lifetime.rs",
     edition = "2024",
     env = {
+        "BUCKGEN_ROOT_CARGO_MANIFEST_DIR": "tests/identity_contract",
+        "BUCKGEN_ROOT_CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "CARGO": "cargo",
-        "CARGO_BIN_EXE_dev_issuer": "$(location :dev_issuer)",
+        "CARGO_BIN_EXE_dev_issuer": "$(location :cargo-bin-dir)/dev_issuer",
         "CARGO_CRATE_NAME": "harness_lifetime",
-        "CARGO_MANIFEST_DIR": "tests/identity_contract",
         "CARGO_PKG_AUTHORS": "Tom Whiting \u003ctom@ablative.com.au\u003e",
         "CARGO_PKG_DESCRIPTION": "The directory's contract tests: registration, signed events, admission, link audit and lifecycle.",
         "CARGO_PKG_HOMEPAGE": "",
@@ -754,14 +860,16 @@ workspace_rust_test(
         "CARGO_PKG_VERSION_MAJOR": "0",
         "CARGO_PKG_VERSION_MINOR": "3",
         "CARGO_PKG_VERSION_PATCH": "3",
-        "CARGO_PKG_VERSION_PRE": "",
-        "CARGO_TARGET_TMPDIR": "buckgen/tmp"
+        "CARGO_PKG_VERSION_PRE": ""
     },
     features = [],
     framework = True,
+    labels = [
+        "tier-1"
+    ],
     mapped_srcs = {
-        "//buckgen/inputs:input-0": "Cargo.lock",
-        "//buckgen/inputs:input-1": "Cargo.toml",
+        "//:input-Cargo.lock": "Cargo.lock",
+        "//:input-Cargo.toml": "Cargo.toml",
         "Cargo.toml": "tests/identity_contract/Cargo.toml",
         "src/app_custody.rs": "tests/identity_contract/src/app_custody.rs",
         "src/apps.rs": "tests/identity_contract/src/apps.rs",
@@ -815,6 +923,18 @@ workspace_rust_test(
         "tempfile": "//third-party:tempfile",
         "tokio": "//third-party:tokio"
     },
+    nextest = {
+        "binary": "harness_lifetime",
+        "binary_id": "identity-contract::harness_lifetime",
+        "dir": "tests/identity_contract",
+        "kind": "test",
+        "package": "identity-contract"
+    },
+    package_bins = {
+        "dev_issuer": ":dev_issuer",
+        "lys-identity-dev-seed": "//crates/lys-identity-server:lys-identity-dev-seed",
+        "lys-identity-server": "//crates/lys-identity-server:lys-identity-server-bin"
+    },
     srcs = [],
     visibility = [
         "PUBLIC"
@@ -823,16 +943,17 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
-    _rust_toolchain = "toolchains//:rust-bin-exe",
+    _rust_toolchain = "toolchains//:rust-workspace",
     _test_toolchain = ":test-toolchain",
     crate = "lifecycle",
     crate_root = "tests/identity_contract/tests/lifecycle.rs",
     edition = "2024",
     env = {
+        "BUCKGEN_ROOT_CARGO_MANIFEST_DIR": "tests/identity_contract",
+        "BUCKGEN_ROOT_CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "CARGO": "cargo",
-        "CARGO_BIN_EXE_dev_issuer": "$(location :dev_issuer)",
+        "CARGO_BIN_EXE_dev_issuer": "$(location :cargo-bin-dir)/dev_issuer",
         "CARGO_CRATE_NAME": "lifecycle",
-        "CARGO_MANIFEST_DIR": "tests/identity_contract",
         "CARGO_PKG_AUTHORS": "Tom Whiting \u003ctom@ablative.com.au\u003e",
         "CARGO_PKG_DESCRIPTION": "The directory's contract tests: registration, signed events, admission, link audit and lifecycle.",
         "CARGO_PKG_HOMEPAGE": "",
@@ -845,14 +966,16 @@ workspace_rust_test(
         "CARGO_PKG_VERSION_MAJOR": "0",
         "CARGO_PKG_VERSION_MINOR": "3",
         "CARGO_PKG_VERSION_PATCH": "3",
-        "CARGO_PKG_VERSION_PRE": "",
-        "CARGO_TARGET_TMPDIR": "buckgen/tmp"
+        "CARGO_PKG_VERSION_PRE": ""
     },
     features = [],
     framework = True,
+    labels = [
+        "tier-1"
+    ],
     mapped_srcs = {
-        "//buckgen/inputs:input-0": "Cargo.lock",
-        "//buckgen/inputs:input-1": "Cargo.toml",
+        "//:input-Cargo.lock": "Cargo.lock",
+        "//:input-Cargo.toml": "Cargo.toml",
         "Cargo.toml": "tests/identity_contract/Cargo.toml",
         "src/app_custody.rs": "tests/identity_contract/src/app_custody.rs",
         "src/apps.rs": "tests/identity_contract/src/apps.rs",
@@ -906,6 +1029,18 @@ workspace_rust_test(
         "tempfile": "//third-party:tempfile",
         "tokio": "//third-party:tokio"
     },
+    nextest = {
+        "binary": "lifecycle",
+        "binary_id": "identity-contract::lifecycle",
+        "dir": "tests/identity_contract",
+        "kind": "test",
+        "package": "identity-contract"
+    },
+    package_bins = {
+        "dev_issuer": ":dev_issuer",
+        "lys-identity-dev-seed": "//crates/lys-identity-server:lys-identity-dev-seed",
+        "lys-identity-server": "//crates/lys-identity-server:lys-identity-server-bin"
+    },
     srcs = [],
     visibility = [
         "PUBLIC"
@@ -914,16 +1049,17 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
-    _rust_toolchain = "toolchains//:rust-bin-exe",
+    _rust_toolchain = "toolchains//:rust-workspace",
     _test_toolchain = ":test-toolchain",
     crate = "link_audit",
     crate_root = "tests/identity_contract/tests/link_audit.rs",
     edition = "2024",
     env = {
+        "BUCKGEN_ROOT_CARGO_MANIFEST_DIR": "tests/identity_contract",
+        "BUCKGEN_ROOT_CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "CARGO": "cargo",
-        "CARGO_BIN_EXE_dev_issuer": "$(location :dev_issuer)",
+        "CARGO_BIN_EXE_dev_issuer": "$(location :cargo-bin-dir)/dev_issuer",
         "CARGO_CRATE_NAME": "link_audit",
-        "CARGO_MANIFEST_DIR": "tests/identity_contract",
         "CARGO_PKG_AUTHORS": "Tom Whiting \u003ctom@ablative.com.au\u003e",
         "CARGO_PKG_DESCRIPTION": "The directory's contract tests: registration, signed events, admission, link audit and lifecycle.",
         "CARGO_PKG_HOMEPAGE": "",
@@ -936,14 +1072,16 @@ workspace_rust_test(
         "CARGO_PKG_VERSION_MAJOR": "0",
         "CARGO_PKG_VERSION_MINOR": "3",
         "CARGO_PKG_VERSION_PATCH": "3",
-        "CARGO_PKG_VERSION_PRE": "",
-        "CARGO_TARGET_TMPDIR": "buckgen/tmp"
+        "CARGO_PKG_VERSION_PRE": ""
     },
     features = [],
     framework = True,
+    labels = [
+        "tier-1"
+    ],
     mapped_srcs = {
-        "//buckgen/inputs:input-0": "Cargo.lock",
-        "//buckgen/inputs:input-1": "Cargo.toml",
+        "//:input-Cargo.lock": "Cargo.lock",
+        "//:input-Cargo.toml": "Cargo.toml",
         "Cargo.toml": "tests/identity_contract/Cargo.toml",
         "src/app_custody.rs": "tests/identity_contract/src/app_custody.rs",
         "src/apps.rs": "tests/identity_contract/src/apps.rs",
@@ -997,6 +1135,18 @@ workspace_rust_test(
         "tempfile": "//third-party:tempfile",
         "tokio": "//third-party:tokio"
     },
+    nextest = {
+        "binary": "link_audit",
+        "binary_id": "identity-contract::link_audit",
+        "dir": "tests/identity_contract",
+        "kind": "test",
+        "package": "identity-contract"
+    },
+    package_bins = {
+        "dev_issuer": ":dev_issuer",
+        "lys-identity-dev-seed": "//crates/lys-identity-server:lys-identity-dev-seed",
+        "lys-identity-server": "//crates/lys-identity-server:lys-identity-server-bin"
+    },
     srcs = [],
     visibility = [
         "PUBLIC"
@@ -1005,16 +1155,17 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
-    _rust_toolchain = "toolchains//:rust-bin-exe",
+    _rust_toolchain = "toolchains//:rust-workspace",
     _test_toolchain = ":test-toolchain",
     crate = "registration",
     crate_root = "tests/identity_contract/tests/registration.rs",
     edition = "2024",
     env = {
+        "BUCKGEN_ROOT_CARGO_MANIFEST_DIR": "tests/identity_contract",
+        "BUCKGEN_ROOT_CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "CARGO": "cargo",
-        "CARGO_BIN_EXE_dev_issuer": "$(location :dev_issuer)",
+        "CARGO_BIN_EXE_dev_issuer": "$(location :cargo-bin-dir)/dev_issuer",
         "CARGO_CRATE_NAME": "registration",
-        "CARGO_MANIFEST_DIR": "tests/identity_contract",
         "CARGO_PKG_AUTHORS": "Tom Whiting \u003ctom@ablative.com.au\u003e",
         "CARGO_PKG_DESCRIPTION": "The directory's contract tests: registration, signed events, admission, link audit and lifecycle.",
         "CARGO_PKG_HOMEPAGE": "",
@@ -1027,14 +1178,16 @@ workspace_rust_test(
         "CARGO_PKG_VERSION_MAJOR": "0",
         "CARGO_PKG_VERSION_MINOR": "3",
         "CARGO_PKG_VERSION_PATCH": "3",
-        "CARGO_PKG_VERSION_PRE": "",
-        "CARGO_TARGET_TMPDIR": "buckgen/tmp"
+        "CARGO_PKG_VERSION_PRE": ""
     },
     features = [],
     framework = True,
+    labels = [
+        "tier-1"
+    ],
     mapped_srcs = {
-        "//buckgen/inputs:input-0": "Cargo.lock",
-        "//buckgen/inputs:input-1": "Cargo.toml",
+        "//:input-Cargo.lock": "Cargo.lock",
+        "//:input-Cargo.toml": "Cargo.toml",
         "Cargo.toml": "tests/identity_contract/Cargo.toml",
         "src/app_custody.rs": "tests/identity_contract/src/app_custody.rs",
         "src/apps.rs": "tests/identity_contract/src/apps.rs",
@@ -1088,6 +1241,18 @@ workspace_rust_test(
         "tempfile": "//third-party:tempfile",
         "tokio": "//third-party:tokio"
     },
+    nextest = {
+        "binary": "registration",
+        "binary_id": "identity-contract::registration",
+        "dir": "tests/identity_contract",
+        "kind": "test",
+        "package": "identity-contract"
+    },
+    package_bins = {
+        "dev_issuer": ":dev_issuer",
+        "lys-identity-dev-seed": "//crates/lys-identity-server:lys-identity-dev-seed",
+        "lys-identity-server": "//crates/lys-identity-server:lys-identity-server-bin"
+    },
     srcs = [],
     visibility = [
         "PUBLIC"
@@ -1096,16 +1261,17 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
-    _rust_toolchain = "toolchains//:rust-bin-exe",
+    _rust_toolchain = "toolchains//:rust-workspace",
     _test_toolchain = ":test-toolchain",
     crate = "setup_event",
     crate_root = "tests/identity_contract/tests/setup_event.rs",
     edition = "2024",
     env = {
+        "BUCKGEN_ROOT_CARGO_MANIFEST_DIR": "tests/identity_contract",
+        "BUCKGEN_ROOT_CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "CARGO": "cargo",
-        "CARGO_BIN_EXE_dev_issuer": "$(location :dev_issuer)",
+        "CARGO_BIN_EXE_dev_issuer": "$(location :cargo-bin-dir)/dev_issuer",
         "CARGO_CRATE_NAME": "setup_event",
-        "CARGO_MANIFEST_DIR": "tests/identity_contract",
         "CARGO_PKG_AUTHORS": "Tom Whiting \u003ctom@ablative.com.au\u003e",
         "CARGO_PKG_DESCRIPTION": "The directory's contract tests: registration, signed events, admission, link audit and lifecycle.",
         "CARGO_PKG_HOMEPAGE": "",
@@ -1118,14 +1284,16 @@ workspace_rust_test(
         "CARGO_PKG_VERSION_MAJOR": "0",
         "CARGO_PKG_VERSION_MINOR": "3",
         "CARGO_PKG_VERSION_PATCH": "3",
-        "CARGO_PKG_VERSION_PRE": "",
-        "CARGO_TARGET_TMPDIR": "buckgen/tmp"
+        "CARGO_PKG_VERSION_PRE": ""
     },
     features = [],
     framework = True,
+    labels = [
+        "tier-1"
+    ],
     mapped_srcs = {
-        "//buckgen/inputs:input-0": "Cargo.lock",
-        "//buckgen/inputs:input-1": "Cargo.toml",
+        "//:input-Cargo.lock": "Cargo.lock",
+        "//:input-Cargo.toml": "Cargo.toml",
         "Cargo.toml": "tests/identity_contract/Cargo.toml",
         "src/app_custody.rs": "tests/identity_contract/src/app_custody.rs",
         "src/apps.rs": "tests/identity_contract/src/apps.rs",
@@ -1179,7 +1347,50 @@ workspace_rust_test(
         "tempfile": "//third-party:tempfile",
         "tokio": "//third-party:tokio"
     },
+    nextest = {
+        "binary": "setup_event",
+        "binary_id": "identity-contract::setup_event",
+        "dir": "tests/identity_contract",
+        "kind": "test",
+        "package": "identity-contract"
+    },
+    package_bins = {
+        "dev_issuer": ":dev_issuer",
+        "lys-identity-dev-seed": "//crates/lys-identity-server:lys-identity-dev-seed",
+        "lys-identity-server": "//crates/lys-identity-server:lys-identity-server-bin"
+    },
     srcs = [],
+    visibility = [
+        "PUBLIC"
+    ],
+)
+export_file(
+    name = "input-src__harness.rs",
+    src = "src/harness.rs",
+    visibility = [
+        "PUBLIC"
+    ],
+)
+
+export_file(
+    name = "input-src__harness_requests.rs",
+    src = "src/harness_requests.rs",
+    visibility = [
+        "PUBLIC"
+    ],
+)
+
+export_file(
+    name = "input-src__harness_serve.rs",
+    src = "src/harness_serve.rs",
+    visibility = [
+        "PUBLIC"
+    ],
+)
+
+export_file(
+    name = "input-src__harness_startup.rs",
+    src = "src/harness_startup.rs",
     visibility = [
         "PUBLIC"
     ],

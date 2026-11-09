@@ -20,14 +20,16 @@ noop_test_toolchain(
 )
 
 rust_library(
+    _rust_toolchain = "toolchains//:rust-workspace",
     crate = "lys_core",
     crate_root = "crates/lys-core/src/lib.rs",
     doctests = True,
     edition = "2024",
     env = {
+        "BUCKGEN_ROOT_CARGO_MANIFEST_DIR": "crates/lys-core",
+        "BUCKGEN_ROOT_CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "CARGO": "cargo",
         "CARGO_CRATE_NAME": "lys_core",
-        "CARGO_MANIFEST_DIR": "crates/lys-core",
         "CARGO_PKG_AUTHORS": "Tom Whiting \u003ctom@ablative.com.au\u003e",
         "CARGO_PKG_DESCRIPTION": "Domain-agnostic cryptographic trust primitives — certificate authority, Merkle transparency log, signed attestations, sealed envelopes, and Ed25519 key management.",
         "CARGO_PKG_HOMEPAGE": "",
@@ -40,15 +42,14 @@ rust_library(
         "CARGO_PKG_VERSION_MAJOR": "0",
         "CARGO_PKG_VERSION_MINOR": "3",
         "CARGO_PKG_VERSION_PATCH": "3",
-        "CARGO_PKG_VERSION_PRE": "",
-        "CARGO_TARGET_TMPDIR": "buckgen/tmp"
+        "CARGO_PKG_VERSION_PRE": ""
     },
     features = [
         "default"
     ],
     mapped_srcs = {
-        "//buckgen/inputs:input-0": "Cargo.lock",
-        "//buckgen/inputs:input-1": "Cargo.toml",
+        "//:input-Cargo.lock": "Cargo.lock",
+        "//:input-Cargo.toml": "Cargo.toml",
         "Cargo.toml": "crates/lys-core/Cargo.toml",
         "LICENSE": "crates/lys-core/LICENSE",
         "README.md": "crates/lys-core/README.md",
@@ -290,14 +291,16 @@ rust_library(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-workspace",
     _test_toolchain = ":test-toolchain",
     crate = "lys_core",
     crate_root = "crates/lys-core/src/lib.rs",
     edition = "2024",
     env = {
+        "BUCKGEN_ROOT_CARGO_MANIFEST_DIR": "crates/lys-core",
+        "BUCKGEN_ROOT_CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "CARGO": "cargo",
         "CARGO_CRATE_NAME": "lys_core",
-        "CARGO_MANIFEST_DIR": "crates/lys-core",
         "CARGO_PKG_AUTHORS": "Tom Whiting \u003ctom@ablative.com.au\u003e",
         "CARGO_PKG_DESCRIPTION": "Domain-agnostic cryptographic trust primitives — certificate authority, Merkle transparency log, signed attestations, sealed envelopes, and Ed25519 key management.",
         "CARGO_PKG_HOMEPAGE": "",
@@ -310,15 +313,17 @@ workspace_rust_test(
         "CARGO_PKG_VERSION_MAJOR": "0",
         "CARGO_PKG_VERSION_MINOR": "3",
         "CARGO_PKG_VERSION_PATCH": "3",
-        "CARGO_PKG_VERSION_PRE": "",
-        "CARGO_TARGET_TMPDIR": "buckgen/tmp"
+        "CARGO_PKG_VERSION_PRE": ""
     },
     features = [
         "default"
     ],
+    labels = [
+        "tier-1"
+    ],
     mapped_srcs = {
-        "//buckgen/inputs:input-0": "Cargo.lock",
-        "//buckgen/inputs:input-1": "Cargo.toml",
+        "//:input-Cargo.lock": "Cargo.lock",
+        "//:input-Cargo.toml": "Cargo.toml",
         "Cargo.toml": "crates/lys-core/Cargo.toml",
         "LICENSE": "crates/lys-core/LICENSE",
         "README.md": "crates/lys-core/README.md",
@@ -556,6 +561,16 @@ workspace_rust_test(
         "x509_parser": "//third-party:x509_parser",
         "zeroize": "//third-party:zeroize"
     },
+    nextest = {
+        "binary": "lys_core",
+        "binary_id": "lys-core",
+        "dir": "crates/lys-core",
+        "kind": "lib",
+        "package": "lys-core"
+    },
+    package_bins = {
+        "examples/go_conformance_fixture": ":example-go_conformance_fixture"
+    },
     srcs = [],
     visibility = [
         "PUBLIC"
@@ -563,13 +578,15 @@ workspace_rust_test(
 )
 
 rust_binary(
+    _rust_toolchain = "toolchains//:rust-workspace",
     crate = "go_conformance_fixture",
     crate_root = "crates/lys-core/examples/go_conformance_fixture.rs",
     edition = "2024",
     env = {
+        "BUCKGEN_ROOT_CARGO_MANIFEST_DIR": "crates/lys-core",
+        "BUCKGEN_ROOT_CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "CARGO": "cargo",
         "CARGO_CRATE_NAME": "go_conformance_fixture",
-        "CARGO_MANIFEST_DIR": "crates/lys-core",
         "CARGO_PKG_AUTHORS": "Tom Whiting \u003ctom@ablative.com.au\u003e",
         "CARGO_PKG_DESCRIPTION": "Domain-agnostic cryptographic trust primitives — certificate authority, Merkle transparency log, signed attestations, sealed envelopes, and Ed25519 key management.",
         "CARGO_PKG_HOMEPAGE": "",
@@ -582,15 +599,14 @@ rust_binary(
         "CARGO_PKG_VERSION_MAJOR": "0",
         "CARGO_PKG_VERSION_MINOR": "3",
         "CARGO_PKG_VERSION_PATCH": "3",
-        "CARGO_PKG_VERSION_PRE": "",
-        "CARGO_TARGET_TMPDIR": "buckgen/tmp"
+        "CARGO_PKG_VERSION_PRE": ""
     },
     features = [
         "default"
     ],
     mapped_srcs = {
-        "//buckgen/inputs:input-0": "Cargo.lock",
-        "//buckgen/inputs:input-1": "Cargo.toml",
+        "//:input-Cargo.lock": "Cargo.lock",
+        "//:input-Cargo.toml": "Cargo.toml",
         "Cargo.toml": "crates/lys-core/Cargo.toml",
         "LICENSE": "crates/lys-core/LICENSE",
         "README.md": "crates/lys-core/README.md",
@@ -837,14 +853,16 @@ rust_binary(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-workspace",
     _test_toolchain = ":test-toolchain",
     crate = "bundle_conformance",
     crate_root = "crates/lys-core/tests/bundle_conformance/main.rs",
     edition = "2024",
     env = {
+        "BUCKGEN_ROOT_CARGO_MANIFEST_DIR": "crates/lys-core",
+        "BUCKGEN_ROOT_CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "CARGO": "cargo",
         "CARGO_CRATE_NAME": "bundle_conformance",
-        "CARGO_MANIFEST_DIR": "crates/lys-core",
         "CARGO_PKG_AUTHORS": "Tom Whiting \u003ctom@ablative.com.au\u003e",
         "CARGO_PKG_DESCRIPTION": "Domain-agnostic cryptographic trust primitives — certificate authority, Merkle transparency log, signed attestations, sealed envelopes, and Ed25519 key management.",
         "CARGO_PKG_HOMEPAGE": "",
@@ -857,16 +875,18 @@ workspace_rust_test(
         "CARGO_PKG_VERSION_MAJOR": "0",
         "CARGO_PKG_VERSION_MINOR": "3",
         "CARGO_PKG_VERSION_PATCH": "3",
-        "CARGO_PKG_VERSION_PRE": "",
-        "CARGO_TARGET_TMPDIR": "buckgen/tmp"
+        "CARGO_PKG_VERSION_PRE": ""
     },
     features = [
         "default"
     ],
     framework = True,
+    labels = [
+        "tier-1"
+    ],
     mapped_srcs = {
-        "//buckgen/inputs:input-0": "Cargo.lock",
-        "//buckgen/inputs:input-1": "Cargo.toml",
+        "//:input-Cargo.lock": "Cargo.lock",
+        "//:input-Cargo.toml": "Cargo.toml",
         "Cargo.toml": "crates/lys-core/Cargo.toml",
         "LICENSE": "crates/lys-core/LICENSE",
         "README.md": "crates/lys-core/README.md",
@@ -1105,6 +1125,19 @@ workspace_rust_test(
         "x509_parser": "//third-party:x509_parser",
         "zeroize": "//third-party:zeroize"
     },
+    nextest = {
+        "binary": "bundle_conformance",
+        "binary_id": "lys-core::bundle_conformance",
+        "dir": "crates/lys-core",
+        "kind": "test",
+        "package": "lys-core"
+    },
+    package_bins = {
+        "examples/go_conformance_fixture": ":example-go_conformance_fixture"
+    },
+    setup = {
+        "go-fixture": "//buckgen:setup-go-fixture"
+    },
     srcs = [],
     visibility = [
         "PUBLIC"
@@ -1113,14 +1146,16 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-workspace",
     _test_toolchain = ":test-toolchain",
     crate = "clock",
     crate_root = "crates/lys-core/tests/clock.rs",
     edition = "2024",
     env = {
+        "BUCKGEN_ROOT_CARGO_MANIFEST_DIR": "crates/lys-core",
+        "BUCKGEN_ROOT_CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "CARGO": "cargo",
         "CARGO_CRATE_NAME": "clock",
-        "CARGO_MANIFEST_DIR": "crates/lys-core",
         "CARGO_PKG_AUTHORS": "Tom Whiting \u003ctom@ablative.com.au\u003e",
         "CARGO_PKG_DESCRIPTION": "Domain-agnostic cryptographic trust primitives — certificate authority, Merkle transparency log, signed attestations, sealed envelopes, and Ed25519 key management.",
         "CARGO_PKG_HOMEPAGE": "",
@@ -1133,16 +1168,18 @@ workspace_rust_test(
         "CARGO_PKG_VERSION_MAJOR": "0",
         "CARGO_PKG_VERSION_MINOR": "3",
         "CARGO_PKG_VERSION_PATCH": "3",
-        "CARGO_PKG_VERSION_PRE": "",
-        "CARGO_TARGET_TMPDIR": "buckgen/tmp"
+        "CARGO_PKG_VERSION_PRE": ""
     },
     features = [
         "default"
     ],
     framework = True,
+    labels = [
+        "tier-1"
+    ],
     mapped_srcs = {
-        "//buckgen/inputs:input-0": "Cargo.lock",
-        "//buckgen/inputs:input-1": "Cargo.toml",
+        "//:input-Cargo.lock": "Cargo.lock",
+        "//:input-Cargo.toml": "Cargo.toml",
         "Cargo.toml": "crates/lys-core/Cargo.toml",
         "LICENSE": "crates/lys-core/LICENSE",
         "README.md": "crates/lys-core/README.md",
@@ -1381,6 +1418,16 @@ workspace_rust_test(
         "x509_parser": "//third-party:x509_parser",
         "zeroize": "//third-party:zeroize"
     },
+    nextest = {
+        "binary": "clock",
+        "binary_id": "lys-core::clock",
+        "dir": "crates/lys-core",
+        "kind": "test",
+        "package": "lys-core"
+    },
+    package_bins = {
+        "examples/go_conformance_fixture": ":example-go_conformance_fixture"
+    },
     srcs = [],
     visibility = [
         "PUBLIC"
@@ -1389,14 +1436,16 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-workspace",
     _test_toolchain = ":test-toolchain",
     crate = "consistency_conformance",
     crate_root = "crates/lys-core/tests/consistency_conformance.rs",
     edition = "2024",
     env = {
+        "BUCKGEN_ROOT_CARGO_MANIFEST_DIR": "crates/lys-core",
+        "BUCKGEN_ROOT_CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "CARGO": "cargo",
         "CARGO_CRATE_NAME": "consistency_conformance",
-        "CARGO_MANIFEST_DIR": "crates/lys-core",
         "CARGO_PKG_AUTHORS": "Tom Whiting \u003ctom@ablative.com.au\u003e",
         "CARGO_PKG_DESCRIPTION": "Domain-agnostic cryptographic trust primitives — certificate authority, Merkle transparency log, signed attestations, sealed envelopes, and Ed25519 key management.",
         "CARGO_PKG_HOMEPAGE": "",
@@ -1409,16 +1458,18 @@ workspace_rust_test(
         "CARGO_PKG_VERSION_MAJOR": "0",
         "CARGO_PKG_VERSION_MINOR": "3",
         "CARGO_PKG_VERSION_PATCH": "3",
-        "CARGO_PKG_VERSION_PRE": "",
-        "CARGO_TARGET_TMPDIR": "buckgen/tmp"
+        "CARGO_PKG_VERSION_PRE": ""
     },
     features = [
         "default"
     ],
     framework = True,
+    labels = [
+        "tier-1"
+    ],
     mapped_srcs = {
-        "//buckgen/inputs:input-0": "Cargo.lock",
-        "//buckgen/inputs:input-1": "Cargo.toml",
+        "//:input-Cargo.lock": "Cargo.lock",
+        "//:input-Cargo.toml": "Cargo.toml",
         "Cargo.toml": "crates/lys-core/Cargo.toml",
         "LICENSE": "crates/lys-core/LICENSE",
         "README.md": "crates/lys-core/README.md",
@@ -1657,6 +1708,19 @@ workspace_rust_test(
         "x509_parser": "//third-party:x509_parser",
         "zeroize": "//third-party:zeroize"
     },
+    nextest = {
+        "binary": "consistency_conformance",
+        "binary_id": "lys-core::consistency_conformance",
+        "dir": "crates/lys-core",
+        "kind": "test",
+        "package": "lys-core"
+    },
+    package_bins = {
+        "examples/go_conformance_fixture": ":example-go_conformance_fixture"
+    },
+    setup = {
+        "go-fixture": "//buckgen:setup-go-fixture"
+    },
     srcs = [],
     visibility = [
         "PUBLIC"
@@ -1665,14 +1729,16 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-workspace",
     _test_toolchain = ":test-toolchain",
     crate = "consistency_receipt_conformance",
     crate_root = "crates/lys-core/tests/consistency_receipt_conformance.rs",
     edition = "2024",
     env = {
+        "BUCKGEN_ROOT_CARGO_MANIFEST_DIR": "crates/lys-core",
+        "BUCKGEN_ROOT_CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "CARGO": "cargo",
         "CARGO_CRATE_NAME": "consistency_receipt_conformance",
-        "CARGO_MANIFEST_DIR": "crates/lys-core",
         "CARGO_PKG_AUTHORS": "Tom Whiting \u003ctom@ablative.com.au\u003e",
         "CARGO_PKG_DESCRIPTION": "Domain-agnostic cryptographic trust primitives — certificate authority, Merkle transparency log, signed attestations, sealed envelopes, and Ed25519 key management.",
         "CARGO_PKG_HOMEPAGE": "",
@@ -1685,16 +1751,18 @@ workspace_rust_test(
         "CARGO_PKG_VERSION_MAJOR": "0",
         "CARGO_PKG_VERSION_MINOR": "3",
         "CARGO_PKG_VERSION_PATCH": "3",
-        "CARGO_PKG_VERSION_PRE": "",
-        "CARGO_TARGET_TMPDIR": "buckgen/tmp"
+        "CARGO_PKG_VERSION_PRE": ""
     },
     features = [
         "default"
     ],
     framework = True,
+    labels = [
+        "tier-1"
+    ],
     mapped_srcs = {
-        "//buckgen/inputs:input-0": "Cargo.lock",
-        "//buckgen/inputs:input-1": "Cargo.toml",
+        "//:input-Cargo.lock": "Cargo.lock",
+        "//:input-Cargo.toml": "Cargo.toml",
         "Cargo.toml": "crates/lys-core/Cargo.toml",
         "LICENSE": "crates/lys-core/LICENSE",
         "README.md": "crates/lys-core/README.md",
@@ -1933,6 +2001,19 @@ workspace_rust_test(
         "x509_parser": "//third-party:x509_parser",
         "zeroize": "//third-party:zeroize"
     },
+    nextest = {
+        "binary": "consistency_receipt_conformance",
+        "binary_id": "lys-core::consistency_receipt_conformance",
+        "dir": "crates/lys-core",
+        "kind": "test",
+        "package": "lys-core"
+    },
+    package_bins = {
+        "examples/go_conformance_fixture": ":example-go_conformance_fixture"
+    },
+    setup = {
+        "go-fixture": "//buckgen:setup-go-fixture"
+    },
     srcs = [],
     visibility = [
         "PUBLIC"
@@ -1941,14 +2022,16 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-workspace",
     _test_toolchain = ":test-toolchain",
     crate = "cose_conformance",
     crate_root = "crates/lys-core/tests/cose_conformance.rs",
     edition = "2024",
     env = {
+        "BUCKGEN_ROOT_CARGO_MANIFEST_DIR": "crates/lys-core",
+        "BUCKGEN_ROOT_CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "CARGO": "cargo",
         "CARGO_CRATE_NAME": "cose_conformance",
-        "CARGO_MANIFEST_DIR": "crates/lys-core",
         "CARGO_PKG_AUTHORS": "Tom Whiting \u003ctom@ablative.com.au\u003e",
         "CARGO_PKG_DESCRIPTION": "Domain-agnostic cryptographic trust primitives — certificate authority, Merkle transparency log, signed attestations, sealed envelopes, and Ed25519 key management.",
         "CARGO_PKG_HOMEPAGE": "",
@@ -1961,16 +2044,18 @@ workspace_rust_test(
         "CARGO_PKG_VERSION_MAJOR": "0",
         "CARGO_PKG_VERSION_MINOR": "3",
         "CARGO_PKG_VERSION_PATCH": "3",
-        "CARGO_PKG_VERSION_PRE": "",
-        "CARGO_TARGET_TMPDIR": "buckgen/tmp"
+        "CARGO_PKG_VERSION_PRE": ""
     },
     features = [
         "default"
     ],
     framework = True,
+    labels = [
+        "tier-1"
+    ],
     mapped_srcs = {
-        "//buckgen/inputs:input-0": "Cargo.lock",
-        "//buckgen/inputs:input-1": "Cargo.toml",
+        "//:input-Cargo.lock": "Cargo.lock",
+        "//:input-Cargo.toml": "Cargo.toml",
         "Cargo.toml": "crates/lys-core/Cargo.toml",
         "LICENSE": "crates/lys-core/LICENSE",
         "README.md": "crates/lys-core/README.md",
@@ -2209,6 +2294,19 @@ workspace_rust_test(
         "x509_parser": "//third-party:x509_parser",
         "zeroize": "//third-party:zeroize"
     },
+    nextest = {
+        "binary": "cose_conformance",
+        "binary_id": "lys-core::cose_conformance",
+        "dir": "crates/lys-core",
+        "kind": "test",
+        "package": "lys-core"
+    },
+    package_bins = {
+        "examples/go_conformance_fixture": ":example-go_conformance_fixture"
+    },
+    setup = {
+        "go-fixture": "//buckgen:setup-go-fixture"
+    },
     srcs = [],
     visibility = [
         "PUBLIC"
@@ -2217,14 +2315,16 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-workspace",
     _test_toolchain = ":test-toolchain",
     crate = "delegation_conformance",
     crate_root = "crates/lys-core/tests/delegation_conformance/main.rs",
     edition = "2024",
     env = {
+        "BUCKGEN_ROOT_CARGO_MANIFEST_DIR": "crates/lys-core",
+        "BUCKGEN_ROOT_CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "CARGO": "cargo",
         "CARGO_CRATE_NAME": "delegation_conformance",
-        "CARGO_MANIFEST_DIR": "crates/lys-core",
         "CARGO_PKG_AUTHORS": "Tom Whiting \u003ctom@ablative.com.au\u003e",
         "CARGO_PKG_DESCRIPTION": "Domain-agnostic cryptographic trust primitives — certificate authority, Merkle transparency log, signed attestations, sealed envelopes, and Ed25519 key management.",
         "CARGO_PKG_HOMEPAGE": "",
@@ -2237,16 +2337,18 @@ workspace_rust_test(
         "CARGO_PKG_VERSION_MAJOR": "0",
         "CARGO_PKG_VERSION_MINOR": "3",
         "CARGO_PKG_VERSION_PATCH": "3",
-        "CARGO_PKG_VERSION_PRE": "",
-        "CARGO_TARGET_TMPDIR": "buckgen/tmp"
+        "CARGO_PKG_VERSION_PRE": ""
     },
     features = [
         "default"
     ],
     framework = True,
+    labels = [
+        "tier-1"
+    ],
     mapped_srcs = {
-        "//buckgen/inputs:input-0": "Cargo.lock",
-        "//buckgen/inputs:input-1": "Cargo.toml",
+        "//:input-Cargo.lock": "Cargo.lock",
+        "//:input-Cargo.toml": "Cargo.toml",
         "Cargo.toml": "crates/lys-core/Cargo.toml",
         "LICENSE": "crates/lys-core/LICENSE",
         "README.md": "crates/lys-core/README.md",
@@ -2485,6 +2587,19 @@ workspace_rust_test(
         "x509_parser": "//third-party:x509_parser",
         "zeroize": "//third-party:zeroize"
     },
+    nextest = {
+        "binary": "delegation_conformance",
+        "binary_id": "lys-core::delegation_conformance",
+        "dir": "crates/lys-core",
+        "kind": "test",
+        "package": "lys-core"
+    },
+    package_bins = {
+        "examples/go_conformance_fixture": ":example-go_conformance_fixture"
+    },
+    setup = {
+        "go-fixture": "//buckgen:setup-go-fixture"
+    },
     srcs = [],
     visibility = [
         "PUBLIC"
@@ -2493,14 +2608,16 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-workspace",
     _test_toolchain = ":test-toolchain",
     crate = "delegation_vector",
     crate_root = "crates/lys-core/tests/delegation_vector/main.rs",
     edition = "2024",
     env = {
+        "BUCKGEN_ROOT_CARGO_MANIFEST_DIR": "crates/lys-core",
+        "BUCKGEN_ROOT_CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "CARGO": "cargo",
         "CARGO_CRATE_NAME": "delegation_vector",
-        "CARGO_MANIFEST_DIR": "crates/lys-core",
         "CARGO_PKG_AUTHORS": "Tom Whiting \u003ctom@ablative.com.au\u003e",
         "CARGO_PKG_DESCRIPTION": "Domain-agnostic cryptographic trust primitives — certificate authority, Merkle transparency log, signed attestations, sealed envelopes, and Ed25519 key management.",
         "CARGO_PKG_HOMEPAGE": "",
@@ -2513,16 +2630,18 @@ workspace_rust_test(
         "CARGO_PKG_VERSION_MAJOR": "0",
         "CARGO_PKG_VERSION_MINOR": "3",
         "CARGO_PKG_VERSION_PATCH": "3",
-        "CARGO_PKG_VERSION_PRE": "",
-        "CARGO_TARGET_TMPDIR": "buckgen/tmp"
+        "CARGO_PKG_VERSION_PRE": ""
     },
     features = [
         "default"
     ],
     framework = True,
+    labels = [
+        "tier-1"
+    ],
     mapped_srcs = {
-        "//buckgen/inputs:input-0": "Cargo.lock",
-        "//buckgen/inputs:input-1": "Cargo.toml",
+        "//:input-Cargo.lock": "Cargo.lock",
+        "//:input-Cargo.toml": "Cargo.toml",
         "Cargo.toml": "crates/lys-core/Cargo.toml",
         "LICENSE": "crates/lys-core/LICENSE",
         "README.md": "crates/lys-core/README.md",
@@ -2761,6 +2880,16 @@ workspace_rust_test(
         "x509_parser": "//third-party:x509_parser",
         "zeroize": "//third-party:zeroize"
     },
+    nextest = {
+        "binary": "delegation_vector",
+        "binary_id": "lys-core::delegation_vector",
+        "dir": "crates/lys-core",
+        "kind": "test",
+        "package": "lys-core"
+    },
+    package_bins = {
+        "examples/go_conformance_fixture": ":example-go_conformance_fixture"
+    },
     srcs = [],
     visibility = [
         "PUBLIC"
@@ -2769,14 +2898,16 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-workspace",
     _test_toolchain = ":test-toolchain",
     crate = "go_cache_errors",
     crate_root = "crates/lys-core/tests/go_cache_errors.rs",
     edition = "2024",
     env = {
+        "BUCKGEN_ROOT_CARGO_MANIFEST_DIR": "crates/lys-core",
+        "BUCKGEN_ROOT_CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "CARGO": "cargo",
         "CARGO_CRATE_NAME": "go_cache_errors",
-        "CARGO_MANIFEST_DIR": "crates/lys-core",
         "CARGO_PKG_AUTHORS": "Tom Whiting \u003ctom@ablative.com.au\u003e",
         "CARGO_PKG_DESCRIPTION": "Domain-agnostic cryptographic trust primitives — certificate authority, Merkle transparency log, signed attestations, sealed envelopes, and Ed25519 key management.",
         "CARGO_PKG_HOMEPAGE": "",
@@ -2789,16 +2920,18 @@ workspace_rust_test(
         "CARGO_PKG_VERSION_MAJOR": "0",
         "CARGO_PKG_VERSION_MINOR": "3",
         "CARGO_PKG_VERSION_PATCH": "3",
-        "CARGO_PKG_VERSION_PRE": "",
-        "CARGO_TARGET_TMPDIR": "buckgen/tmp"
+        "CARGO_PKG_VERSION_PRE": ""
     },
     features = [
         "default"
     ],
     framework = True,
+    labels = [
+        "tier-1"
+    ],
     mapped_srcs = {
-        "//buckgen/inputs:input-0": "Cargo.lock",
-        "//buckgen/inputs:input-1": "Cargo.toml",
+        "//:input-Cargo.lock": "Cargo.lock",
+        "//:input-Cargo.toml": "Cargo.toml",
         "Cargo.toml": "crates/lys-core/Cargo.toml",
         "LICENSE": "crates/lys-core/LICENSE",
         "README.md": "crates/lys-core/README.md",
@@ -3037,6 +3170,16 @@ workspace_rust_test(
         "x509_parser": "//third-party:x509_parser",
         "zeroize": "//third-party:zeroize"
     },
+    nextest = {
+        "binary": "go_cache_errors",
+        "binary_id": "lys-core::go_cache_errors",
+        "dir": "crates/lys-core",
+        "kind": "test",
+        "package": "lys-core"
+    },
+    package_bins = {
+        "examples/go_conformance_fixture": ":example-go_conformance_fixture"
+    },
     srcs = [],
     visibility = [
         "PUBLIC"
@@ -3045,14 +3188,16 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-workspace",
     _test_toolchain = ":test-toolchain",
     crate = "go_conformance",
     crate_root = "crates/lys-core/tests/go_conformance.rs",
     edition = "2024",
     env = {
+        "BUCKGEN_ROOT_CARGO_MANIFEST_DIR": "crates/lys-core",
+        "BUCKGEN_ROOT_CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "CARGO": "cargo",
         "CARGO_CRATE_NAME": "go_conformance",
-        "CARGO_MANIFEST_DIR": "crates/lys-core",
         "CARGO_PKG_AUTHORS": "Tom Whiting \u003ctom@ablative.com.au\u003e",
         "CARGO_PKG_DESCRIPTION": "Domain-agnostic cryptographic trust primitives — certificate authority, Merkle transparency log, signed attestations, sealed envelopes, and Ed25519 key management.",
         "CARGO_PKG_HOMEPAGE": "",
@@ -3065,16 +3210,18 @@ workspace_rust_test(
         "CARGO_PKG_VERSION_MAJOR": "0",
         "CARGO_PKG_VERSION_MINOR": "3",
         "CARGO_PKG_VERSION_PATCH": "3",
-        "CARGO_PKG_VERSION_PRE": "",
-        "CARGO_TARGET_TMPDIR": "buckgen/tmp"
+        "CARGO_PKG_VERSION_PRE": ""
     },
     features = [
         "default"
     ],
     framework = True,
+    labels = [
+        "tier-1"
+    ],
     mapped_srcs = {
-        "//buckgen/inputs:input-0": "Cargo.lock",
-        "//buckgen/inputs:input-1": "Cargo.toml",
+        "//:input-Cargo.lock": "Cargo.lock",
+        "//:input-Cargo.toml": "Cargo.toml",
         "Cargo.toml": "crates/lys-core/Cargo.toml",
         "LICENSE": "crates/lys-core/LICENSE",
         "README.md": "crates/lys-core/README.md",
@@ -3313,6 +3460,19 @@ workspace_rust_test(
         "x509_parser": "//third-party:x509_parser",
         "zeroize": "//third-party:zeroize"
     },
+    nextest = {
+        "binary": "go_conformance",
+        "binary_id": "lys-core::go_conformance",
+        "dir": "crates/lys-core",
+        "kind": "test",
+        "package": "lys-core"
+    },
+    package_bins = {
+        "examples/go_conformance_fixture": ":example-go_conformance_fixture"
+    },
+    setup = {
+        "go-fixture": "//buckgen:setup-go-fixture"
+    },
     srcs = [],
     visibility = [
         "PUBLIC"
@@ -3321,14 +3481,16 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-workspace",
     _test_toolchain = ":test-toolchain",
     crate = "openssl_csr_interop",
     crate_root = "crates/lys-core/tests/openssl_csr_interop.rs",
     edition = "2024",
     env = {
+        "BUCKGEN_ROOT_CARGO_MANIFEST_DIR": "crates/lys-core",
+        "BUCKGEN_ROOT_CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "CARGO": "cargo",
         "CARGO_CRATE_NAME": "openssl_csr_interop",
-        "CARGO_MANIFEST_DIR": "crates/lys-core",
         "CARGO_PKG_AUTHORS": "Tom Whiting \u003ctom@ablative.com.au\u003e",
         "CARGO_PKG_DESCRIPTION": "Domain-agnostic cryptographic trust primitives — certificate authority, Merkle transparency log, signed attestations, sealed envelopes, and Ed25519 key management.",
         "CARGO_PKG_HOMEPAGE": "",
@@ -3341,16 +3503,18 @@ workspace_rust_test(
         "CARGO_PKG_VERSION_MAJOR": "0",
         "CARGO_PKG_VERSION_MINOR": "3",
         "CARGO_PKG_VERSION_PATCH": "3",
-        "CARGO_PKG_VERSION_PRE": "",
-        "CARGO_TARGET_TMPDIR": "buckgen/tmp"
+        "CARGO_PKG_VERSION_PRE": ""
     },
     features = [
         "default"
     ],
     framework = True,
+    labels = [
+        "tier-1"
+    ],
     mapped_srcs = {
-        "//buckgen/inputs:input-0": "Cargo.lock",
-        "//buckgen/inputs:input-1": "Cargo.toml",
+        "//:input-Cargo.lock": "Cargo.lock",
+        "//:input-Cargo.toml": "Cargo.toml",
         "Cargo.toml": "crates/lys-core/Cargo.toml",
         "LICENSE": "crates/lys-core/LICENSE",
         "README.md": "crates/lys-core/README.md",
@@ -3589,6 +3753,16 @@ workspace_rust_test(
         "x509_parser": "//third-party:x509_parser",
         "zeroize": "//third-party:zeroize"
     },
+    nextest = {
+        "binary": "openssl_csr_interop",
+        "binary_id": "lys-core::openssl_csr_interop",
+        "dir": "crates/lys-core",
+        "kind": "test",
+        "package": "lys-core"
+    },
+    package_bins = {
+        "examples/go_conformance_fixture": ":example-go_conformance_fixture"
+    },
     srcs = [],
     visibility = [
         "PUBLIC"
@@ -3597,14 +3771,16 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-workspace",
     _test_toolchain = ":test-toolchain",
     crate = "receipt_conformance",
     crate_root = "crates/lys-core/tests/receipt_conformance.rs",
     edition = "2024",
     env = {
+        "BUCKGEN_ROOT_CARGO_MANIFEST_DIR": "crates/lys-core",
+        "BUCKGEN_ROOT_CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "CARGO": "cargo",
         "CARGO_CRATE_NAME": "receipt_conformance",
-        "CARGO_MANIFEST_DIR": "crates/lys-core",
         "CARGO_PKG_AUTHORS": "Tom Whiting \u003ctom@ablative.com.au\u003e",
         "CARGO_PKG_DESCRIPTION": "Domain-agnostic cryptographic trust primitives — certificate authority, Merkle transparency log, signed attestations, sealed envelopes, and Ed25519 key management.",
         "CARGO_PKG_HOMEPAGE": "",
@@ -3617,16 +3793,18 @@ workspace_rust_test(
         "CARGO_PKG_VERSION_MAJOR": "0",
         "CARGO_PKG_VERSION_MINOR": "3",
         "CARGO_PKG_VERSION_PATCH": "3",
-        "CARGO_PKG_VERSION_PRE": "",
-        "CARGO_TARGET_TMPDIR": "buckgen/tmp"
+        "CARGO_PKG_VERSION_PRE": ""
     },
     features = [
         "default"
     ],
     framework = True,
+    labels = [
+        "tier-1"
+    ],
     mapped_srcs = {
-        "//buckgen/inputs:input-0": "Cargo.lock",
-        "//buckgen/inputs:input-1": "Cargo.toml",
+        "//:input-Cargo.lock": "Cargo.lock",
+        "//:input-Cargo.toml": "Cargo.toml",
         "Cargo.toml": "crates/lys-core/Cargo.toml",
         "LICENSE": "crates/lys-core/LICENSE",
         "README.md": "crates/lys-core/README.md",
@@ -3865,6 +4043,19 @@ workspace_rust_test(
         "x509_parser": "//third-party:x509_parser",
         "zeroize": "//third-party:zeroize"
     },
+    nextest = {
+        "binary": "receipt_conformance",
+        "binary_id": "lys-core::receipt_conformance",
+        "dir": "crates/lys-core",
+        "kind": "test",
+        "package": "lys-core"
+    },
+    package_bins = {
+        "examples/go_conformance_fixture": ":example-go_conformance_fixture"
+    },
+    setup = {
+        "go-fixture": "//buckgen:setup-go-fixture"
+    },
     srcs = [],
     visibility = [
         "PUBLIC"
@@ -3873,14 +4064,16 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-workspace",
     _test_toolchain = ":test-toolchain",
     crate = "seal_derivation",
     crate_root = "crates/lys-core/tests/seal_derivation.rs",
     edition = "2024",
     env = {
+        "BUCKGEN_ROOT_CARGO_MANIFEST_DIR": "crates/lys-core",
+        "BUCKGEN_ROOT_CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "CARGO": "cargo",
         "CARGO_CRATE_NAME": "seal_derivation",
-        "CARGO_MANIFEST_DIR": "crates/lys-core",
         "CARGO_PKG_AUTHORS": "Tom Whiting \u003ctom@ablative.com.au\u003e",
         "CARGO_PKG_DESCRIPTION": "Domain-agnostic cryptographic trust primitives — certificate authority, Merkle transparency log, signed attestations, sealed envelopes, and Ed25519 key management.",
         "CARGO_PKG_HOMEPAGE": "",
@@ -3893,16 +4086,18 @@ workspace_rust_test(
         "CARGO_PKG_VERSION_MAJOR": "0",
         "CARGO_PKG_VERSION_MINOR": "3",
         "CARGO_PKG_VERSION_PATCH": "3",
-        "CARGO_PKG_VERSION_PRE": "",
-        "CARGO_TARGET_TMPDIR": "buckgen/tmp"
+        "CARGO_PKG_VERSION_PRE": ""
     },
     features = [
         "default"
     ],
     framework = True,
+    labels = [
+        "tier-1"
+    ],
     mapped_srcs = {
-        "//buckgen/inputs:input-0": "Cargo.lock",
-        "//buckgen/inputs:input-1": "Cargo.toml",
+        "//:input-Cargo.lock": "Cargo.lock",
+        "//:input-Cargo.toml": "Cargo.toml",
         "Cargo.toml": "crates/lys-core/Cargo.toml",
         "LICENSE": "crates/lys-core/LICENSE",
         "README.md": "crates/lys-core/README.md",
@@ -4141,6 +4336,16 @@ workspace_rust_test(
         "x509_parser": "//third-party:x509_parser",
         "zeroize": "//third-party:zeroize"
     },
+    nextest = {
+        "binary": "seal_derivation",
+        "binary_id": "lys-core::seal_derivation",
+        "dir": "crates/lys-core",
+        "kind": "test",
+        "package": "lys-core"
+    },
+    package_bins = {
+        "examples/go_conformance_fixture": ":example-go_conformance_fixture"
+    },
     srcs = [],
     visibility = [
         "PUBLIC"
@@ -4149,14 +4354,16 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-workspace",
     _test_toolchain = ":test-toolchain",
     crate = "signed_note_crosscheck",
     crate_root = "crates/lys-core/tests/signed_note_crosscheck.rs",
     edition = "2024",
     env = {
+        "BUCKGEN_ROOT_CARGO_MANIFEST_DIR": "crates/lys-core",
+        "BUCKGEN_ROOT_CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "CARGO": "cargo",
         "CARGO_CRATE_NAME": "signed_note_crosscheck",
-        "CARGO_MANIFEST_DIR": "crates/lys-core",
         "CARGO_PKG_AUTHORS": "Tom Whiting \u003ctom@ablative.com.au\u003e",
         "CARGO_PKG_DESCRIPTION": "Domain-agnostic cryptographic trust primitives — certificate authority, Merkle transparency log, signed attestations, sealed envelopes, and Ed25519 key management.",
         "CARGO_PKG_HOMEPAGE": "",
@@ -4169,16 +4376,18 @@ workspace_rust_test(
         "CARGO_PKG_VERSION_MAJOR": "0",
         "CARGO_PKG_VERSION_MINOR": "3",
         "CARGO_PKG_VERSION_PATCH": "3",
-        "CARGO_PKG_VERSION_PRE": "",
-        "CARGO_TARGET_TMPDIR": "buckgen/tmp"
+        "CARGO_PKG_VERSION_PRE": ""
     },
     features = [
         "default"
     ],
     framework = True,
+    labels = [
+        "tier-1"
+    ],
     mapped_srcs = {
-        "//buckgen/inputs:input-0": "Cargo.lock",
-        "//buckgen/inputs:input-1": "Cargo.toml",
+        "//:input-Cargo.lock": "Cargo.lock",
+        "//:input-Cargo.toml": "Cargo.toml",
         "Cargo.toml": "crates/lys-core/Cargo.toml",
         "LICENSE": "crates/lys-core/LICENSE",
         "README.md": "crates/lys-core/README.md",
@@ -4417,7 +4626,32 @@ workspace_rust_test(
         "x509_parser": "//third-party:x509_parser",
         "zeroize": "//third-party:zeroize"
     },
+    nextest = {
+        "binary": "signed_note_crosscheck",
+        "binary_id": "lys-core::signed_note_crosscheck",
+        "dir": "crates/lys-core",
+        "kind": "test",
+        "package": "lys-core"
+    },
+    package_bins = {
+        "examples/go_conformance_fixture": ":example-go_conformance_fixture"
+    },
     srcs = [],
+    visibility = [
+        "PUBLIC"
+    ],
+)
+export_file(
+    name = "input-tests__clock.rs",
+    src = "tests/clock.rs",
+    visibility = [
+        "PUBLIC"
+    ],
+)
+
+export_file(
+    name = "input-tests__harness__cache.rs",
+    src = "tests/harness/cache.rs",
     visibility = [
         "PUBLIC"
     ],
@@ -4425,6 +4659,7 @@ workspace_rust_test(
 load("@build//buck:checks.bzl", "file_check")
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-core/Cargo.toml",
     name = "check-length-Cargo.toml",
@@ -4434,6 +4669,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-core/Cargo.toml",
     name = "check-portable-Cargo.toml",
@@ -4465,6 +4701,7 @@ file_check(
     src = "Cargo.toml",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-core/LICENSE",
     name = "check-length-LICENSE",
@@ -4473,6 +4710,7 @@ file_check(
     src = "LICENSE",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-core/examples/go_conformance_fixture.rs",
     name = "check-length-examples__go_conformance_fixture.rs",
@@ -4483,6 +4721,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-core/examples/go_conformance_fixture.rs",
     name = "check-portable-examples__go_conformance_fixture.rs",
@@ -4491,6 +4730,7 @@ file_check(
     src = "examples/go_conformance_fixture.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-core/src/attestation/artifact.rs",
     name = "check-length-src__attestation__artifact.rs",
@@ -4501,6 +4741,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-core/src/attestation/artifact.rs",
     name = "check-portable-src__attestation__artifact.rs",
@@ -4509,6 +4750,7 @@ file_check(
     src = "src/attestation/artifact.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-core/src/attestation/encoding.rs",
     name = "check-length-src__attestation__encoding.rs",
@@ -4519,6 +4761,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-core/src/attestation/encoding.rs",
     name = "check-portable-src__attestation__encoding.rs",
@@ -4527,6 +4770,7 @@ file_check(
     src = "src/attestation/encoding.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-core/src/attestation/mod.rs",
     name = "check-length-src__attestation__mod.rs",
@@ -4537,6 +4781,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-core/src/attestation/mod.rs",
     name = "check-portable-src__attestation__mod.rs",
@@ -4545,6 +4790,7 @@ file_check(
     src = "src/attestation/mod.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-core/src/attestation/sign.rs",
     name = "check-length-src__attestation__sign.rs",
@@ -4555,6 +4801,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-core/src/attestation/sign.rs",
     name = "check-portable-src__attestation__sign.rs",
@@ -4563,6 +4810,7 @@ file_check(
     src = "src/attestation/sign.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-core/src/bundle/artifact.rs",
     name = "check-length-src__bundle__artifact.rs",
@@ -4573,6 +4821,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-core/src/bundle/artifact.rs",
     name = "check-portable-src__bundle__artifact.rs",
@@ -4581,6 +4830,7 @@ file_check(
     src = "src/bundle/artifact.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-core/src/bundle/mod.rs",
     name = "check-length-src__bundle__mod.rs",
@@ -4591,6 +4841,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-core/src/bundle/mod.rs",
     name = "check-portable-src__bundle__mod.rs",
@@ -4599,6 +4850,7 @@ file_check(
     src = "src/bundle/mod.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-core/src/bundle/verify.rs",
     name = "check-length-src__bundle__verify.rs",
@@ -4609,6 +4861,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-core/src/bundle/verify.rs",
     name = "check-portable-src__bundle__verify.rs",
@@ -4617,6 +4870,7 @@ file_check(
     src = "src/bundle/verify.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-core/src/ca/authority.rs",
     name = "check-length-src__ca__authority.rs",
@@ -4627,6 +4881,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-core/src/ca/authority.rs",
     name = "check-portable-src__ca__authority.rs",
@@ -4635,6 +4890,7 @@ file_check(
     src = "src/ca/authority.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-core/src/ca/authority/verify.rs",
     name = "check-length-src__ca__authority__verify.rs",
@@ -4645,6 +4901,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-core/src/ca/authority/verify.rs",
     name = "check-portable-src__ca__authority__verify.rs",
@@ -4653,6 +4910,7 @@ file_check(
     src = "src/ca/authority/verify.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-core/src/ca/certificate.rs",
     name = "check-length-src__ca__certificate.rs",
@@ -4663,6 +4921,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-core/src/ca/certificate.rs",
     name = "check-portable-src__ca__certificate.rs",
@@ -4671,6 +4930,7 @@ file_check(
     src = "src/ca/certificate.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-core/src/ca/extensions.rs",
     name = "check-length-src__ca__extensions.rs",
@@ -4681,6 +4941,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-core/src/ca/extensions.rs",
     name = "check-portable-src__ca__extensions.rs",
@@ -4689,6 +4950,7 @@ file_check(
     src = "src/ca/extensions.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-core/src/ca/mod.rs",
     name = "check-length-src__ca__mod.rs",
@@ -4699,6 +4961,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-core/src/ca/mod.rs",
     name = "check-portable-src__ca__mod.rs",
@@ -4707,6 +4970,7 @@ file_check(
     src = "src/ca/mod.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-core/src/ca/rcgen_bridge.rs",
     name = "check-length-src__ca__rcgen_bridge.rs",
@@ -4717,6 +4981,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-core/src/ca/rcgen_bridge.rs",
     name = "check-portable-src__ca__rcgen_bridge.rs",
@@ -4725,6 +4990,7 @@ file_check(
     src = "src/ca/rcgen_bridge.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-core/src/ca/request.rs",
     name = "check-length-src__ca__request.rs",
@@ -4735,6 +5001,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-core/src/ca/request.rs",
     name = "check-portable-src__ca__request.rs",
@@ -4743,6 +5010,7 @@ file_check(
     src = "src/ca/request.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-core/src/cbor.rs",
     name = "check-length-src__cbor.rs",
@@ -4753,6 +5021,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-core/src/cbor.rs",
     name = "check-portable-src__cbor.rs",
@@ -4761,6 +5030,7 @@ file_check(
     src = "src/cbor.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-core/src/checkpoint/body.rs",
     name = "check-length-src__checkpoint__body.rs",
@@ -4771,6 +5041,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-core/src/checkpoint/body.rs",
     name = "check-portable-src__checkpoint__body.rs",
@@ -4779,6 +5050,7 @@ file_check(
     src = "src/checkpoint/body.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-core/src/checkpoint/mod.rs",
     name = "check-length-src__checkpoint__mod.rs",
@@ -4789,6 +5061,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-core/src/checkpoint/mod.rs",
     name = "check-portable-src__checkpoint__mod.rs",
@@ -4797,6 +5070,7 @@ file_check(
     src = "src/checkpoint/mod.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-core/src/checkpoint/note.rs",
     name = "check-length-src__checkpoint__note.rs",
@@ -4807,6 +5081,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-core/src/checkpoint/note.rs",
     name = "check-portable-src__checkpoint__note.rs",
@@ -4815,6 +5090,7 @@ file_check(
     src = "src/checkpoint/note.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-core/src/checkpoint/verifier_key.rs",
     name = "check-length-src__checkpoint__verifier_key.rs",
@@ -4825,6 +5101,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-core/src/checkpoint/verifier_key.rs",
     name = "check-portable-src__checkpoint__verifier_key.rs",
@@ -4833,6 +5110,7 @@ file_check(
     src = "src/checkpoint/verifier_key.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-core/src/clock.rs",
     name = "check-length-src__clock.rs",
@@ -4843,6 +5121,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-core/src/clock.rs",
     name = "check-portable-src__clock.rs",
@@ -4851,6 +5130,7 @@ file_check(
     src = "src/clock.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-core/src/delegation/artifact.rs",
     name = "check-length-src__delegation__artifact.rs",
@@ -4861,6 +5141,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-core/src/delegation/artifact.rs",
     name = "check-portable-src__delegation__artifact.rs",
@@ -4869,6 +5150,7 @@ file_check(
     src = "src/delegation/artifact.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-core/src/delegation/artifact/subject_kind.rs",
     name = "check-length-src__delegation__artifact__subject_kind.rs",
@@ -4879,6 +5161,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-core/src/delegation/artifact/subject_kind.rs",
     name = "check-portable-src__delegation__artifact__subject_kind.rs",
@@ -4887,6 +5170,7 @@ file_check(
     src = "src/delegation/artifact/subject_kind.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-core/src/delegation/encoding.rs",
     name = "check-length-src__delegation__encoding.rs",
@@ -4897,6 +5181,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-core/src/delegation/encoding.rs",
     name = "check-portable-src__delegation__encoding.rs",
@@ -4905,6 +5190,7 @@ file_check(
     src = "src/delegation/encoding.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-core/src/delegation/encoding/decode.rs",
     name = "check-length-src__delegation__encoding__decode.rs",
@@ -4915,6 +5201,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-core/src/delegation/encoding/decode.rs",
     name = "check-portable-src__delegation__encoding__decode.rs",
@@ -4923,6 +5210,7 @@ file_check(
     src = "src/delegation/encoding/decode.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-core/src/delegation/mod.rs",
     name = "check-length-src__delegation__mod.rs",
@@ -4933,6 +5221,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-core/src/delegation/mod.rs",
     name = "check-portable-src__delegation__mod.rs",
@@ -4941,6 +5230,7 @@ file_check(
     src = "src/delegation/mod.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-core/src/delegation/sign.rs",
     name = "check-length-src__delegation__sign.rs",
@@ -4951,6 +5241,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-core/src/delegation/sign.rs",
     name = "check-portable-src__delegation__sign.rs",
@@ -4959,6 +5250,7 @@ file_check(
     src = "src/delegation/sign.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-core/src/error.rs",
     name = "check-length-src__error.rs",
@@ -4969,6 +5261,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-core/src/error.rs",
     name = "check-portable-src__error.rs",
@@ -4977,6 +5270,7 @@ file_check(
     src = "src/error.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-core/src/keys/compare.rs",
     name = "check-length-src__keys__compare.rs",
@@ -4987,6 +5281,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-core/src/keys/compare.rs",
     name = "check-portable-src__keys__compare.rs",
@@ -4995,6 +5290,7 @@ file_check(
     src = "src/keys/compare.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-core/src/keys/identity.rs",
     name = "check-length-src__keys__identity.rs",
@@ -5005,6 +5301,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-core/src/keys/identity.rs",
     name = "check-portable-src__keys__identity.rs",
@@ -5013,6 +5310,7 @@ file_check(
     src = "src/keys/identity.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-core/src/keys/identity/persist.rs",
     name = "check-length-src__keys__identity__persist.rs",
@@ -5023,6 +5321,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-core/src/keys/identity/persist.rs",
     name = "check-portable-src__keys__identity__persist.rs",
@@ -5031,6 +5330,7 @@ file_check(
     src = "src/keys/identity/persist.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-core/src/keys/mod.rs",
     name = "check-length-src__keys__mod.rs",
@@ -5041,6 +5341,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-core/src/keys/mod.rs",
     name = "check-portable-src__keys__mod.rs",
@@ -5049,6 +5350,7 @@ file_check(
     src = "src/keys/mod.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-core/src/keys/ssh.rs",
     name = "check-length-src__keys__ssh.rs",
@@ -5059,6 +5361,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-core/src/keys/ssh.rs",
     name = "check-portable-src__keys__ssh.rs",
@@ -5067,6 +5370,7 @@ file_check(
     src = "src/keys/ssh.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-core/src/lib.rs",
     name = "check-length-src__lib.rs",
@@ -5077,6 +5381,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-core/src/lib.rs",
     name = "check-portable-src__lib.rs",
@@ -5085,6 +5390,7 @@ file_check(
     src = "src/lib.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-core/src/merkle/consistency.rs",
     name = "check-length-src__merkle__consistency.rs",
@@ -5095,6 +5401,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-core/src/merkle/consistency.rs",
     name = "check-portable-src__merkle__consistency.rs",
@@ -5103,6 +5410,7 @@ file_check(
     src = "src/merkle/consistency.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-core/src/merkle/leaf.rs",
     name = "check-length-src__merkle__leaf.rs",
@@ -5113,6 +5421,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-core/src/merkle/leaf.rs",
     name = "check-portable-src__merkle__leaf.rs",
@@ -5121,6 +5430,7 @@ file_check(
     src = "src/merkle/leaf.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-core/src/merkle/mod.rs",
     name = "check-length-src__merkle__mod.rs",
@@ -5131,6 +5441,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-core/src/merkle/mod.rs",
     name = "check-portable-src__merkle__mod.rs",
@@ -5139,6 +5450,7 @@ file_check(
     src = "src/merkle/mod.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-core/src/merkle/proof.rs",
     name = "check-length-src__merkle__proof.rs",
@@ -5149,6 +5461,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-core/src/merkle/proof.rs",
     name = "check-portable-src__merkle__proof.rs",
@@ -5157,6 +5470,7 @@ file_check(
     src = "src/merkle/proof.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-core/src/merkle/reconstruct.rs",
     name = "check-length-src__merkle__reconstruct.rs",
@@ -5167,6 +5481,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-core/src/merkle/reconstruct.rs",
     name = "check-portable-src__merkle__reconstruct.rs",
@@ -5175,6 +5490,7 @@ file_check(
     src = "src/merkle/reconstruct.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-core/src/merkle/tree.rs",
     name = "check-length-src__merkle__tree.rs",
@@ -5185,6 +5501,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-core/src/merkle/tree.rs",
     name = "check-portable-src__merkle__tree.rs",
@@ -5193,6 +5510,7 @@ file_check(
     src = "src/merkle/tree.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-core/src/merkle/tree/validation.rs",
     name = "check-length-src__merkle__tree__validation.rs",
@@ -5203,6 +5521,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-core/src/merkle/tree/validation.rs",
     name = "check-portable-src__merkle__tree__validation.rs",
@@ -5211,6 +5530,7 @@ file_check(
     src = "src/merkle/tree/validation.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-core/src/pairing_words.rs",
     name = "check-length-src__pairing_words.rs",
@@ -5221,6 +5541,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-core/src/pairing_words.rs",
     name = "check-portable-src__pairing_words.rs",
@@ -5229,6 +5550,7 @@ file_check(
     src = "src/pairing_words.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-core/src/receipt/artifact.rs",
     name = "check-length-src__receipt__artifact.rs",
@@ -5239,6 +5561,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-core/src/receipt/artifact.rs",
     name = "check-portable-src__receipt__artifact.rs",
@@ -5247,6 +5570,7 @@ file_check(
     src = "src/receipt/artifact.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-core/src/receipt/consistency.rs",
     name = "check-length-src__receipt__consistency.rs",
@@ -5257,6 +5581,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-core/src/receipt/consistency.rs",
     name = "check-portable-src__receipt__consistency.rs",
@@ -5265,6 +5590,7 @@ file_check(
     src = "src/receipt/consistency.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-core/src/receipt/encoding.rs",
     name = "check-length-src__receipt__encoding.rs",
@@ -5275,6 +5601,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-core/src/receipt/encoding.rs",
     name = "check-portable-src__receipt__encoding.rs",
@@ -5283,6 +5610,7 @@ file_check(
     src = "src/receipt/encoding.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-core/src/receipt/encoding/decode.rs",
     name = "check-length-src__receipt__encoding__decode.rs",
@@ -5293,6 +5621,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-core/src/receipt/encoding/decode.rs",
     name = "check-portable-src__receipt__encoding__decode.rs",
@@ -5301,6 +5630,7 @@ file_check(
     src = "src/receipt/encoding/decode.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-core/src/receipt/mod.rs",
     name = "check-length-src__receipt__mod.rs",
@@ -5311,6 +5641,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-core/src/receipt/mod.rs",
     name = "check-portable-src__receipt__mod.rs",
@@ -5319,6 +5650,7 @@ file_check(
     src = "src/receipt/mod.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-core/src/receipt/sign.rs",
     name = "check-length-src__receipt__sign.rs",
@@ -5329,6 +5661,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-core/src/receipt/sign.rs",
     name = "check-portable-src__receipt__sign.rs",
@@ -5337,6 +5670,7 @@ file_check(
     src = "src/receipt/sign.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-core/src/seal/authenticated.rs",
     name = "check-length-src__seal__authenticated.rs",
@@ -5347,6 +5681,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-core/src/seal/authenticated.rs",
     name = "check-portable-src__seal__authenticated.rs",
@@ -5355,6 +5690,7 @@ file_check(
     src = "src/seal/authenticated.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-core/src/seal/mod.rs",
     name = "check-length-src__seal__mod.rs",
@@ -5365,6 +5701,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-core/src/seal/mod.rs",
     name = "check-portable-src__seal__mod.rs",
@@ -5373,6 +5710,7 @@ file_check(
     src = "src/seal/mod.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-core/src/seal/sealed_envelope.rs",
     name = "check-length-src__seal__sealed_envelope.rs",
@@ -5383,6 +5721,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-core/src/seal/sealed_envelope.rs",
     name = "check-portable-src__seal__sealed_envelope.rs",
@@ -5391,6 +5730,7 @@ file_check(
     src = "src/seal/sealed_envelope.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-core/src/seat_file.rs",
     name = "check-length-src__seat_file.rs",
@@ -5401,6 +5741,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-core/src/seat_file.rs",
     name = "check-portable-src__seat_file.rs",
@@ -5409,6 +5750,7 @@ file_check(
     src = "src/seat_file.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-core/src/tlog/artifact.rs",
     name = "check-length-src__tlog__artifact.rs",
@@ -5419,6 +5761,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-core/src/tlog/artifact.rs",
     name = "check-portable-src__tlog__artifact.rs",
@@ -5427,6 +5770,7 @@ file_check(
     src = "src/tlog/artifact.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-core/src/tlog/build.rs",
     name = "check-length-src__tlog__build.rs",
@@ -5437,6 +5781,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-core/src/tlog/build.rs",
     name = "check-portable-src__tlog__build.rs",
@@ -5445,6 +5790,7 @@ file_check(
     src = "src/tlog/build.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-core/src/tlog/mod.rs",
     name = "check-length-src__tlog__mod.rs",
@@ -5455,6 +5801,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-core/src/tlog/mod.rs",
     name = "check-portable-src__tlog__mod.rs",
@@ -5463,6 +5810,7 @@ file_check(
     src = "src/tlog/mod.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-core/src/tlog/verify.rs",
     name = "check-length-src__tlog__verify.rs",
@@ -5473,6 +5821,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-core/src/tlog/verify.rs",
     name = "check-portable-src__tlog__verify.rs",

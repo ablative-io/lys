@@ -191,6 +191,7 @@ rust_binary(
 
 workspace_buildscript(
     binary = ":build-script-build",
+    checkout_git = True,
     env = {
         "CARGO": "cargo",
         "CARGO_MANIFEST_DIR": "crates/lys-secrets",
@@ -213,8 +214,8 @@ workspace_buildscript(
     name = "build-script-run",
     package_dir = "crates/lys-secrets",
     srcs = {
-        "Cargo.lock": "//buckgen/inputs:input-0",
-        "Cargo.toml": "//buckgen/inputs:input-1",
+        "Cargo.lock": "//:input-Cargo.lock",
+        "Cargo.toml": "//:input-Cargo.toml",
         "crates/lys-secrets/Cargo.toml": "Cargo.toml",
         "crates/lys-secrets/build.rs": "build.rs",
         "crates/lys-secrets/build/provenance.rs": "build/provenance.rs",
@@ -357,14 +358,16 @@ workspace_buildscript(
 )
 
 rust_library(
+    _rust_toolchain = "toolchains//:rust-workspace",
     crate = "lys_secrets",
     crate_root = "crates/lys-secrets/src/lib.rs",
     doctests = True,
     edition = "2024",
     env = {
+        "BUCKGEN_ROOT_CARGO_MANIFEST_DIR": "crates/lys-secrets",
+        "BUCKGEN_ROOT_CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "CARGO": "cargo",
         "CARGO_CRATE_NAME": "lys_secrets",
-        "CARGO_MANIFEST_DIR": "crates/lys-secrets",
         "CARGO_PKG_AUTHORS": "Tom Whiting \u003ctom@ablative.com.au\u003e",
         "CARGO_PKG_DESCRIPTION": "The lys secrets broker: an encrypted store, redacted secret bytes, holder-bound handles, the proxy swap with one audit line per use, account rotation under one handle, and revocation.",
         "CARGO_PKG_HOMEPAGE": "",
@@ -378,13 +381,12 @@ rust_library(
         "CARGO_PKG_VERSION_MINOR": "3",
         "CARGO_PKG_VERSION_PATCH": "3",
         "CARGO_PKG_VERSION_PRE": "",
-        "CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "OUT_DIR": "$(location :build-script-run[out_dir])"
     },
     features = [],
     mapped_srcs = {
-        "//buckgen/inputs:input-0": "Cargo.lock",
-        "//buckgen/inputs:input-1": "Cargo.toml",
+        "//:input-Cargo.lock": "Cargo.lock",
+        "//:input-Cargo.toml": "Cargo.toml",
         "Cargo.toml": "crates/lys-secrets/Cargo.toml",
         "build.rs": "crates/lys-secrets/build.rs",
         "build/provenance.rs": "crates/lys-secrets/build/provenance.rs",
@@ -554,14 +556,16 @@ rust_library(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-workspace",
     _test_toolchain = ":test-toolchain",
     crate = "lys_secrets",
     crate_root = "crates/lys-secrets/src/lib.rs",
     edition = "2024",
     env = {
+        "BUCKGEN_ROOT_CARGO_MANIFEST_DIR": "crates/lys-secrets",
+        "BUCKGEN_ROOT_CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "CARGO": "cargo",
         "CARGO_CRATE_NAME": "lys_secrets",
-        "CARGO_MANIFEST_DIR": "crates/lys-secrets",
         "CARGO_PKG_AUTHORS": "Tom Whiting \u003ctom@ablative.com.au\u003e",
         "CARGO_PKG_DESCRIPTION": "The lys secrets broker: an encrypted store, redacted secret bytes, holder-bound handles, the proxy swap with one audit line per use, account rotation under one handle, and revocation.",
         "CARGO_PKG_HOMEPAGE": "",
@@ -575,13 +579,15 @@ workspace_rust_test(
         "CARGO_PKG_VERSION_MINOR": "3",
         "CARGO_PKG_VERSION_PATCH": "3",
         "CARGO_PKG_VERSION_PRE": "",
-        "CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "OUT_DIR": "$(location :build-script-run[out_dir])"
     },
     features = [],
+    labels = [
+        "tier-1"
+    ],
     mapped_srcs = {
-        "//buckgen/inputs:input-0": "Cargo.lock",
-        "//buckgen/inputs:input-1": "Cargo.toml",
+        "//:input-Cargo.lock": "Cargo.lock",
+        "//:input-Cargo.toml": "Cargo.toml",
         "Cargo.toml": "crates/lys-secrets/Cargo.toml",
         "build.rs": "crates/lys-secrets/build.rs",
         "build/provenance.rs": "crates/lys-secrets/build/provenance.rs",
@@ -740,6 +746,18 @@ workspace_rust_test(
         "tokio": "//third-party:tokio",
         "zeroize": "//third-party:zeroize"
     },
+    nextest = {
+        "binary": "lys_secrets",
+        "binary_id": "lys-secrets",
+        "dir": "crates/lys-secrets",
+        "kind": "lib",
+        "package": "lys-secrets"
+    },
+    package_bins = {
+        "examples/log_window_pack": ":example-log_window_pack",
+        "lys-secrets": ":lys-secrets-bin",
+        "lys-secrets-demo": ":lys-secrets-demo"
+    },
     rustc_flags = [
         "@$(location :build-script-run[rustc_flags])"
     ],
@@ -750,14 +768,16 @@ workspace_rust_test(
 )
 
 rust_binary(
+    _rust_toolchain = "toolchains//:rust-workspace",
     crate = "lys_secrets",
     crate_root = "crates/lys-secrets/src/bin/lys-secrets/main.rs",
     edition = "2024",
     env = {
+        "BUCKGEN_ROOT_CARGO_MANIFEST_DIR": "crates/lys-secrets",
+        "BUCKGEN_ROOT_CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "CARGO": "cargo",
         "CARGO_BIN_NAME": "lys-secrets",
         "CARGO_CRATE_NAME": "lys_secrets",
-        "CARGO_MANIFEST_DIR": "crates/lys-secrets",
         "CARGO_PKG_AUTHORS": "Tom Whiting \u003ctom@ablative.com.au\u003e",
         "CARGO_PKG_DESCRIPTION": "The lys secrets broker: an encrypted store, redacted secret bytes, holder-bound handles, the proxy swap with one audit line per use, account rotation under one handle, and revocation.",
         "CARGO_PKG_HOMEPAGE": "",
@@ -771,13 +791,12 @@ rust_binary(
         "CARGO_PKG_VERSION_MINOR": "3",
         "CARGO_PKG_VERSION_PATCH": "3",
         "CARGO_PKG_VERSION_PRE": "",
-        "CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "OUT_DIR": "$(location :build-script-run[out_dir])"
     },
     features = [],
     mapped_srcs = {
-        "//buckgen/inputs:input-0": "Cargo.lock",
-        "//buckgen/inputs:input-1": "Cargo.toml",
+        "//:input-Cargo.lock": "Cargo.lock",
+        "//:input-Cargo.toml": "Cargo.toml",
         "Cargo.toml": "crates/lys-secrets/Cargo.toml",
         "build.rs": "crates/lys-secrets/build.rs",
         "build/provenance.rs": "crates/lys-secrets/build/provenance.rs",
@@ -948,15 +967,17 @@ rust_binary(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-workspace",
     _test_toolchain = ":test-toolchain",
     crate = "lys_secrets",
     crate_root = "crates/lys-secrets/src/bin/lys-secrets/main.rs",
     edition = "2024",
     env = {
+        "BUCKGEN_ROOT_CARGO_MANIFEST_DIR": "crates/lys-secrets",
+        "BUCKGEN_ROOT_CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "CARGO": "cargo",
         "CARGO_BIN_NAME": "lys-secrets",
         "CARGO_CRATE_NAME": "lys_secrets",
-        "CARGO_MANIFEST_DIR": "crates/lys-secrets",
         "CARGO_PKG_AUTHORS": "Tom Whiting \u003ctom@ablative.com.au\u003e",
         "CARGO_PKG_DESCRIPTION": "The lys secrets broker: an encrypted store, redacted secret bytes, holder-bound handles, the proxy swap with one audit line per use, account rotation under one handle, and revocation.",
         "CARGO_PKG_HOMEPAGE": "",
@@ -970,13 +991,15 @@ workspace_rust_test(
         "CARGO_PKG_VERSION_MINOR": "3",
         "CARGO_PKG_VERSION_PATCH": "3",
         "CARGO_PKG_VERSION_PRE": "",
-        "CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "OUT_DIR": "$(location :build-script-run[out_dir])"
     },
     features = [],
+    labels = [
+        "tier-1"
+    ],
     mapped_srcs = {
-        "//buckgen/inputs:input-0": "Cargo.lock",
-        "//buckgen/inputs:input-1": "Cargo.toml",
+        "//:input-Cargo.lock": "Cargo.lock",
+        "//:input-Cargo.toml": "Cargo.toml",
         "Cargo.toml": "crates/lys-secrets/Cargo.toml",
         "build.rs": "crates/lys-secrets/build.rs",
         "build/provenance.rs": "crates/lys-secrets/build/provenance.rs",
@@ -1136,6 +1159,18 @@ workspace_rust_test(
         "tokio": "//third-party:tokio",
         "zeroize": "//third-party:zeroize"
     },
+    nextest = {
+        "binary": "lys-secrets",
+        "binary_id": "lys-secrets::bin/lys-secrets",
+        "dir": "crates/lys-secrets",
+        "kind": "bin",
+        "package": "lys-secrets"
+    },
+    package_bins = {
+        "examples/log_window_pack": ":example-log_window_pack",
+        "lys-secrets": ":lys-secrets-bin",
+        "lys-secrets-demo": ":lys-secrets-demo"
+    },
     rustc_flags = [
         "@$(location :build-script-run[rustc_flags])"
     ],
@@ -1146,14 +1181,16 @@ workspace_rust_test(
 )
 
 rust_binary(
+    _rust_toolchain = "toolchains//:rust-workspace",
     crate = "lys_secrets_demo",
     crate_root = "crates/lys-secrets/src/bin/lys-secrets-demo.rs",
     edition = "2024",
     env = {
+        "BUCKGEN_ROOT_CARGO_MANIFEST_DIR": "crates/lys-secrets",
+        "BUCKGEN_ROOT_CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "CARGO": "cargo",
         "CARGO_BIN_NAME": "lys-secrets-demo",
         "CARGO_CRATE_NAME": "lys_secrets_demo",
-        "CARGO_MANIFEST_DIR": "crates/lys-secrets",
         "CARGO_PKG_AUTHORS": "Tom Whiting \u003ctom@ablative.com.au\u003e",
         "CARGO_PKG_DESCRIPTION": "The lys secrets broker: an encrypted store, redacted secret bytes, holder-bound handles, the proxy swap with one audit line per use, account rotation under one handle, and revocation.",
         "CARGO_PKG_HOMEPAGE": "",
@@ -1167,13 +1204,12 @@ rust_binary(
         "CARGO_PKG_VERSION_MINOR": "3",
         "CARGO_PKG_VERSION_PATCH": "3",
         "CARGO_PKG_VERSION_PRE": "",
-        "CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "OUT_DIR": "$(location :build-script-run[out_dir])"
     },
     features = [],
     mapped_srcs = {
-        "//buckgen/inputs:input-0": "Cargo.lock",
-        "//buckgen/inputs:input-1": "Cargo.toml",
+        "//:input-Cargo.lock": "Cargo.lock",
+        "//:input-Cargo.toml": "Cargo.toml",
         "Cargo.toml": "crates/lys-secrets/Cargo.toml",
         "build.rs": "crates/lys-secrets/build.rs",
         "build/provenance.rs": "crates/lys-secrets/build/provenance.rs",
@@ -1344,15 +1380,17 @@ rust_binary(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-workspace",
     _test_toolchain = ":test-toolchain",
     crate = "lys_secrets_demo",
     crate_root = "crates/lys-secrets/src/bin/lys-secrets-demo.rs",
     edition = "2024",
     env = {
+        "BUCKGEN_ROOT_CARGO_MANIFEST_DIR": "crates/lys-secrets",
+        "BUCKGEN_ROOT_CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "CARGO": "cargo",
         "CARGO_BIN_NAME": "lys-secrets-demo",
         "CARGO_CRATE_NAME": "lys_secrets_demo",
-        "CARGO_MANIFEST_DIR": "crates/lys-secrets",
         "CARGO_PKG_AUTHORS": "Tom Whiting \u003ctom@ablative.com.au\u003e",
         "CARGO_PKG_DESCRIPTION": "The lys secrets broker: an encrypted store, redacted secret bytes, holder-bound handles, the proxy swap with one audit line per use, account rotation under one handle, and revocation.",
         "CARGO_PKG_HOMEPAGE": "",
@@ -1366,13 +1404,15 @@ workspace_rust_test(
         "CARGO_PKG_VERSION_MINOR": "3",
         "CARGO_PKG_VERSION_PATCH": "3",
         "CARGO_PKG_VERSION_PRE": "",
-        "CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "OUT_DIR": "$(location :build-script-run[out_dir])"
     },
     features = [],
+    labels = [
+        "tier-1"
+    ],
     mapped_srcs = {
-        "//buckgen/inputs:input-0": "Cargo.lock",
-        "//buckgen/inputs:input-1": "Cargo.toml",
+        "//:input-Cargo.lock": "Cargo.lock",
+        "//:input-Cargo.toml": "Cargo.toml",
         "Cargo.toml": "crates/lys-secrets/Cargo.toml",
         "build.rs": "crates/lys-secrets/build.rs",
         "build/provenance.rs": "crates/lys-secrets/build/provenance.rs",
@@ -1532,6 +1572,18 @@ workspace_rust_test(
         "tokio": "//third-party:tokio",
         "zeroize": "//third-party:zeroize"
     },
+    nextest = {
+        "binary": "lys-secrets-demo",
+        "binary_id": "lys-secrets::bin/lys-secrets-demo",
+        "dir": "crates/lys-secrets",
+        "kind": "bin",
+        "package": "lys-secrets"
+    },
+    package_bins = {
+        "examples/log_window_pack": ":example-log_window_pack",
+        "lys-secrets": ":lys-secrets-bin",
+        "lys-secrets-demo": ":lys-secrets-demo"
+    },
     rustc_flags = [
         "@$(location :build-script-run[rustc_flags])"
     ],
@@ -1542,13 +1594,15 @@ workspace_rust_test(
 )
 
 rust_binary(
+    _rust_toolchain = "toolchains//:rust-workspace",
     crate = "log_window_pack",
     crate_root = "crates/lys-secrets/examples/log_window_pack.rs",
     edition = "2024",
     env = {
+        "BUCKGEN_ROOT_CARGO_MANIFEST_DIR": "crates/lys-secrets",
+        "BUCKGEN_ROOT_CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "CARGO": "cargo",
         "CARGO_CRATE_NAME": "log_window_pack",
-        "CARGO_MANIFEST_DIR": "crates/lys-secrets",
         "CARGO_PKG_AUTHORS": "Tom Whiting \u003ctom@ablative.com.au\u003e",
         "CARGO_PKG_DESCRIPTION": "The lys secrets broker: an encrypted store, redacted secret bytes, holder-bound handles, the proxy swap with one audit line per use, account rotation under one handle, and revocation.",
         "CARGO_PKG_HOMEPAGE": "",
@@ -1562,13 +1616,12 @@ rust_binary(
         "CARGO_PKG_VERSION_MINOR": "3",
         "CARGO_PKG_VERSION_PATCH": "3",
         "CARGO_PKG_VERSION_PRE": "",
-        "CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "OUT_DIR": "$(location :build-script-run[out_dir])"
     },
     features = [],
     mapped_srcs = {
-        "//buckgen/inputs:input-0": "Cargo.lock",
-        "//buckgen/inputs:input-1": "Cargo.toml",
+        "//:input-Cargo.lock": "Cargo.lock",
+        "//:input-Cargo.toml": "Cargo.toml",
         "Cargo.toml": "crates/lys-secrets/Cargo.toml",
         "build.rs": "crates/lys-secrets/build.rs",
         "build/provenance.rs": "crates/lys-secrets/build/provenance.rs",
@@ -1739,17 +1792,18 @@ rust_binary(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
-    _rust_toolchain = "toolchains//:rust-bin-exe",
+    _rust_toolchain = "toolchains//:rust-workspace",
     _test_toolchain = ":test-toolchain",
     crate = "accounts",
     crate_root = "crates/lys-secrets/tests/accounts.rs",
     edition = "2024",
     env = {
+        "BUCKGEN_ROOT_CARGO_MANIFEST_DIR": "crates/lys-secrets",
+        "BUCKGEN_ROOT_CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "CARGO": "cargo",
         "CARGO_BIN_EXE_lys-secrets": "$(location :lys-secrets-bin)",
         "CARGO_BIN_EXE_lys-secrets-demo": "$(location :lys-secrets-demo)",
         "CARGO_CRATE_NAME": "accounts",
-        "CARGO_MANIFEST_DIR": "crates/lys-secrets",
         "CARGO_PKG_AUTHORS": "Tom Whiting \u003ctom@ablative.com.au\u003e",
         "CARGO_PKG_DESCRIPTION": "The lys secrets broker: an encrypted store, redacted secret bytes, holder-bound handles, the proxy swap with one audit line per use, account rotation under one handle, and revocation.",
         "CARGO_PKG_HOMEPAGE": "",
@@ -1763,14 +1817,16 @@ workspace_rust_test(
         "CARGO_PKG_VERSION_MINOR": "3",
         "CARGO_PKG_VERSION_PATCH": "3",
         "CARGO_PKG_VERSION_PRE": "",
-        "CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "OUT_DIR": "$(location :build-script-run[out_dir])"
     },
     features = [],
     framework = True,
+    labels = [
+        "tier-1"
+    ],
     mapped_srcs = {
-        "//buckgen/inputs:input-0": "Cargo.lock",
-        "//buckgen/inputs:input-1": "Cargo.toml",
+        "//:input-Cargo.lock": "Cargo.lock",
+        "//:input-Cargo.toml": "Cargo.toml",
         "Cargo.toml": "crates/lys-secrets/Cargo.toml",
         "build.rs": "crates/lys-secrets/build.rs",
         "build/provenance.rs": "crates/lys-secrets/build/provenance.rs",
@@ -1930,6 +1986,18 @@ workspace_rust_test(
         "tokio": "//third-party:tokio",
         "zeroize": "//third-party:zeroize"
     },
+    nextest = {
+        "binary": "accounts",
+        "binary_id": "lys-secrets::accounts",
+        "dir": "crates/lys-secrets",
+        "kind": "test",
+        "package": "lys-secrets"
+    },
+    package_bins = {
+        "examples/log_window_pack": ":example-log_window_pack",
+        "lys-secrets": ":lys-secrets-bin",
+        "lys-secrets-demo": ":lys-secrets-demo"
+    },
     rustc_flags = [
         "@$(location :build-script-run[rustc_flags])"
     ],
@@ -1941,17 +2009,18 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
-    _rust_toolchain = "toolchains//:rust-bin-exe",
+    _rust_toolchain = "toolchains//:rust-workspace",
     _test_toolchain = ":test-toolchain",
     crate = "anchor_once",
     crate_root = "crates/lys-secrets/tests/anchor_once.rs",
     edition = "2024",
     env = {
+        "BUCKGEN_ROOT_CARGO_MANIFEST_DIR": "crates/lys-secrets",
+        "BUCKGEN_ROOT_CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "CARGO": "cargo",
         "CARGO_BIN_EXE_lys-secrets": "$(location :lys-secrets-bin)",
         "CARGO_BIN_EXE_lys-secrets-demo": "$(location :lys-secrets-demo)",
         "CARGO_CRATE_NAME": "anchor_once",
-        "CARGO_MANIFEST_DIR": "crates/lys-secrets",
         "CARGO_PKG_AUTHORS": "Tom Whiting \u003ctom@ablative.com.au\u003e",
         "CARGO_PKG_DESCRIPTION": "The lys secrets broker: an encrypted store, redacted secret bytes, holder-bound handles, the proxy swap with one audit line per use, account rotation under one handle, and revocation.",
         "CARGO_PKG_HOMEPAGE": "",
@@ -1965,14 +2034,16 @@ workspace_rust_test(
         "CARGO_PKG_VERSION_MINOR": "3",
         "CARGO_PKG_VERSION_PATCH": "3",
         "CARGO_PKG_VERSION_PRE": "",
-        "CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "OUT_DIR": "$(location :build-script-run[out_dir])"
     },
     features = [],
     framework = True,
+    labels = [
+        "tier-1"
+    ],
     mapped_srcs = {
-        "//buckgen/inputs:input-0": "Cargo.lock",
-        "//buckgen/inputs:input-1": "Cargo.toml",
+        "//:input-Cargo.lock": "Cargo.lock",
+        "//:input-Cargo.toml": "Cargo.toml",
         "Cargo.toml": "crates/lys-secrets/Cargo.toml",
         "build.rs": "crates/lys-secrets/build.rs",
         "build/provenance.rs": "crates/lys-secrets/build/provenance.rs",
@@ -2132,6 +2203,18 @@ workspace_rust_test(
         "tokio": "//third-party:tokio",
         "zeroize": "//third-party:zeroize"
     },
+    nextest = {
+        "binary": "anchor_once",
+        "binary_id": "lys-secrets::anchor_once",
+        "dir": "crates/lys-secrets",
+        "kind": "test",
+        "package": "lys-secrets"
+    },
+    package_bins = {
+        "examples/log_window_pack": ":example-log_window_pack",
+        "lys-secrets": ":lys-secrets-bin",
+        "lys-secrets-demo": ":lys-secrets-demo"
+    },
     rustc_flags = [
         "@$(location :build-script-run[rustc_flags])"
     ],
@@ -2143,17 +2226,18 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
-    _rust_toolchain = "toolchains//:rust-bin-exe",
+    _rust_toolchain = "toolchains//:rust-workspace",
     _test_toolchain = ":test-toolchain",
     crate = "audit_window",
     crate_root = "crates/lys-secrets/tests/audit_window.rs",
     edition = "2024",
     env = {
+        "BUCKGEN_ROOT_CARGO_MANIFEST_DIR": "crates/lys-secrets",
+        "BUCKGEN_ROOT_CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "CARGO": "cargo",
         "CARGO_BIN_EXE_lys-secrets": "$(location :lys-secrets-bin)",
         "CARGO_BIN_EXE_lys-secrets-demo": "$(location :lys-secrets-demo)",
         "CARGO_CRATE_NAME": "audit_window",
-        "CARGO_MANIFEST_DIR": "crates/lys-secrets",
         "CARGO_PKG_AUTHORS": "Tom Whiting \u003ctom@ablative.com.au\u003e",
         "CARGO_PKG_DESCRIPTION": "The lys secrets broker: an encrypted store, redacted secret bytes, holder-bound handles, the proxy swap with one audit line per use, account rotation under one handle, and revocation.",
         "CARGO_PKG_HOMEPAGE": "",
@@ -2167,14 +2251,16 @@ workspace_rust_test(
         "CARGO_PKG_VERSION_MINOR": "3",
         "CARGO_PKG_VERSION_PATCH": "3",
         "CARGO_PKG_VERSION_PRE": "",
-        "CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "OUT_DIR": "$(location :build-script-run[out_dir])"
     },
     features = [],
     framework = True,
+    labels = [
+        "tier-1"
+    ],
     mapped_srcs = {
-        "//buckgen/inputs:input-0": "Cargo.lock",
-        "//buckgen/inputs:input-1": "Cargo.toml",
+        "//:input-Cargo.lock": "Cargo.lock",
+        "//:input-Cargo.toml": "Cargo.toml",
         "Cargo.toml": "crates/lys-secrets/Cargo.toml",
         "build.rs": "crates/lys-secrets/build.rs",
         "build/provenance.rs": "crates/lys-secrets/build/provenance.rs",
@@ -2334,6 +2420,18 @@ workspace_rust_test(
         "tokio": "//third-party:tokio",
         "zeroize": "//third-party:zeroize"
     },
+    nextest = {
+        "binary": "audit_window",
+        "binary_id": "lys-secrets::audit_window",
+        "dir": "crates/lys-secrets",
+        "kind": "test",
+        "package": "lys-secrets"
+    },
+    package_bins = {
+        "examples/log_window_pack": ":example-log_window_pack",
+        "lys-secrets": ":lys-secrets-bin",
+        "lys-secrets-demo": ":lys-secrets-demo"
+    },
     rustc_flags = [
         "@$(location :build-script-run[rustc_flags])"
     ],
@@ -2345,17 +2443,18 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
-    _rust_toolchain = "toolchains//:rust-bin-exe",
+    _rust_toolchain = "toolchains//:rust-workspace",
     _test_toolchain = ":test-toolchain",
     crate = "broker",
     crate_root = "crates/lys-secrets/tests/broker.rs",
     edition = "2024",
     env = {
+        "BUCKGEN_ROOT_CARGO_MANIFEST_DIR": "crates/lys-secrets",
+        "BUCKGEN_ROOT_CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "CARGO": "cargo",
         "CARGO_BIN_EXE_lys-secrets": "$(location :lys-secrets-bin)",
         "CARGO_BIN_EXE_lys-secrets-demo": "$(location :lys-secrets-demo)",
         "CARGO_CRATE_NAME": "broker",
-        "CARGO_MANIFEST_DIR": "crates/lys-secrets",
         "CARGO_PKG_AUTHORS": "Tom Whiting \u003ctom@ablative.com.au\u003e",
         "CARGO_PKG_DESCRIPTION": "The lys secrets broker: an encrypted store, redacted secret bytes, holder-bound handles, the proxy swap with one audit line per use, account rotation under one handle, and revocation.",
         "CARGO_PKG_HOMEPAGE": "",
@@ -2369,14 +2468,16 @@ workspace_rust_test(
         "CARGO_PKG_VERSION_MINOR": "3",
         "CARGO_PKG_VERSION_PATCH": "3",
         "CARGO_PKG_VERSION_PRE": "",
-        "CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "OUT_DIR": "$(location :build-script-run[out_dir])"
     },
     features = [],
     framework = True,
+    labels = [
+        "tier-1"
+    ],
     mapped_srcs = {
-        "//buckgen/inputs:input-0": "Cargo.lock",
-        "//buckgen/inputs:input-1": "Cargo.toml",
+        "//:input-Cargo.lock": "Cargo.lock",
+        "//:input-Cargo.toml": "Cargo.toml",
         "Cargo.toml": "crates/lys-secrets/Cargo.toml",
         "build.rs": "crates/lys-secrets/build.rs",
         "build/provenance.rs": "crates/lys-secrets/build/provenance.rs",
@@ -2536,6 +2637,18 @@ workspace_rust_test(
         "tokio": "//third-party:tokio",
         "zeroize": "//third-party:zeroize"
     },
+    nextest = {
+        "binary": "broker",
+        "binary_id": "lys-secrets::broker",
+        "dir": "crates/lys-secrets",
+        "kind": "test",
+        "package": "lys-secrets"
+    },
+    package_bins = {
+        "examples/log_window_pack": ":example-log_window_pack",
+        "lys-secrets": ":lys-secrets-bin",
+        "lys-secrets-demo": ":lys-secrets-demo"
+    },
     rustc_flags = [
         "@$(location :build-script-run[rustc_flags])"
     ],
@@ -2547,17 +2660,18 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
-    _rust_toolchain = "toolchains//:rust-bin-exe",
+    _rust_toolchain = "toolchains//:rust-workspace",
     _test_toolchain = ":test-toolchain",
     crate = "ending",
     crate_root = "crates/lys-secrets/tests/ending.rs",
     edition = "2024",
     env = {
+        "BUCKGEN_ROOT_CARGO_MANIFEST_DIR": "crates/lys-secrets",
+        "BUCKGEN_ROOT_CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "CARGO": "cargo",
         "CARGO_BIN_EXE_lys-secrets": "$(location :lys-secrets-bin)",
         "CARGO_BIN_EXE_lys-secrets-demo": "$(location :lys-secrets-demo)",
         "CARGO_CRATE_NAME": "ending",
-        "CARGO_MANIFEST_DIR": "crates/lys-secrets",
         "CARGO_PKG_AUTHORS": "Tom Whiting \u003ctom@ablative.com.au\u003e",
         "CARGO_PKG_DESCRIPTION": "The lys secrets broker: an encrypted store, redacted secret bytes, holder-bound handles, the proxy swap with one audit line per use, account rotation under one handle, and revocation.",
         "CARGO_PKG_HOMEPAGE": "",
@@ -2571,14 +2685,16 @@ workspace_rust_test(
         "CARGO_PKG_VERSION_MINOR": "3",
         "CARGO_PKG_VERSION_PATCH": "3",
         "CARGO_PKG_VERSION_PRE": "",
-        "CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "OUT_DIR": "$(location :build-script-run[out_dir])"
     },
     features = [],
     framework = True,
+    labels = [
+        "tier-1"
+    ],
     mapped_srcs = {
-        "//buckgen/inputs:input-0": "Cargo.lock",
-        "//buckgen/inputs:input-1": "Cargo.toml",
+        "//:input-Cargo.lock": "Cargo.lock",
+        "//:input-Cargo.toml": "Cargo.toml",
         "Cargo.toml": "crates/lys-secrets/Cargo.toml",
         "build.rs": "crates/lys-secrets/build.rs",
         "build/provenance.rs": "crates/lys-secrets/build/provenance.rs",
@@ -2738,6 +2854,18 @@ workspace_rust_test(
         "tokio": "//third-party:tokio",
         "zeroize": "//third-party:zeroize"
     },
+    nextest = {
+        "binary": "ending",
+        "binary_id": "lys-secrets::ending",
+        "dir": "crates/lys-secrets",
+        "kind": "test",
+        "package": "lys-secrets"
+    },
+    package_bins = {
+        "examples/log_window_pack": ":example-log_window_pack",
+        "lys-secrets": ":lys-secrets-bin",
+        "lys-secrets-demo": ":lys-secrets-demo"
+    },
     rustc_flags = [
         "@$(location :build-script-run[rustc_flags])"
     ],
@@ -2749,17 +2877,18 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
-    _rust_toolchain = "toolchains//:rust-bin-exe",
+    _rust_toolchain = "toolchains//:rust-workspace",
     _test_toolchain = ":test-toolchain",
     crate = "lease_relinquish",
     crate_root = "crates/lys-secrets/tests/lease_relinquish.rs",
     edition = "2024",
     env = {
+        "BUCKGEN_ROOT_CARGO_MANIFEST_DIR": "crates/lys-secrets",
+        "BUCKGEN_ROOT_CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "CARGO": "cargo",
         "CARGO_BIN_EXE_lys-secrets": "$(location :lys-secrets-bin)",
         "CARGO_BIN_EXE_lys-secrets-demo": "$(location :lys-secrets-demo)",
         "CARGO_CRATE_NAME": "lease_relinquish",
-        "CARGO_MANIFEST_DIR": "crates/lys-secrets",
         "CARGO_PKG_AUTHORS": "Tom Whiting \u003ctom@ablative.com.au\u003e",
         "CARGO_PKG_DESCRIPTION": "The lys secrets broker: an encrypted store, redacted secret bytes, holder-bound handles, the proxy swap with one audit line per use, account rotation under one handle, and revocation.",
         "CARGO_PKG_HOMEPAGE": "",
@@ -2773,14 +2902,16 @@ workspace_rust_test(
         "CARGO_PKG_VERSION_MINOR": "3",
         "CARGO_PKG_VERSION_PATCH": "3",
         "CARGO_PKG_VERSION_PRE": "",
-        "CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "OUT_DIR": "$(location :build-script-run[out_dir])"
     },
     features = [],
     framework = True,
+    labels = [
+        "tier-1"
+    ],
     mapped_srcs = {
-        "//buckgen/inputs:input-0": "Cargo.lock",
-        "//buckgen/inputs:input-1": "Cargo.toml",
+        "//:input-Cargo.lock": "Cargo.lock",
+        "//:input-Cargo.toml": "Cargo.toml",
         "Cargo.toml": "crates/lys-secrets/Cargo.toml",
         "build.rs": "crates/lys-secrets/build.rs",
         "build/provenance.rs": "crates/lys-secrets/build/provenance.rs",
@@ -2940,6 +3071,18 @@ workspace_rust_test(
         "tokio": "//third-party:tokio",
         "zeroize": "//third-party:zeroize"
     },
+    nextest = {
+        "binary": "lease_relinquish",
+        "binary_id": "lys-secrets::lease_relinquish",
+        "dir": "crates/lys-secrets",
+        "kind": "test",
+        "package": "lys-secrets"
+    },
+    package_bins = {
+        "examples/log_window_pack": ":example-log_window_pack",
+        "lys-secrets": ":lys-secrets-bin",
+        "lys-secrets-demo": ":lys-secrets-demo"
+    },
     rustc_flags = [
         "@$(location :build-script-run[rustc_flags])"
     ],
@@ -2951,17 +3094,18 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
-    _rust_toolchain = "toolchains//:rust-bin-exe",
+    _rust_toolchain = "toolchains//:rust-workspace",
     _test_toolchain = ":test-toolchain",
     crate = "lease_revoke",
     crate_root = "crates/lys-secrets/tests/lease_revoke.rs",
     edition = "2024",
     env = {
+        "BUCKGEN_ROOT_CARGO_MANIFEST_DIR": "crates/lys-secrets",
+        "BUCKGEN_ROOT_CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "CARGO": "cargo",
         "CARGO_BIN_EXE_lys-secrets": "$(location :lys-secrets-bin)",
         "CARGO_BIN_EXE_lys-secrets-demo": "$(location :lys-secrets-demo)",
         "CARGO_CRATE_NAME": "lease_revoke",
-        "CARGO_MANIFEST_DIR": "crates/lys-secrets",
         "CARGO_PKG_AUTHORS": "Tom Whiting \u003ctom@ablative.com.au\u003e",
         "CARGO_PKG_DESCRIPTION": "The lys secrets broker: an encrypted store, redacted secret bytes, holder-bound handles, the proxy swap with one audit line per use, account rotation under one handle, and revocation.",
         "CARGO_PKG_HOMEPAGE": "",
@@ -2975,14 +3119,16 @@ workspace_rust_test(
         "CARGO_PKG_VERSION_MINOR": "3",
         "CARGO_PKG_VERSION_PATCH": "3",
         "CARGO_PKG_VERSION_PRE": "",
-        "CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "OUT_DIR": "$(location :build-script-run[out_dir])"
     },
     features = [],
     framework = True,
+    labels = [
+        "tier-1"
+    ],
     mapped_srcs = {
-        "//buckgen/inputs:input-0": "Cargo.lock",
-        "//buckgen/inputs:input-1": "Cargo.toml",
+        "//:input-Cargo.lock": "Cargo.lock",
+        "//:input-Cargo.toml": "Cargo.toml",
         "Cargo.toml": "crates/lys-secrets/Cargo.toml",
         "build.rs": "crates/lys-secrets/build.rs",
         "build/provenance.rs": "crates/lys-secrets/build/provenance.rs",
@@ -3142,6 +3288,18 @@ workspace_rust_test(
         "tokio": "//third-party:tokio",
         "zeroize": "//third-party:zeroize"
     },
+    nextest = {
+        "binary": "lease_revoke",
+        "binary_id": "lys-secrets::lease_revoke",
+        "dir": "crates/lys-secrets",
+        "kind": "test",
+        "package": "lys-secrets"
+    },
+    package_bins = {
+        "examples/log_window_pack": ":example-log_window_pack",
+        "lys-secrets": ":lys-secrets-bin",
+        "lys-secrets-demo": ":lys-secrets-demo"
+    },
     rustc_flags = [
         "@$(location :build-script-run[rustc_flags])"
     ],
@@ -3153,17 +3311,18 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
-    _rust_toolchain = "toolchains//:rust-bin-exe",
+    _rust_toolchain = "toolchains//:rust-workspace",
     _test_toolchain = ":test-toolchain",
     crate = "lineage",
     crate_root = "crates/lys-secrets/tests/lineage.rs",
     edition = "2024",
     env = {
+        "BUCKGEN_ROOT_CARGO_MANIFEST_DIR": "crates/lys-secrets",
+        "BUCKGEN_ROOT_CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "CARGO": "cargo",
         "CARGO_BIN_EXE_lys-secrets": "$(location :lys-secrets-bin)",
         "CARGO_BIN_EXE_lys-secrets-demo": "$(location :lys-secrets-demo)",
         "CARGO_CRATE_NAME": "lineage",
-        "CARGO_MANIFEST_DIR": "crates/lys-secrets",
         "CARGO_PKG_AUTHORS": "Tom Whiting \u003ctom@ablative.com.au\u003e",
         "CARGO_PKG_DESCRIPTION": "The lys secrets broker: an encrypted store, redacted secret bytes, holder-bound handles, the proxy swap with one audit line per use, account rotation under one handle, and revocation.",
         "CARGO_PKG_HOMEPAGE": "",
@@ -3177,14 +3336,16 @@ workspace_rust_test(
         "CARGO_PKG_VERSION_MINOR": "3",
         "CARGO_PKG_VERSION_PATCH": "3",
         "CARGO_PKG_VERSION_PRE": "",
-        "CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "OUT_DIR": "$(location :build-script-run[out_dir])"
     },
     features = [],
     framework = True,
+    labels = [
+        "tier-1"
+    ],
     mapped_srcs = {
-        "//buckgen/inputs:input-0": "Cargo.lock",
-        "//buckgen/inputs:input-1": "Cargo.toml",
+        "//:input-Cargo.lock": "Cargo.lock",
+        "//:input-Cargo.toml": "Cargo.toml",
         "Cargo.toml": "crates/lys-secrets/Cargo.toml",
         "build.rs": "crates/lys-secrets/build.rs",
         "build/provenance.rs": "crates/lys-secrets/build/provenance.rs",
@@ -3344,6 +3505,18 @@ workspace_rust_test(
         "tokio": "//third-party:tokio",
         "zeroize": "//third-party:zeroize"
     },
+    nextest = {
+        "binary": "lineage",
+        "binary_id": "lys-secrets::lineage",
+        "dir": "crates/lys-secrets",
+        "kind": "test",
+        "package": "lys-secrets"
+    },
+    package_bins = {
+        "examples/log_window_pack": ":example-log_window_pack",
+        "lys-secrets": ":lys-secrets-bin",
+        "lys-secrets-demo": ":lys-secrets-demo"
+    },
     rustc_flags = [
         "@$(location :build-script-run[rustc_flags])"
     ],
@@ -3355,17 +3528,18 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
-    _rust_toolchain = "toolchains//:rust-bin-exe",
+    _rust_toolchain = "toolchains//:rust-workspace",
     _test_toolchain = ":test-toolchain",
     crate = "log_window",
     crate_root = "crates/lys-secrets/tests/log_window.rs",
     edition = "2024",
     env = {
+        "BUCKGEN_ROOT_CARGO_MANIFEST_DIR": "crates/lys-secrets",
+        "BUCKGEN_ROOT_CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "CARGO": "cargo",
         "CARGO_BIN_EXE_lys-secrets": "$(location :lys-secrets-bin)",
         "CARGO_BIN_EXE_lys-secrets-demo": "$(location :lys-secrets-demo)",
         "CARGO_CRATE_NAME": "log_window",
-        "CARGO_MANIFEST_DIR": "crates/lys-secrets",
         "CARGO_PKG_AUTHORS": "Tom Whiting \u003ctom@ablative.com.au\u003e",
         "CARGO_PKG_DESCRIPTION": "The lys secrets broker: an encrypted store, redacted secret bytes, holder-bound handles, the proxy swap with one audit line per use, account rotation under one handle, and revocation.",
         "CARGO_PKG_HOMEPAGE": "",
@@ -3379,14 +3553,16 @@ workspace_rust_test(
         "CARGO_PKG_VERSION_MINOR": "3",
         "CARGO_PKG_VERSION_PATCH": "3",
         "CARGO_PKG_VERSION_PRE": "",
-        "CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "OUT_DIR": "$(location :build-script-run[out_dir])"
     },
     features = [],
     framework = True,
+    labels = [
+        "tier-1"
+    ],
     mapped_srcs = {
-        "//buckgen/inputs:input-0": "Cargo.lock",
-        "//buckgen/inputs:input-1": "Cargo.toml",
+        "//:input-Cargo.lock": "Cargo.lock",
+        "//:input-Cargo.toml": "Cargo.toml",
         "Cargo.toml": "crates/lys-secrets/Cargo.toml",
         "build.rs": "crates/lys-secrets/build.rs",
         "build/provenance.rs": "crates/lys-secrets/build/provenance.rs",
@@ -3546,6 +3722,18 @@ workspace_rust_test(
         "tokio": "//third-party:tokio",
         "zeroize": "//third-party:zeroize"
     },
+    nextest = {
+        "binary": "log_window",
+        "binary_id": "lys-secrets::log_window",
+        "dir": "crates/lys-secrets",
+        "kind": "test",
+        "package": "lys-secrets"
+    },
+    package_bins = {
+        "examples/log_window_pack": ":example-log_window_pack",
+        "lys-secrets": ":lys-secrets-bin",
+        "lys-secrets-demo": ":lys-secrets-demo"
+    },
     rustc_flags = [
         "@$(location :build-script-run[rustc_flags])"
     ],
@@ -3557,17 +3745,18 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
-    _rust_toolchain = "toolchains//:rust-bin-exe",
+    _rust_toolchain = "toolchains//:rust-workspace",
     _test_toolchain = ":test-toolchain",
     crate = "log_window_pack",
     crate_root = "crates/lys-secrets/tests/log_window_pack.rs",
     edition = "2024",
     env = {
+        "BUCKGEN_ROOT_CARGO_MANIFEST_DIR": "crates/lys-secrets",
+        "BUCKGEN_ROOT_CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "CARGO": "cargo",
         "CARGO_BIN_EXE_lys-secrets": "$(location :lys-secrets-bin)",
         "CARGO_BIN_EXE_lys-secrets-demo": "$(location :lys-secrets-demo)",
         "CARGO_CRATE_NAME": "log_window_pack",
-        "CARGO_MANIFEST_DIR": "crates/lys-secrets",
         "CARGO_PKG_AUTHORS": "Tom Whiting \u003ctom@ablative.com.au\u003e",
         "CARGO_PKG_DESCRIPTION": "The lys secrets broker: an encrypted store, redacted secret bytes, holder-bound handles, the proxy swap with one audit line per use, account rotation under one handle, and revocation.",
         "CARGO_PKG_HOMEPAGE": "",
@@ -3581,14 +3770,16 @@ workspace_rust_test(
         "CARGO_PKG_VERSION_MINOR": "3",
         "CARGO_PKG_VERSION_PATCH": "3",
         "CARGO_PKG_VERSION_PRE": "",
-        "CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "OUT_DIR": "$(location :build-script-run[out_dir])"
     },
     features = [],
     framework = True,
+    labels = [
+        "tier-1"
+    ],
     mapped_srcs = {
-        "//buckgen/inputs:input-0": "Cargo.lock",
-        "//buckgen/inputs:input-1": "Cargo.toml",
+        "//:input-Cargo.lock": "Cargo.lock",
+        "//:input-Cargo.toml": "Cargo.toml",
         "Cargo.toml": "crates/lys-secrets/Cargo.toml",
         "build.rs": "crates/lys-secrets/build.rs",
         "build/provenance.rs": "crates/lys-secrets/build/provenance.rs",
@@ -3748,6 +3939,17 @@ workspace_rust_test(
         "tokio": "//third-party:tokio",
         "zeroize": "//third-party:zeroize"
     },
+    nextest = {
+        "binary": "log_window_pack",
+        "binary_id": "lys-secrets::log_window_pack",
+        "dir": "crates/lys-secrets",
+        "kind": "test",
+        "package": "lys-secrets"
+    },
+    package_bins = {
+        "lys-secrets": ":lys-secrets-bin",
+        "lys-secrets-demo": ":lys-secrets-demo"
+    },
     rustc_flags = [
         "@$(location :build-script-run[rustc_flags])"
     ],
@@ -3759,17 +3961,18 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
-    _rust_toolchain = "toolchains//:rust-bin-exe",
+    _rust_toolchain = "toolchains//:rust-workspace",
     _test_toolchain = ":test-toolchain",
     crate = "next_account",
     crate_root = "crates/lys-secrets/tests/next_account.rs",
     edition = "2024",
     env = {
+        "BUCKGEN_ROOT_CARGO_MANIFEST_DIR": "crates/lys-secrets",
+        "BUCKGEN_ROOT_CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "CARGO": "cargo",
         "CARGO_BIN_EXE_lys-secrets": "$(location :lys-secrets-bin)",
         "CARGO_BIN_EXE_lys-secrets-demo": "$(location :lys-secrets-demo)",
         "CARGO_CRATE_NAME": "next_account",
-        "CARGO_MANIFEST_DIR": "crates/lys-secrets",
         "CARGO_PKG_AUTHORS": "Tom Whiting \u003ctom@ablative.com.au\u003e",
         "CARGO_PKG_DESCRIPTION": "The lys secrets broker: an encrypted store, redacted secret bytes, holder-bound handles, the proxy swap with one audit line per use, account rotation under one handle, and revocation.",
         "CARGO_PKG_HOMEPAGE": "",
@@ -3783,14 +3986,16 @@ workspace_rust_test(
         "CARGO_PKG_VERSION_MINOR": "3",
         "CARGO_PKG_VERSION_PATCH": "3",
         "CARGO_PKG_VERSION_PRE": "",
-        "CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "OUT_DIR": "$(location :build-script-run[out_dir])"
     },
     features = [],
     framework = True,
+    labels = [
+        "tier-1"
+    ],
     mapped_srcs = {
-        "//buckgen/inputs:input-0": "Cargo.lock",
-        "//buckgen/inputs:input-1": "Cargo.toml",
+        "//:input-Cargo.lock": "Cargo.lock",
+        "//:input-Cargo.toml": "Cargo.toml",
         "Cargo.toml": "crates/lys-secrets/Cargo.toml",
         "build.rs": "crates/lys-secrets/build.rs",
         "build/provenance.rs": "crates/lys-secrets/build/provenance.rs",
@@ -3950,6 +4155,18 @@ workspace_rust_test(
         "tokio": "//third-party:tokio",
         "zeroize": "//third-party:zeroize"
     },
+    nextest = {
+        "binary": "next_account",
+        "binary_id": "lys-secrets::next_account",
+        "dir": "crates/lys-secrets",
+        "kind": "test",
+        "package": "lys-secrets"
+    },
+    package_bins = {
+        "examples/log_window_pack": ":example-log_window_pack",
+        "lys-secrets": ":lys-secrets-bin",
+        "lys-secrets-demo": ":lys-secrets-demo"
+    },
     rustc_flags = [
         "@$(location :build-script-run[rustc_flags])"
     ],
@@ -3961,17 +4178,18 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
-    _rust_toolchain = "toolchains//:rust-bin-exe",
+    _rust_toolchain = "toolchains//:rust-workspace",
     _test_toolchain = ":test-toolchain",
     crate = "oauth",
     crate_root = "crates/lys-secrets/tests/oauth.rs",
     edition = "2024",
     env = {
+        "BUCKGEN_ROOT_CARGO_MANIFEST_DIR": "crates/lys-secrets",
+        "BUCKGEN_ROOT_CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "CARGO": "cargo",
         "CARGO_BIN_EXE_lys-secrets": "$(location :lys-secrets-bin)",
         "CARGO_BIN_EXE_lys-secrets-demo": "$(location :lys-secrets-demo)",
         "CARGO_CRATE_NAME": "oauth",
-        "CARGO_MANIFEST_DIR": "crates/lys-secrets",
         "CARGO_PKG_AUTHORS": "Tom Whiting \u003ctom@ablative.com.au\u003e",
         "CARGO_PKG_DESCRIPTION": "The lys secrets broker: an encrypted store, redacted secret bytes, holder-bound handles, the proxy swap with one audit line per use, account rotation under one handle, and revocation.",
         "CARGO_PKG_HOMEPAGE": "",
@@ -3985,14 +4203,16 @@ workspace_rust_test(
         "CARGO_PKG_VERSION_MINOR": "3",
         "CARGO_PKG_VERSION_PATCH": "3",
         "CARGO_PKG_VERSION_PRE": "",
-        "CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "OUT_DIR": "$(location :build-script-run[out_dir])"
     },
     features = [],
     framework = True,
+    labels = [
+        "tier-1"
+    ],
     mapped_srcs = {
-        "//buckgen/inputs:input-0": "Cargo.lock",
-        "//buckgen/inputs:input-1": "Cargo.toml",
+        "//:input-Cargo.lock": "Cargo.lock",
+        "//:input-Cargo.toml": "Cargo.toml",
         "Cargo.toml": "crates/lys-secrets/Cargo.toml",
         "build.rs": "crates/lys-secrets/build.rs",
         "build/provenance.rs": "crates/lys-secrets/build/provenance.rs",
@@ -4152,6 +4372,18 @@ workspace_rust_test(
         "tokio": "//third-party:tokio",
         "zeroize": "//third-party:zeroize"
     },
+    nextest = {
+        "binary": "oauth",
+        "binary_id": "lys-secrets::oauth",
+        "dir": "crates/lys-secrets",
+        "kind": "test",
+        "package": "lys-secrets"
+    },
+    package_bins = {
+        "examples/log_window_pack": ":example-log_window_pack",
+        "lys-secrets": ":lys-secrets-bin",
+        "lys-secrets-demo": ":lys-secrets-demo"
+    },
     rustc_flags = [
         "@$(location :build-script-run[rustc_flags])"
     ],
@@ -4163,17 +4395,18 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
-    _rust_toolchain = "toolchains//:rust-bin-exe",
+    _rust_toolchain = "toolchains//:rust-workspace",
     _test_toolchain = ":test-toolchain",
     crate = "owner_operations",
     crate_root = "crates/lys-secrets/tests/owner_operations.rs",
     edition = "2024",
     env = {
+        "BUCKGEN_ROOT_CARGO_MANIFEST_DIR": "crates/lys-secrets",
+        "BUCKGEN_ROOT_CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "CARGO": "cargo",
         "CARGO_BIN_EXE_lys-secrets": "$(location :lys-secrets-bin)",
         "CARGO_BIN_EXE_lys-secrets-demo": "$(location :lys-secrets-demo)",
         "CARGO_CRATE_NAME": "owner_operations",
-        "CARGO_MANIFEST_DIR": "crates/lys-secrets",
         "CARGO_PKG_AUTHORS": "Tom Whiting \u003ctom@ablative.com.au\u003e",
         "CARGO_PKG_DESCRIPTION": "The lys secrets broker: an encrypted store, redacted secret bytes, holder-bound handles, the proxy swap with one audit line per use, account rotation under one handle, and revocation.",
         "CARGO_PKG_HOMEPAGE": "",
@@ -4187,14 +4420,16 @@ workspace_rust_test(
         "CARGO_PKG_VERSION_MINOR": "3",
         "CARGO_PKG_VERSION_PATCH": "3",
         "CARGO_PKG_VERSION_PRE": "",
-        "CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "OUT_DIR": "$(location :build-script-run[out_dir])"
     },
     features = [],
     framework = True,
+    labels = [
+        "tier-1"
+    ],
     mapped_srcs = {
-        "//buckgen/inputs:input-0": "Cargo.lock",
-        "//buckgen/inputs:input-1": "Cargo.toml",
+        "//:input-Cargo.lock": "Cargo.lock",
+        "//:input-Cargo.toml": "Cargo.toml",
         "Cargo.toml": "crates/lys-secrets/Cargo.toml",
         "build.rs": "crates/lys-secrets/build.rs",
         "build/provenance.rs": "crates/lys-secrets/build/provenance.rs",
@@ -4354,6 +4589,18 @@ workspace_rust_test(
         "tokio": "//third-party:tokio",
         "zeroize": "//third-party:zeroize"
     },
+    nextest = {
+        "binary": "owner_operations",
+        "binary_id": "lys-secrets::owner_operations",
+        "dir": "crates/lys-secrets",
+        "kind": "test",
+        "package": "lys-secrets"
+    },
+    package_bins = {
+        "examples/log_window_pack": ":example-log_window_pack",
+        "lys-secrets": ":lys-secrets-bin",
+        "lys-secrets-demo": ":lys-secrets-demo"
+    },
     rustc_flags = [
         "@$(location :build-script-run[rustc_flags])"
     ],
@@ -4365,17 +4612,18 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
-    _rust_toolchain = "toolchains//:rust-bin-exe",
+    _rust_toolchain = "toolchains//:rust-workspace",
     _test_toolchain = ":test-toolchain",
     crate = "proxy",
     crate_root = "crates/lys-secrets/tests/proxy.rs",
     edition = "2024",
     env = {
+        "BUCKGEN_ROOT_CARGO_MANIFEST_DIR": "crates/lys-secrets",
+        "BUCKGEN_ROOT_CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "CARGO": "cargo",
         "CARGO_BIN_EXE_lys-secrets": "$(location :lys-secrets-bin)",
         "CARGO_BIN_EXE_lys-secrets-demo": "$(location :lys-secrets-demo)",
         "CARGO_CRATE_NAME": "proxy",
-        "CARGO_MANIFEST_DIR": "crates/lys-secrets",
         "CARGO_PKG_AUTHORS": "Tom Whiting \u003ctom@ablative.com.au\u003e",
         "CARGO_PKG_DESCRIPTION": "The lys secrets broker: an encrypted store, redacted secret bytes, holder-bound handles, the proxy swap with one audit line per use, account rotation under one handle, and revocation.",
         "CARGO_PKG_HOMEPAGE": "",
@@ -4389,14 +4637,16 @@ workspace_rust_test(
         "CARGO_PKG_VERSION_MINOR": "3",
         "CARGO_PKG_VERSION_PATCH": "3",
         "CARGO_PKG_VERSION_PRE": "",
-        "CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "OUT_DIR": "$(location :build-script-run[out_dir])"
     },
     features = [],
     framework = True,
+    labels = [
+        "tier-1"
+    ],
     mapped_srcs = {
-        "//buckgen/inputs:input-0": "Cargo.lock",
-        "//buckgen/inputs:input-1": "Cargo.toml",
+        "//:input-Cargo.lock": "Cargo.lock",
+        "//:input-Cargo.toml": "Cargo.toml",
         "Cargo.toml": "crates/lys-secrets/Cargo.toml",
         "build.rs": "crates/lys-secrets/build.rs",
         "build/provenance.rs": "crates/lys-secrets/build/provenance.rs",
@@ -4556,6 +4806,18 @@ workspace_rust_test(
         "tokio": "//third-party:tokio",
         "zeroize": "//third-party:zeroize"
     },
+    nextest = {
+        "binary": "proxy",
+        "binary_id": "lys-secrets::proxy",
+        "dir": "crates/lys-secrets",
+        "kind": "test",
+        "package": "lys-secrets"
+    },
+    package_bins = {
+        "examples/log_window_pack": ":example-log_window_pack",
+        "lys-secrets": ":lys-secrets-bin",
+        "lys-secrets-demo": ":lys-secrets-demo"
+    },
     rustc_flags = [
         "@$(location :build-script-run[rustc_flags])"
     ],
@@ -4567,17 +4829,18 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
-    _rust_toolchain = "toolchains//:rust-bin-exe",
+    _rust_toolchain = "toolchains//:rust-workspace",
     _test_toolchain = ":test-toolchain",
     crate = "records",
     crate_root = "crates/lys-secrets/tests/records.rs",
     edition = "2024",
     env = {
+        "BUCKGEN_ROOT_CARGO_MANIFEST_DIR": "crates/lys-secrets",
+        "BUCKGEN_ROOT_CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "CARGO": "cargo",
         "CARGO_BIN_EXE_lys-secrets": "$(location :lys-secrets-bin)",
         "CARGO_BIN_EXE_lys-secrets-demo": "$(location :lys-secrets-demo)",
         "CARGO_CRATE_NAME": "records",
-        "CARGO_MANIFEST_DIR": "crates/lys-secrets",
         "CARGO_PKG_AUTHORS": "Tom Whiting \u003ctom@ablative.com.au\u003e",
         "CARGO_PKG_DESCRIPTION": "The lys secrets broker: an encrypted store, redacted secret bytes, holder-bound handles, the proxy swap with one audit line per use, account rotation under one handle, and revocation.",
         "CARGO_PKG_HOMEPAGE": "",
@@ -4591,14 +4854,16 @@ workspace_rust_test(
         "CARGO_PKG_VERSION_MINOR": "3",
         "CARGO_PKG_VERSION_PATCH": "3",
         "CARGO_PKG_VERSION_PRE": "",
-        "CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "OUT_DIR": "$(location :build-script-run[out_dir])"
     },
     features = [],
     framework = True,
+    labels = [
+        "tier-1"
+    ],
     mapped_srcs = {
-        "//buckgen/inputs:input-0": "Cargo.lock",
-        "//buckgen/inputs:input-1": "Cargo.toml",
+        "//:input-Cargo.lock": "Cargo.lock",
+        "//:input-Cargo.toml": "Cargo.toml",
         "Cargo.toml": "crates/lys-secrets/Cargo.toml",
         "build.rs": "crates/lys-secrets/build.rs",
         "build/provenance.rs": "crates/lys-secrets/build/provenance.rs",
@@ -4758,6 +5023,18 @@ workspace_rust_test(
         "tokio": "//third-party:tokio",
         "zeroize": "//third-party:zeroize"
     },
+    nextest = {
+        "binary": "records",
+        "binary_id": "lys-secrets::records",
+        "dir": "crates/lys-secrets",
+        "kind": "test",
+        "package": "lys-secrets"
+    },
+    package_bins = {
+        "examples/log_window_pack": ":example-log_window_pack",
+        "lys-secrets": ":lys-secrets-bin",
+        "lys-secrets-demo": ":lys-secrets-demo"
+    },
     rustc_flags = [
         "@$(location :build-script-run[rustc_flags])"
     ],
@@ -4769,17 +5046,18 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
-    _rust_toolchain = "toolchains//:rust-bin-exe",
+    _rust_toolchain = "toolchains//:rust-workspace",
     _test_toolchain = ":test-toolchain",
     crate = "restart_snapshots",
     crate_root = "crates/lys-secrets/tests/restart_snapshots.rs",
     edition = "2024",
     env = {
+        "BUCKGEN_ROOT_CARGO_MANIFEST_DIR": "crates/lys-secrets",
+        "BUCKGEN_ROOT_CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "CARGO": "cargo",
         "CARGO_BIN_EXE_lys-secrets": "$(location :lys-secrets-bin)",
         "CARGO_BIN_EXE_lys-secrets-demo": "$(location :lys-secrets-demo)",
         "CARGO_CRATE_NAME": "restart_snapshots",
-        "CARGO_MANIFEST_DIR": "crates/lys-secrets",
         "CARGO_PKG_AUTHORS": "Tom Whiting \u003ctom@ablative.com.au\u003e",
         "CARGO_PKG_DESCRIPTION": "The lys secrets broker: an encrypted store, redacted secret bytes, holder-bound handles, the proxy swap with one audit line per use, account rotation under one handle, and revocation.",
         "CARGO_PKG_HOMEPAGE": "",
@@ -4793,14 +5071,16 @@ workspace_rust_test(
         "CARGO_PKG_VERSION_MINOR": "3",
         "CARGO_PKG_VERSION_PATCH": "3",
         "CARGO_PKG_VERSION_PRE": "",
-        "CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "OUT_DIR": "$(location :build-script-run[out_dir])"
     },
     features = [],
     framework = True,
+    labels = [
+        "tier-1"
+    ],
     mapped_srcs = {
-        "//buckgen/inputs:input-0": "Cargo.lock",
-        "//buckgen/inputs:input-1": "Cargo.toml",
+        "//:input-Cargo.lock": "Cargo.lock",
+        "//:input-Cargo.toml": "Cargo.toml",
         "Cargo.toml": "crates/lys-secrets/Cargo.toml",
         "build.rs": "crates/lys-secrets/build.rs",
         "build/provenance.rs": "crates/lys-secrets/build/provenance.rs",
@@ -4960,6 +5240,18 @@ workspace_rust_test(
         "tokio": "//third-party:tokio",
         "zeroize": "//third-party:zeroize"
     },
+    nextest = {
+        "binary": "restart_snapshots",
+        "binary_id": "lys-secrets::restart_snapshots",
+        "dir": "crates/lys-secrets",
+        "kind": "test",
+        "package": "lys-secrets"
+    },
+    package_bins = {
+        "examples/log_window_pack": ":example-log_window_pack",
+        "lys-secrets": ":lys-secrets-bin",
+        "lys-secrets-demo": ":lys-secrets-demo"
+    },
     rustc_flags = [
         "@$(location :build-script-run[rustc_flags])"
     ],
@@ -4971,17 +5263,18 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
-    _rust_toolchain = "toolchains//:rust-bin-exe",
+    _rust_toolchain = "toolchains//:rust-workspace",
     _test_toolchain = ":test-toolchain",
     crate = "scope",
     crate_root = "crates/lys-secrets/tests/scope.rs",
     edition = "2024",
     env = {
+        "BUCKGEN_ROOT_CARGO_MANIFEST_DIR": "crates/lys-secrets",
+        "BUCKGEN_ROOT_CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "CARGO": "cargo",
         "CARGO_BIN_EXE_lys-secrets": "$(location :lys-secrets-bin)",
         "CARGO_BIN_EXE_lys-secrets-demo": "$(location :lys-secrets-demo)",
         "CARGO_CRATE_NAME": "scope",
-        "CARGO_MANIFEST_DIR": "crates/lys-secrets",
         "CARGO_PKG_AUTHORS": "Tom Whiting \u003ctom@ablative.com.au\u003e",
         "CARGO_PKG_DESCRIPTION": "The lys secrets broker: an encrypted store, redacted secret bytes, holder-bound handles, the proxy swap with one audit line per use, account rotation under one handle, and revocation.",
         "CARGO_PKG_HOMEPAGE": "",
@@ -4995,14 +5288,16 @@ workspace_rust_test(
         "CARGO_PKG_VERSION_MINOR": "3",
         "CARGO_PKG_VERSION_PATCH": "3",
         "CARGO_PKG_VERSION_PRE": "",
-        "CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "OUT_DIR": "$(location :build-script-run[out_dir])"
     },
     features = [],
     framework = True,
+    labels = [
+        "tier-1"
+    ],
     mapped_srcs = {
-        "//buckgen/inputs:input-0": "Cargo.lock",
-        "//buckgen/inputs:input-1": "Cargo.toml",
+        "//:input-Cargo.lock": "Cargo.lock",
+        "//:input-Cargo.toml": "Cargo.toml",
         "Cargo.toml": "crates/lys-secrets/Cargo.toml",
         "build.rs": "crates/lys-secrets/build.rs",
         "build/provenance.rs": "crates/lys-secrets/build/provenance.rs",
@@ -5162,6 +5457,18 @@ workspace_rust_test(
         "tokio": "//third-party:tokio",
         "zeroize": "//third-party:zeroize"
     },
+    nextest = {
+        "binary": "scope",
+        "binary_id": "lys-secrets::scope",
+        "dir": "crates/lys-secrets",
+        "kind": "test",
+        "package": "lys-secrets"
+    },
+    package_bins = {
+        "examples/log_window_pack": ":example-log_window_pack",
+        "lys-secrets": ":lys-secrets-bin",
+        "lys-secrets-demo": ":lys-secrets-demo"
+    },
     rustc_flags = [
         "@$(location :build-script-run[rustc_flags])"
     ],
@@ -5173,17 +5480,18 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
-    _rust_toolchain = "toolchains//:rust-bin-exe",
+    _rust_toolchain = "toolchains//:rust-workspace",
     _test_toolchain = ":test-toolchain",
     crate = "screen_routes",
     crate_root = "crates/lys-secrets/tests/screen_routes.rs",
     edition = "2024",
     env = {
+        "BUCKGEN_ROOT_CARGO_MANIFEST_DIR": "crates/lys-secrets",
+        "BUCKGEN_ROOT_CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "CARGO": "cargo",
         "CARGO_BIN_EXE_lys-secrets": "$(location :lys-secrets-bin)",
         "CARGO_BIN_EXE_lys-secrets-demo": "$(location :lys-secrets-demo)",
         "CARGO_CRATE_NAME": "screen_routes",
-        "CARGO_MANIFEST_DIR": "crates/lys-secrets",
         "CARGO_PKG_AUTHORS": "Tom Whiting \u003ctom@ablative.com.au\u003e",
         "CARGO_PKG_DESCRIPTION": "The lys secrets broker: an encrypted store, redacted secret bytes, holder-bound handles, the proxy swap with one audit line per use, account rotation under one handle, and revocation.",
         "CARGO_PKG_HOMEPAGE": "",
@@ -5197,14 +5505,16 @@ workspace_rust_test(
         "CARGO_PKG_VERSION_MINOR": "3",
         "CARGO_PKG_VERSION_PATCH": "3",
         "CARGO_PKG_VERSION_PRE": "",
-        "CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "OUT_DIR": "$(location :build-script-run[out_dir])"
     },
     features = [],
     framework = True,
+    labels = [
+        "tier-1"
+    ],
     mapped_srcs = {
-        "//buckgen/inputs:input-0": "Cargo.lock",
-        "//buckgen/inputs:input-1": "Cargo.toml",
+        "//:input-Cargo.lock": "Cargo.lock",
+        "//:input-Cargo.toml": "Cargo.toml",
         "Cargo.toml": "crates/lys-secrets/Cargo.toml",
         "build.rs": "crates/lys-secrets/build.rs",
         "build/provenance.rs": "crates/lys-secrets/build/provenance.rs",
@@ -5364,6 +5674,18 @@ workspace_rust_test(
         "tokio": "//third-party:tokio",
         "zeroize": "//third-party:zeroize"
     },
+    nextest = {
+        "binary": "screen_routes",
+        "binary_id": "lys-secrets::screen_routes",
+        "dir": "crates/lys-secrets",
+        "kind": "test",
+        "package": "lys-secrets"
+    },
+    package_bins = {
+        "examples/log_window_pack": ":example-log_window_pack",
+        "lys-secrets": ":lys-secrets-bin",
+        "lys-secrets-demo": ":lys-secrets-demo"
+    },
     rustc_flags = [
         "@$(location :build-script-run[rustc_flags])"
     ],
@@ -5375,17 +5697,18 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
-    _rust_toolchain = "toolchains//:rust-bin-exe",
+    _rust_toolchain = "toolchains//:rust-workspace",
     _test_toolchain = ":test-toolchain",
     crate = "secret_list",
     crate_root = "crates/lys-secrets/tests/secret_list.rs",
     edition = "2024",
     env = {
+        "BUCKGEN_ROOT_CARGO_MANIFEST_DIR": "crates/lys-secrets",
+        "BUCKGEN_ROOT_CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "CARGO": "cargo",
         "CARGO_BIN_EXE_lys-secrets": "$(location :lys-secrets-bin)",
         "CARGO_BIN_EXE_lys-secrets-demo": "$(location :lys-secrets-demo)",
         "CARGO_CRATE_NAME": "secret_list",
-        "CARGO_MANIFEST_DIR": "crates/lys-secrets",
         "CARGO_PKG_AUTHORS": "Tom Whiting \u003ctom@ablative.com.au\u003e",
         "CARGO_PKG_DESCRIPTION": "The lys secrets broker: an encrypted store, redacted secret bytes, holder-bound handles, the proxy swap with one audit line per use, account rotation under one handle, and revocation.",
         "CARGO_PKG_HOMEPAGE": "",
@@ -5399,14 +5722,16 @@ workspace_rust_test(
         "CARGO_PKG_VERSION_MINOR": "3",
         "CARGO_PKG_VERSION_PATCH": "3",
         "CARGO_PKG_VERSION_PRE": "",
-        "CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "OUT_DIR": "$(location :build-script-run[out_dir])"
     },
     features = [],
     framework = True,
+    labels = [
+        "tier-1"
+    ],
     mapped_srcs = {
-        "//buckgen/inputs:input-0": "Cargo.lock",
-        "//buckgen/inputs:input-1": "Cargo.toml",
+        "//:input-Cargo.lock": "Cargo.lock",
+        "//:input-Cargo.toml": "Cargo.toml",
         "Cargo.toml": "crates/lys-secrets/Cargo.toml",
         "build.rs": "crates/lys-secrets/build.rs",
         "build/provenance.rs": "crates/lys-secrets/build/provenance.rs",
@@ -5566,6 +5891,18 @@ workspace_rust_test(
         "tokio": "//third-party:tokio",
         "zeroize": "//third-party:zeroize"
     },
+    nextest = {
+        "binary": "secret_list",
+        "binary_id": "lys-secrets::secret_list",
+        "dir": "crates/lys-secrets",
+        "kind": "test",
+        "package": "lys-secrets"
+    },
+    package_bins = {
+        "examples/log_window_pack": ":example-log_window_pack",
+        "lys-secrets": ":lys-secrets-bin",
+        "lys-secrets-demo": ":lys-secrets-demo"
+    },
     rustc_flags = [
         "@$(location :build-script-run[rustc_flags])"
     ],
@@ -5577,17 +5914,18 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
-    _rust_toolchain = "toolchains//:rust-bin-exe",
+    _rust_toolchain = "toolchains//:rust-workspace",
     _test_toolchain = ":test-toolchain",
     crate = "service",
     crate_root = "crates/lys-secrets/tests/service.rs",
     edition = "2024",
     env = {
+        "BUCKGEN_ROOT_CARGO_MANIFEST_DIR": "crates/lys-secrets",
+        "BUCKGEN_ROOT_CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "CARGO": "cargo",
         "CARGO_BIN_EXE_lys-secrets": "$(location :lys-secrets-bin)",
         "CARGO_BIN_EXE_lys-secrets-demo": "$(location :lys-secrets-demo)",
         "CARGO_CRATE_NAME": "service",
-        "CARGO_MANIFEST_DIR": "crates/lys-secrets",
         "CARGO_PKG_AUTHORS": "Tom Whiting \u003ctom@ablative.com.au\u003e",
         "CARGO_PKG_DESCRIPTION": "The lys secrets broker: an encrypted store, redacted secret bytes, holder-bound handles, the proxy swap with one audit line per use, account rotation under one handle, and revocation.",
         "CARGO_PKG_HOMEPAGE": "",
@@ -5601,14 +5939,16 @@ workspace_rust_test(
         "CARGO_PKG_VERSION_MINOR": "3",
         "CARGO_PKG_VERSION_PATCH": "3",
         "CARGO_PKG_VERSION_PRE": "",
-        "CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "OUT_DIR": "$(location :build-script-run[out_dir])"
     },
     features = [],
     framework = True,
+    labels = [
+        "tier-1"
+    ],
     mapped_srcs = {
-        "//buckgen/inputs:input-0": "Cargo.lock",
-        "//buckgen/inputs:input-1": "Cargo.toml",
+        "//:input-Cargo.lock": "Cargo.lock",
+        "//:input-Cargo.toml": "Cargo.toml",
         "Cargo.toml": "crates/lys-secrets/Cargo.toml",
         "build.rs": "crates/lys-secrets/build.rs",
         "build/provenance.rs": "crates/lys-secrets/build/provenance.rs",
@@ -5768,6 +6108,18 @@ workspace_rust_test(
         "tokio": "//third-party:tokio",
         "zeroize": "//third-party:zeroize"
     },
+    nextest = {
+        "binary": "service",
+        "binary_id": "lys-secrets::service",
+        "dir": "crates/lys-secrets",
+        "kind": "test",
+        "package": "lys-secrets"
+    },
+    package_bins = {
+        "examples/log_window_pack": ":example-log_window_pack",
+        "lys-secrets": ":lys-secrets-bin",
+        "lys-secrets-demo": ":lys-secrets-demo"
+    },
     rustc_flags = [
         "@$(location :build-script-run[rustc_flags])"
     ],
@@ -5779,17 +6131,18 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
-    _rust_toolchain = "toolchains//:rust-bin-exe",
+    _rust_toolchain = "toolchains//:rust-workspace",
     _test_toolchain = ":test-toolchain",
     crate = "spawn_login",
     crate_root = "crates/lys-secrets/tests/spawn_login.rs",
     edition = "2024",
     env = {
+        "BUCKGEN_ROOT_CARGO_MANIFEST_DIR": "crates/lys-secrets",
+        "BUCKGEN_ROOT_CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "CARGO": "cargo",
         "CARGO_BIN_EXE_lys-secrets": "$(location :lys-secrets-bin)",
         "CARGO_BIN_EXE_lys-secrets-demo": "$(location :lys-secrets-demo)",
         "CARGO_CRATE_NAME": "spawn_login",
-        "CARGO_MANIFEST_DIR": "crates/lys-secrets",
         "CARGO_PKG_AUTHORS": "Tom Whiting \u003ctom@ablative.com.au\u003e",
         "CARGO_PKG_DESCRIPTION": "The lys secrets broker: an encrypted store, redacted secret bytes, holder-bound handles, the proxy swap with one audit line per use, account rotation under one handle, and revocation.",
         "CARGO_PKG_HOMEPAGE": "",
@@ -5803,14 +6156,16 @@ workspace_rust_test(
         "CARGO_PKG_VERSION_MINOR": "3",
         "CARGO_PKG_VERSION_PATCH": "3",
         "CARGO_PKG_VERSION_PRE": "",
-        "CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "OUT_DIR": "$(location :build-script-run[out_dir])"
     },
     features = [],
     framework = True,
+    labels = [
+        "tier-1"
+    ],
     mapped_srcs = {
-        "//buckgen/inputs:input-0": "Cargo.lock",
-        "//buckgen/inputs:input-1": "Cargo.toml",
+        "//:input-Cargo.lock": "Cargo.lock",
+        "//:input-Cargo.toml": "Cargo.toml",
         "Cargo.toml": "crates/lys-secrets/Cargo.toml",
         "build.rs": "crates/lys-secrets/build.rs",
         "build/provenance.rs": "crates/lys-secrets/build/provenance.rs",
@@ -5970,6 +6325,18 @@ workspace_rust_test(
         "tokio": "//third-party:tokio",
         "zeroize": "//third-party:zeroize"
     },
+    nextest = {
+        "binary": "spawn_login",
+        "binary_id": "lys-secrets::spawn_login",
+        "dir": "crates/lys-secrets",
+        "kind": "test",
+        "package": "lys-secrets"
+    },
+    package_bins = {
+        "examples/log_window_pack": ":example-log_window_pack",
+        "lys-secrets": ":lys-secrets-bin",
+        "lys-secrets-demo": ":lys-secrets-demo"
+    },
     rustc_flags = [
         "@$(location :build-script-run[rustc_flags])"
     ],
@@ -5981,17 +6348,18 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
-    _rust_toolchain = "toolchains//:rust-bin-exe",
+    _rust_toolchain = "toolchains//:rust-workspace",
     _test_toolchain = ":test-toolchain",
     crate = "spend",
     crate_root = "crates/lys-secrets/tests/spend.rs",
     edition = "2024",
     env = {
+        "BUCKGEN_ROOT_CARGO_MANIFEST_DIR": "crates/lys-secrets",
+        "BUCKGEN_ROOT_CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "CARGO": "cargo",
         "CARGO_BIN_EXE_lys-secrets": "$(location :lys-secrets-bin)",
         "CARGO_BIN_EXE_lys-secrets-demo": "$(location :lys-secrets-demo)",
         "CARGO_CRATE_NAME": "spend",
-        "CARGO_MANIFEST_DIR": "crates/lys-secrets",
         "CARGO_PKG_AUTHORS": "Tom Whiting \u003ctom@ablative.com.au\u003e",
         "CARGO_PKG_DESCRIPTION": "The lys secrets broker: an encrypted store, redacted secret bytes, holder-bound handles, the proxy swap with one audit line per use, account rotation under one handle, and revocation.",
         "CARGO_PKG_HOMEPAGE": "",
@@ -6005,14 +6373,16 @@ workspace_rust_test(
         "CARGO_PKG_VERSION_MINOR": "3",
         "CARGO_PKG_VERSION_PATCH": "3",
         "CARGO_PKG_VERSION_PRE": "",
-        "CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "OUT_DIR": "$(location :build-script-run[out_dir])"
     },
     features = [],
     framework = True,
+    labels = [
+        "tier-1"
+    ],
     mapped_srcs = {
-        "//buckgen/inputs:input-0": "Cargo.lock",
-        "//buckgen/inputs:input-1": "Cargo.toml",
+        "//:input-Cargo.lock": "Cargo.lock",
+        "//:input-Cargo.toml": "Cargo.toml",
         "Cargo.toml": "crates/lys-secrets/Cargo.toml",
         "build.rs": "crates/lys-secrets/build.rs",
         "build/provenance.rs": "crates/lys-secrets/build/provenance.rs",
@@ -6172,6 +6542,18 @@ workspace_rust_test(
         "tokio": "//third-party:tokio",
         "zeroize": "//third-party:zeroize"
     },
+    nextest = {
+        "binary": "spend",
+        "binary_id": "lys-secrets::spend",
+        "dir": "crates/lys-secrets",
+        "kind": "test",
+        "package": "lys-secrets"
+    },
+    package_bins = {
+        "examples/log_window_pack": ":example-log_window_pack",
+        "lys-secrets": ":lys-secrets-bin",
+        "lys-secrets-demo": ":lys-secrets-demo"
+    },
     rustc_flags = [
         "@$(location :build-script-run[rustc_flags])"
     ],
@@ -6183,17 +6565,18 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
-    _rust_toolchain = "toolchains//:rust-bin-exe",
+    _rust_toolchain = "toolchains//:rust-workspace",
     _test_toolchain = ":test-toolchain",
     crate = "store_leases",
     crate_root = "crates/lys-secrets/tests/store_leases.rs",
     edition = "2024",
     env = {
+        "BUCKGEN_ROOT_CARGO_MANIFEST_DIR": "crates/lys-secrets",
+        "BUCKGEN_ROOT_CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "CARGO": "cargo",
         "CARGO_BIN_EXE_lys-secrets": "$(location :lys-secrets-bin)",
         "CARGO_BIN_EXE_lys-secrets-demo": "$(location :lys-secrets-demo)",
         "CARGO_CRATE_NAME": "store_leases",
-        "CARGO_MANIFEST_DIR": "crates/lys-secrets",
         "CARGO_PKG_AUTHORS": "Tom Whiting \u003ctom@ablative.com.au\u003e",
         "CARGO_PKG_DESCRIPTION": "The lys secrets broker: an encrypted store, redacted secret bytes, holder-bound handles, the proxy swap with one audit line per use, account rotation under one handle, and revocation.",
         "CARGO_PKG_HOMEPAGE": "",
@@ -6207,14 +6590,16 @@ workspace_rust_test(
         "CARGO_PKG_VERSION_MINOR": "3",
         "CARGO_PKG_VERSION_PATCH": "3",
         "CARGO_PKG_VERSION_PRE": "",
-        "CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "OUT_DIR": "$(location :build-script-run[out_dir])"
     },
     features = [],
     framework = True,
+    labels = [
+        "tier-1"
+    ],
     mapped_srcs = {
-        "//buckgen/inputs:input-0": "Cargo.lock",
-        "//buckgen/inputs:input-1": "Cargo.toml",
+        "//:input-Cargo.lock": "Cargo.lock",
+        "//:input-Cargo.toml": "Cargo.toml",
         "Cargo.toml": "crates/lys-secrets/Cargo.toml",
         "build.rs": "crates/lys-secrets/build.rs",
         "build/provenance.rs": "crates/lys-secrets/build/provenance.rs",
@@ -6374,6 +6759,18 @@ workspace_rust_test(
         "tokio": "//third-party:tokio",
         "zeroize": "//third-party:zeroize"
     },
+    nextest = {
+        "binary": "store_leases",
+        "binary_id": "lys-secrets::store_leases",
+        "dir": "crates/lys-secrets",
+        "kind": "test",
+        "package": "lys-secrets"
+    },
+    package_bins = {
+        "examples/log_window_pack": ":example-log_window_pack",
+        "lys-secrets": ":lys-secrets-bin",
+        "lys-secrets-demo": ":lys-secrets-demo"
+    },
     rustc_flags = [
         "@$(location :build-script-run[rustc_flags])"
     ],
@@ -6385,17 +6782,18 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
-    _rust_toolchain = "toolchains//:rust-bin-exe",
+    _rust_toolchain = "toolchains//:rust-workspace",
     _test_toolchain = ":test-toolchain",
     crate = "version",
     crate_root = "crates/lys-secrets/tests/version.rs",
     edition = "2024",
     env = {
+        "BUCKGEN_ROOT_CARGO_MANIFEST_DIR": "crates/lys-secrets",
+        "BUCKGEN_ROOT_CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "CARGO": "cargo",
         "CARGO_BIN_EXE_lys-secrets": "$(location :lys-secrets-bin)",
         "CARGO_BIN_EXE_lys-secrets-demo": "$(location :lys-secrets-demo)",
         "CARGO_CRATE_NAME": "version",
-        "CARGO_MANIFEST_DIR": "crates/lys-secrets",
         "CARGO_PKG_AUTHORS": "Tom Whiting \u003ctom@ablative.com.au\u003e",
         "CARGO_PKG_DESCRIPTION": "The lys secrets broker: an encrypted store, redacted secret bytes, holder-bound handles, the proxy swap with one audit line per use, account rotation under one handle, and revocation.",
         "CARGO_PKG_HOMEPAGE": "",
@@ -6409,14 +6807,16 @@ workspace_rust_test(
         "CARGO_PKG_VERSION_MINOR": "3",
         "CARGO_PKG_VERSION_PATCH": "3",
         "CARGO_PKG_VERSION_PRE": "",
-        "CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "OUT_DIR": "$(location :build-script-run[out_dir])"
     },
     features = [],
     framework = True,
+    labels = [
+        "tier-1"
+    ],
     mapped_srcs = {
-        "//buckgen/inputs:input-0": "Cargo.lock",
-        "//buckgen/inputs:input-1": "Cargo.toml",
+        "//:input-Cargo.lock": "Cargo.lock",
+        "//:input-Cargo.toml": "Cargo.toml",
         "Cargo.toml": "crates/lys-secrets/Cargo.toml",
         "build.rs": "crates/lys-secrets/build.rs",
         "build/provenance.rs": "crates/lys-secrets/build/provenance.rs",
@@ -6576,6 +6976,18 @@ workspace_rust_test(
         "tokio": "//third-party:tokio",
         "zeroize": "//third-party:zeroize"
     },
+    nextest = {
+        "binary": "version",
+        "binary_id": "lys-secrets::version",
+        "dir": "crates/lys-secrets",
+        "kind": "test",
+        "package": "lys-secrets"
+    },
+    package_bins = {
+        "examples/log_window_pack": ":example-log_window_pack",
+        "lys-secrets": ":lys-secrets-bin",
+        "lys-secrets-demo": ":lys-secrets-demo"
+    },
     rustc_flags = [
         "@$(location :build-script-run[rustc_flags])"
     ],
@@ -6587,6 +6999,7 @@ workspace_rust_test(
 load("@build//buck:checks.bzl", "file_check")
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-secrets/Cargo.toml",
     name = "check-length-Cargo.toml",
@@ -6596,6 +7009,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-secrets/Cargo.toml",
     name = "check-portable-Cargo.toml",
@@ -6627,6 +7041,7 @@ file_check(
     src = "Cargo.toml",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-secrets/build.rs",
     name = "check-length-build.rs",
@@ -6637,6 +7052,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-secrets/build.rs",
     name = "check-portable-build.rs",
@@ -6645,6 +7061,7 @@ file_check(
     src = "build.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-secrets/build/provenance.rs",
     name = "check-length-build__provenance.rs",
@@ -6655,6 +7072,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-secrets/build/provenance.rs",
     name = "check-portable-build__provenance.rs",
@@ -6663,6 +7081,7 @@ file_check(
     src = "build/provenance.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-secrets/examples/log_window_pack.rs",
     name = "check-length-examples__log_window_pack.rs",
@@ -6673,6 +7092,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-secrets/examples/log_window_pack.rs",
     name = "check-portable-examples__log_window_pack.rs",
@@ -6681,6 +7101,7 @@ file_check(
     src = "examples/log_window_pack.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-secrets/src/access.rs",
     name = "check-length-src__access.rs",
@@ -6691,6 +7112,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-secrets/src/access.rs",
     name = "check-portable-src__access.rs",
@@ -6699,6 +7121,7 @@ file_check(
     src = "src/access.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-secrets/src/audit.rs",
     name = "check-length-src__audit.rs",
@@ -6709,6 +7132,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-secrets/src/audit.rs",
     name = "check-portable-src__audit.rs",
@@ -6717,6 +7141,7 @@ file_check(
     src = "src/audit.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-secrets/src/audit/codec.rs",
     name = "check-length-src__audit__codec.rs",
@@ -6727,6 +7152,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-secrets/src/audit/codec.rs",
     name = "check-portable-src__audit__codec.rs",
@@ -6735,6 +7161,7 @@ file_check(
     src = "src/audit/codec.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-secrets/src/audit/create.rs",
     name = "check-length-src__audit__create.rs",
@@ -6745,6 +7172,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-secrets/src/audit/create.rs",
     name = "check-portable-src__audit__create.rs",
@@ -6753,6 +7181,7 @@ file_check(
     src = "src/audit/create.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-secrets/src/bin/lys-secrets-demo.rs",
     name = "check-length-src__bin__lys-secrets-demo.rs",
@@ -6763,6 +7192,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-secrets/src/bin/lys-secrets-demo.rs",
     name = "check-portable-src__bin__lys-secrets-demo.rs",
@@ -6771,6 +7201,7 @@ file_check(
     src = "src/bin/lys-secrets-demo.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-secrets/src/bin/lys-secrets/account_binding.rs",
     name = "check-length-src__bin__lys-secrets__account_binding.rs",
@@ -6781,6 +7212,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-secrets/src/bin/lys-secrets/account_binding.rs",
     name = "check-portable-src__bin__lys-secrets__account_binding.rs",
@@ -6789,6 +7221,7 @@ file_check(
     src = "src/bin/lys-secrets/account_binding.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-secrets/src/bin/lys-secrets/app_client.rs",
     name = "check-length-src__bin__lys-secrets__app_client.rs",
@@ -6799,6 +7232,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-secrets/src/bin/lys-secrets/app_client.rs",
     name = "check-portable-src__bin__lys-secrets__app_client.rs",
@@ -6807,6 +7241,7 @@ file_check(
     src = "src/bin/lys-secrets/app_client.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-secrets/src/bin/lys-secrets/args.rs",
     name = "check-length-src__bin__lys-secrets__args.rs",
@@ -6817,6 +7252,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-secrets/src/bin/lys-secrets/args.rs",
     name = "check-portable-src__bin__lys-secrets__args.rs",
@@ -6825,6 +7261,7 @@ file_check(
     src = "src/bin/lys-secrets/args.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-secrets/src/bin/lys-secrets/callers.rs",
     name = "check-length-src__bin__lys-secrets__callers.rs",
@@ -6835,6 +7272,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-secrets/src/bin/lys-secrets/callers.rs",
     name = "check-portable-src__bin__lys-secrets__callers.rs",
@@ -6843,6 +7281,7 @@ file_check(
     src = "src/bin/lys-secrets/callers.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-secrets/src/bin/lys-secrets/cli.rs",
     name = "check-length-src__bin__lys-secrets__cli.rs",
@@ -6853,6 +7292,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-secrets/src/bin/lys-secrets/cli.rs",
     name = "check-portable-src__bin__lys-secrets__cli.rs",
@@ -6861,6 +7301,7 @@ file_check(
     src = "src/bin/lys-secrets/cli.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-secrets/src/bin/lys-secrets/command_run.rs",
     name = "check-length-src__bin__lys-secrets__command_run.rs",
@@ -6871,6 +7312,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-secrets/src/bin/lys-secrets/command_run.rs",
     name = "check-portable-src__bin__lys-secrets__command_run.rs",
@@ -6879,6 +7321,7 @@ file_check(
     src = "src/bin/lys-secrets/command_run.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-secrets/src/bin/lys-secrets/files.rs",
     name = "check-length-src__bin__lys-secrets__files.rs",
@@ -6889,6 +7332,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-secrets/src/bin/lys-secrets/files.rs",
     name = "check-portable-src__bin__lys-secrets__files.rs",
@@ -6897,6 +7341,7 @@ file_check(
     src = "src/bin/lys-secrets/files.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-secrets/src/bin/lys-secrets/main.rs",
     name = "check-length-src__bin__lys-secrets__main.rs",
@@ -6907,6 +7352,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-secrets/src/bin/lys-secrets/main.rs",
     name = "check-portable-src__bin__lys-secrets__main.rs",
@@ -6915,6 +7361,7 @@ file_check(
     src = "src/bin/lys-secrets/main.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-secrets/src/bin/lys-secrets/manage.rs",
     name = "check-length-src__bin__lys-secrets__manage.rs",
@@ -6925,6 +7372,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-secrets/src/bin/lys-secrets/manage.rs",
     name = "check-portable-src__bin__lys-secrets__manage.rs",
@@ -6933,6 +7381,7 @@ file_check(
     src = "src/bin/lys-secrets/manage.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-secrets/src/bin/lys-secrets/model.rs",
     name = "check-length-src__bin__lys-secrets__model.rs",
@@ -6943,6 +7392,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-secrets/src/bin/lys-secrets/model.rs",
     name = "check-portable-src__bin__lys-secrets__model.rs",
@@ -6951,6 +7401,7 @@ file_check(
     src = "src/bin/lys-secrets/model.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-secrets/src/bin/lys-secrets/oauth_proxy.rs",
     name = "check-length-src__bin__lys-secrets__oauth_proxy.rs",
@@ -6961,6 +7412,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-secrets/src/bin/lys-secrets/oauth_proxy.rs",
     name = "check-portable-src__bin__lys-secrets__oauth_proxy.rs",
@@ -6969,6 +7421,7 @@ file_check(
     src = "src/bin/lys-secrets/oauth_proxy.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-secrets/src/bin/lys-secrets/redact.rs",
     name = "check-length-src__bin__lys-secrets__redact.rs",
@@ -6979,6 +7432,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-secrets/src/bin/lys-secrets/redact.rs",
     name = "check-portable-src__bin__lys-secrets__redact.rs",
@@ -6987,6 +7441,7 @@ file_check(
     src = "src/bin/lys-secrets/redact.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-secrets/src/bin/lys-secrets/router.rs",
     name = "check-length-src__bin__lys-secrets__router.rs",
@@ -6997,6 +7452,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-secrets/src/bin/lys-secrets/router.rs",
     name = "check-portable-src__bin__lys-secrets__router.rs",
@@ -7005,6 +7461,7 @@ file_check(
     src = "src/bin/lys-secrets/router.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-secrets/src/bin/lys-secrets/save_app.rs",
     name = "check-length-src__bin__lys-secrets__save_app.rs",
@@ -7015,6 +7472,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-secrets/src/bin/lys-secrets/save_app.rs",
     name = "check-portable-src__bin__lys-secrets__save_app.rs",
@@ -7023,6 +7481,7 @@ file_check(
     src = "src/bin/lys-secrets/save_app.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-secrets/src/bin/lys-secrets/serve.rs",
     name = "check-length-src__bin__lys-secrets__serve.rs",
@@ -7033,6 +7492,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-secrets/src/bin/lys-secrets/serve.rs",
     name = "check-portable-src__bin__lys-secrets__serve.rs",
@@ -7041,6 +7501,7 @@ file_check(
     src = "src/bin/lys-secrets/serve.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-secrets/src/bin/lys-secrets/serve_forward.rs",
     name = "check-length-src__bin__lys-secrets__serve_forward.rs",
@@ -7051,6 +7512,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-secrets/src/bin/lys-secrets/serve_forward.rs",
     name = "check-portable-src__bin__lys-secrets__serve_forward.rs",
@@ -7059,6 +7521,7 @@ file_check(
     src = "src/bin/lys-secrets/serve_forward.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-secrets/src/bin/lys-secrets/signing.rs",
     name = "check-length-src__bin__lys-secrets__signing.rs",
@@ -7069,6 +7532,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-secrets/src/bin/lys-secrets/signing.rs",
     name = "check-portable-src__bin__lys-secrets__signing.rs",
@@ -7077,6 +7541,7 @@ file_check(
     src = "src/bin/lys-secrets/signing.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-secrets/src/bin/lys-secrets/spice.rs",
     name = "check-length-src__bin__lys-secrets__spice.rs",
@@ -7087,6 +7552,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-secrets/src/bin/lys-secrets/spice.rs",
     name = "check-portable-src__bin__lys-secrets__spice.rs",
@@ -7095,6 +7561,7 @@ file_check(
     src = "src/bin/lys-secrets/spice.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-secrets/src/bin/lys-secrets/upgrade_window.rs",
     name = "check-length-src__bin__lys-secrets__upgrade_window.rs",
@@ -7105,6 +7572,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-secrets/src/bin/lys-secrets/upgrade_window.rs",
     name = "check-portable-src__bin__lys-secrets__upgrade_window.rs",
@@ -7113,6 +7581,7 @@ file_check(
     src = "src/bin/lys-secrets/upgrade_window.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-secrets/src/bin/lys-secrets/values.rs",
     name = "check-length-src__bin__lys-secrets__values.rs",
@@ -7123,6 +7592,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-secrets/src/bin/lys-secrets/values.rs",
     name = "check-portable-src__bin__lys-secrets__values.rs",
@@ -7131,6 +7601,7 @@ file_check(
     src = "src/bin/lys-secrets/values.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-secrets/src/bin/lys-secrets/view.rs",
     name = "check-length-src__bin__lys-secrets__view.rs",
@@ -7141,6 +7612,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-secrets/src/bin/lys-secrets/view.rs",
     name = "check-portable-src__bin__lys-secrets__view.rs",
@@ -7149,6 +7621,7 @@ file_check(
     src = "src/bin/lys-secrets/view.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-secrets/src/bin/lys-secrets/watched.rs",
     name = "check-length-src__bin__lys-secrets__watched.rs",
@@ -7159,6 +7632,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-secrets/src/bin/lys-secrets/watched.rs",
     name = "check-portable-src__bin__lys-secrets__watched.rs",
@@ -7167,6 +7641,7 @@ file_check(
     src = "src/bin/lys-secrets/watched.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-secrets/src/broker.rs",
     name = "check-length-src__broker.rs",
@@ -7177,6 +7652,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-secrets/src/broker.rs",
     name = "check-portable-src__broker.rs",
@@ -7185,6 +7661,7 @@ file_check(
     src = "src/broker.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-secrets/src/broker/accounts.rs",
     name = "check-length-src__broker__accounts.rs",
@@ -7195,6 +7672,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-secrets/src/broker/accounts.rs",
     name = "check-portable-src__broker__accounts.rs",
@@ -7203,6 +7681,7 @@ file_check(
     src = "src/broker/accounts.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-secrets/src/broker/admit.rs",
     name = "check-length-src__broker__admit.rs",
@@ -7213,6 +7692,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-secrets/src/broker/admit.rs",
     name = "check-portable-src__broker__admit.rs",
@@ -7221,6 +7701,7 @@ file_check(
     src = "src/broker/admit.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-secrets/src/broker/app_client.rs",
     name = "check-length-src__broker__app_client.rs",
@@ -7231,6 +7712,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-secrets/src/broker/app_client.rs",
     name = "check-portable-src__broker__app_client.rs",
@@ -7239,6 +7721,7 @@ file_check(
     src = "src/broker/app_client.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-secrets/src/broker/checked.rs",
     name = "check-length-src__broker__checked.rs",
@@ -7249,6 +7732,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-secrets/src/broker/checked.rs",
     name = "check-portable-src__broker__checked.rs",
@@ -7257,6 +7741,7 @@ file_check(
     src = "src/broker/checked.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-secrets/src/broker/ending.rs",
     name = "check-length-src__broker__ending.rs",
@@ -7267,6 +7752,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-secrets/src/broker/ending.rs",
     name = "check-portable-src__broker__ending.rs",
@@ -7275,6 +7761,7 @@ file_check(
     src = "src/broker/ending.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-secrets/src/broker/ending/kinds.rs",
     name = "check-length-src__broker__ending__kinds.rs",
@@ -7285,6 +7772,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-secrets/src/broker/ending/kinds.rs",
     name = "check-portable-src__broker__ending__kinds.rs",
@@ -7293,6 +7781,7 @@ file_check(
     src = "src/broker/ending/kinds.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-secrets/src/broker/ending/records.rs",
     name = "check-length-src__broker__ending__records.rs",
@@ -7303,6 +7792,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-secrets/src/broker/ending/records.rs",
     name = "check-portable-src__broker__ending__records.rs",
@@ -7311,6 +7801,7 @@ file_check(
     src = "src/broker/ending/records.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-secrets/src/broker/folded.rs",
     name = "check-length-src__broker__folded.rs",
@@ -7321,6 +7812,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-secrets/src/broker/folded.rs",
     name = "check-portable-src__broker__folded.rs",
@@ -7329,6 +7821,7 @@ file_check(
     src = "src/broker/folded.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-secrets/src/broker/handles.rs",
     name = "check-length-src__broker__handles.rs",
@@ -7339,6 +7832,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-secrets/src/broker/handles.rs",
     name = "check-portable-src__broker__handles.rs",
@@ -7347,6 +7841,7 @@ file_check(
     src = "src/broker/handles.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-secrets/src/broker/held.rs",
     name = "check-length-src__broker__held.rs",
@@ -7357,6 +7852,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-secrets/src/broker/held.rs",
     name = "check-portable-src__broker__held.rs",
@@ -7365,6 +7861,7 @@ file_check(
     src = "src/broker/held.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-secrets/src/broker/inflight.rs",
     name = "check-length-src__broker__inflight.rs",
@@ -7375,6 +7872,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-secrets/src/broker/inflight.rs",
     name = "check-portable-src__broker__inflight.rs",
@@ -7383,6 +7881,7 @@ file_check(
     src = "src/broker/inflight.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-secrets/src/broker/lineage.rs",
     name = "check-length-src__broker__lineage.rs",
@@ -7393,6 +7892,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-secrets/src/broker/lineage.rs",
     name = "check-portable-src__broker__lineage.rs",
@@ -7401,6 +7901,7 @@ file_check(
     src = "src/broker/lineage.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-secrets/src/broker/oauth_grants.rs",
     name = "check-length-src__broker__oauth_grants.rs",
@@ -7411,6 +7912,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-secrets/src/broker/oauth_grants.rs",
     name = "check-portable-src__broker__oauth_grants.rs",
@@ -7419,6 +7921,7 @@ file_check(
     src = "src/broker/oauth_grants.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-secrets/src/broker/owner.rs",
     name = "check-length-src__broker__owner.rs",
@@ -7429,6 +7932,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-secrets/src/broker/owner.rs",
     name = "check-portable-src__broker__owner.rs",
@@ -7437,6 +7941,7 @@ file_check(
     src = "src/broker/owner.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-secrets/src/broker/records.rs",
     name = "check-length-src__broker__records.rs",
@@ -7447,6 +7952,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-secrets/src/broker/records.rs",
     name = "check-portable-src__broker__records.rs",
@@ -7455,6 +7961,7 @@ file_check(
     src = "src/broker/records.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-secrets/src/broker/restart.rs",
     name = "check-length-src__broker__restart.rs",
@@ -7465,6 +7972,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-secrets/src/broker/restart.rs",
     name = "check-portable-src__broker__restart.rs",
@@ -7473,6 +7981,7 @@ file_check(
     src = "src/broker/restart.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-secrets/src/broker/revocation.rs",
     name = "check-length-src__broker__revocation.rs",
@@ -7483,6 +7992,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-secrets/src/broker/revocation.rs",
     name = "check-portable-src__broker__revocation.rs",
@@ -7491,6 +8001,7 @@ file_check(
     src = "src/broker/revocation.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-secrets/src/broker/rotation.rs",
     name = "check-length-src__broker__rotation.rs",
@@ -7501,6 +8012,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-secrets/src/broker/rotation.rs",
     name = "check-portable-src__broker__rotation.rs",
@@ -7509,6 +8021,7 @@ file_check(
     src = "src/broker/rotation.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-secrets/src/broker/scope.rs",
     name = "check-length-src__broker__scope.rs",
@@ -7519,6 +8032,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-secrets/src/broker/scope.rs",
     name = "check-portable-src__broker__scope.rs",
@@ -7527,6 +8041,7 @@ file_check(
     src = "src/broker/scope.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-secrets/src/broker/seal_once.rs",
     name = "check-length-src__broker__seal_once.rs",
@@ -7537,6 +8052,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-secrets/src/broker/seal_once.rs",
     name = "check-portable-src__broker__seal_once.rs",
@@ -7545,6 +8061,7 @@ file_check(
     src = "src/broker/seal_once.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-secrets/src/broker/sign.rs",
     name = "check-length-src__broker__sign.rs",
@@ -7555,6 +8072,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-secrets/src/broker/sign.rs",
     name = "check-portable-src__broker__sign.rs",
@@ -7563,6 +8081,7 @@ file_check(
     src = "src/broker/sign.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-secrets/src/broker/spawn.rs",
     name = "check-length-src__broker__spawn.rs",
@@ -7573,6 +8092,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-secrets/src/broker/spawn.rs",
     name = "check-portable-src__broker__spawn.rs",
@@ -7581,6 +8101,7 @@ file_check(
     src = "src/broker/spawn.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-secrets/src/broker/using.rs",
     name = "check-length-src__broker__using.rs",
@@ -7591,6 +8112,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-secrets/src/broker/using.rs",
     name = "check-portable-src__broker__using.rs",
@@ -7599,6 +8121,7 @@ file_check(
     src = "src/broker/using.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-secrets/src/broker/values.rs",
     name = "check-length-src__broker__values.rs",
@@ -7609,6 +8132,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-secrets/src/broker/values.rs",
     name = "check-portable-src__broker__values.rs",
@@ -7617,6 +8141,7 @@ file_check(
     src = "src/broker/values.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-secrets/src/encoding.rs",
     name = "check-length-src__encoding.rs",
@@ -7627,6 +8152,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-secrets/src/encoding.rs",
     name = "check-portable-src__encoding.rs",
@@ -7635,6 +8161,7 @@ file_check(
     src = "src/encoding.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-secrets/src/error.rs",
     name = "check-length-src__error.rs",
@@ -7645,6 +8172,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-secrets/src/error.rs",
     name = "check-portable-src__error.rs",
@@ -7653,6 +8181,7 @@ file_check(
     src = "src/error.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-secrets/src/error/accounts.rs",
     name = "check-length-src__error__accounts.rs",
@@ -7663,6 +8192,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-secrets/src/error/accounts.rs",
     name = "check-portable-src__error__accounts.rs",
@@ -7671,6 +8201,7 @@ file_check(
     src = "src/error/accounts.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-secrets/src/error/app_client.rs",
     name = "check-length-src__error__app_client.rs",
@@ -7681,6 +8212,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-secrets/src/error/app_client.rs",
     name = "check-portable-src__error__app_client.rs",
@@ -7689,6 +8221,7 @@ file_check(
     src = "src/error/app_client.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-secrets/src/error/bounds.rs",
     name = "check-length-src__error__bounds.rs",
@@ -7699,6 +8232,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-secrets/src/error/bounds.rs",
     name = "check-portable-src__error__bounds.rs",
@@ -7707,6 +8241,7 @@ file_check(
     src = "src/error/bounds.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-secrets/src/error/lease.rs",
     name = "check-length-src__error__lease.rs",
@@ -7717,6 +8252,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-secrets/src/error/lease.rs",
     name = "check-portable-src__error__lease.rs",
@@ -7725,6 +8261,7 @@ file_check(
     src = "src/error/lease.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-secrets/src/error/lending.rs",
     name = "check-length-src__error__lending.rs",
@@ -7735,6 +8272,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-secrets/src/error/lending.rs",
     name = "check-portable-src__error__lending.rs",
@@ -7743,6 +8281,7 @@ file_check(
     src = "src/error/lending.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-secrets/src/error/name.rs",
     name = "check-length-src__error__name.rs",
@@ -7753,6 +8292,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-secrets/src/error/name.rs",
     name = "check-portable-src__error__name.rs",
@@ -7761,6 +8301,7 @@ file_check(
     src = "src/error/name.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-secrets/src/error/oauth.rs",
     name = "check-length-src__error__oauth.rs",
@@ -7771,6 +8312,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-secrets/src/error/oauth.rs",
     name = "check-portable-src__error__oauth.rs",
@@ -7779,6 +8321,7 @@ file_check(
     src = "src/error/oauth.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-secrets/src/error/owner.rs",
     name = "check-length-src__error__owner.rs",
@@ -7789,6 +8332,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-secrets/src/error/owner.rs",
     name = "check-portable-src__error__owner.rs",
@@ -7797,6 +8341,7 @@ file_check(
     src = "src/error/owner.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-secrets/src/error/revocation.rs",
     name = "check-length-src__error__revocation.rs",
@@ -7807,6 +8352,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-secrets/src/error/revocation.rs",
     name = "check-portable-src__error__revocation.rs",
@@ -7815,6 +8361,7 @@ file_check(
     src = "src/error/revocation.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-secrets/src/error/service.rs",
     name = "check-length-src__error__service.rs",
@@ -7825,6 +8372,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-secrets/src/error/service.rs",
     name = "check-portable-src__error__service.rs",
@@ -7833,6 +8381,7 @@ file_check(
     src = "src/error/service.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-secrets/src/fsutil.rs",
     name = "check-length-src__fsutil.rs",
@@ -7843,6 +8392,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-secrets/src/fsutil.rs",
     name = "check-portable-src__fsutil.rs",
@@ -7851,6 +8401,7 @@ file_check(
     src = "src/fsutil.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-secrets/src/handle.rs",
     name = "check-length-src__handle.rs",
@@ -7861,6 +8412,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-secrets/src/handle.rs",
     name = "check-portable-src__handle.rs",
@@ -7869,6 +8421,7 @@ file_check(
     src = "src/handle.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-secrets/src/keys.rs",
     name = "check-length-src__keys.rs",
@@ -7879,6 +8432,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-secrets/src/keys.rs",
     name = "check-portable-src__keys.rs",
@@ -7887,6 +8441,7 @@ file_check(
     src = "src/keys.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-secrets/src/lib.rs",
     name = "check-length-src__lib.rs",
@@ -7897,6 +8452,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-secrets/src/lib.rs",
     name = "check-portable-src__lib.rs",
@@ -7905,6 +8461,7 @@ file_check(
     src = "src/lib.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-secrets/src/local_grants.rs",
     name = "check-length-src__local_grants.rs",
@@ -7915,6 +8472,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-secrets/src/local_grants.rs",
     name = "check-portable-src__local_grants.rs",
@@ -7923,6 +8481,7 @@ file_check(
     src = "src/local_grants.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-secrets/src/oauth.rs",
     name = "check-length-src__oauth.rs",
@@ -7933,6 +8492,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-secrets/src/oauth.rs",
     name = "check-portable-src__oauth.rs",
@@ -7941,6 +8501,7 @@ file_check(
     src = "src/oauth.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-secrets/src/permission.rs",
     name = "check-length-src__permission.rs",
@@ -7951,6 +8512,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-secrets/src/permission.rs",
     name = "check-portable-src__permission.rs",
@@ -7959,6 +8521,7 @@ file_check(
     src = "src/permission.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-secrets/src/secret.rs",
     name = "check-length-src__secret.rs",
@@ -7969,6 +8532,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-secrets/src/secret.rs",
     name = "check-portable-src__secret.rs",
@@ -7977,6 +8541,7 @@ file_check(
     src = "src/secret.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-secrets/src/service.rs",
     name = "check-length-src__service.rs",
@@ -7987,6 +8552,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-secrets/src/service.rs",
     name = "check-portable-src__service.rs",
@@ -7995,6 +8561,7 @@ file_check(
     src = "src/service.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-secrets/src/store.rs",
     name = "check-length-src__store.rs",
@@ -8005,6 +8572,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-secrets/src/store.rs",
     name = "check-portable-src__store.rs",
@@ -8013,6 +8581,7 @@ file_check(
     src = "src/store.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-secrets/src/store/accounts.rs",
     name = "check-length-src__store__accounts.rs",
@@ -8023,6 +8592,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-secrets/src/store/accounts.rs",
     name = "check-portable-src__store__accounts.rs",
@@ -8031,6 +8601,7 @@ file_check(
     src = "src/store/accounts.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-secrets/src/store/index_commit.rs",
     name = "check-length-src__store__index_commit.rs",
@@ -8041,6 +8612,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-secrets/src/store/index_commit.rs",
     name = "check-portable-src__store__index_commit.rs",
@@ -8049,6 +8621,7 @@ file_check(
     src = "src/store/index_commit.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-secrets/src/store/lock.rs",
     name = "check-length-src__store__lock.rs",
@@ -8059,6 +8632,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-secrets/src/store/lock.rs",
     name = "check-portable-src__store__lock.rs",
@@ -8067,6 +8641,7 @@ file_check(
     src = "src/store/lock.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-secrets/src/store/policy.rs",
     name = "check-length-src__store__policy.rs",
@@ -8077,6 +8652,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-secrets/src/store/policy.rs",
     name = "check-portable-src__store__policy.rs",
@@ -8085,6 +8661,7 @@ file_check(
     src = "src/store/policy.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-secrets/src/store/retired.rs",
     name = "check-length-src__store__retired.rs",
@@ -8095,6 +8672,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-secrets/src/store/retired.rs",
     name = "check-portable-src__store__retired.rs",
@@ -8103,6 +8681,7 @@ file_check(
     src = "src/store/retired.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-secrets/src/store/scope.rs",
     name = "check-length-src__store__scope.rs",
@@ -8113,6 +8692,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-secrets/src/store/scope.rs",
     name = "check-portable-src__store__scope.rs",
@@ -8121,6 +8701,7 @@ file_check(
     src = "src/store/scope.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-secrets/src/teams.rs",
     name = "check-length-src__teams.rs",
@@ -8131,6 +8712,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-secrets/src/teams.rs",
     name = "check-portable-src__teams.rs",

@@ -20,14 +20,16 @@ noop_test_toolchain(
 )
 
 rust_library(
+    _rust_toolchain = "toolchains//:rust-workspace",
     crate = "lys_anchor",
     crate_root = "crates/lys-anchor/src/lib.rs",
     doctests = True,
     edition = "2024",
     env = {
+        "BUCKGEN_ROOT_CARGO_MANIFEST_DIR": "crates/lys-anchor",
+        "BUCKGEN_ROOT_CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "CARGO": "cargo",
         "CARGO_CRATE_NAME": "lys_anchor",
-        "CARGO_MANIFEST_DIR": "crates/lys-anchor",
         "CARGO_PKG_AUTHORS": "Tom Whiting \u003ctom@ablative.com.au\u003e",
         "CARGO_PKG_DESCRIPTION": "A lys transparency anchor: an append-only log with a genesis leaf, over any LeafStore.",
         "CARGO_PKG_HOMEPAGE": "",
@@ -40,16 +42,15 @@ rust_library(
         "CARGO_PKG_VERSION_MAJOR": "0",
         "CARGO_PKG_VERSION_MINOR": "3",
         "CARGO_PKG_VERSION_PATCH": "3",
-        "CARGO_PKG_VERSION_PRE": "",
-        "CARGO_TARGET_TMPDIR": "buckgen/tmp"
+        "CARGO_PKG_VERSION_PRE": ""
     },
     features = [
         "default"
     ],
     mapped_srcs = {
-        "//buckgen/inputs:input-0": "Cargo.lock",
-        "//buckgen/inputs:input-1": "Cargo.toml",
-        "//buckgen/inputs:input-8": "crates/lys-core/tests/harness/cache.rs",
+        "//:input-Cargo.lock": "Cargo.lock",
+        "//:input-Cargo.toml": "Cargo.toml",
+        "//crates/lys-core:input-tests__harness__cache.rs": "crates/lys-core/tests/harness/cache.rs",
         "Cargo.toml": "crates/lys-anchor/Cargo.toml",
         "src/admission/certificate.rs": "crates/lys-anchor/src/admission/certificate.rs",
         "src/admission/certificate_tests.rs": "crates/lys-anchor/src/admission/certificate_tests.rs",
@@ -142,14 +143,16 @@ rust_library(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-workspace",
     _test_toolchain = ":test-toolchain",
     crate = "lys_anchor",
     crate_root = "crates/lys-anchor/src/lib.rs",
     edition = "2024",
     env = {
+        "BUCKGEN_ROOT_CARGO_MANIFEST_DIR": "crates/lys-anchor",
+        "BUCKGEN_ROOT_CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "CARGO": "cargo",
         "CARGO_CRATE_NAME": "lys_anchor",
-        "CARGO_MANIFEST_DIR": "crates/lys-anchor",
         "CARGO_PKG_AUTHORS": "Tom Whiting \u003ctom@ablative.com.au\u003e",
         "CARGO_PKG_DESCRIPTION": "A lys transparency anchor: an append-only log with a genesis leaf, over any LeafStore.",
         "CARGO_PKG_HOMEPAGE": "",
@@ -162,16 +165,18 @@ workspace_rust_test(
         "CARGO_PKG_VERSION_MAJOR": "0",
         "CARGO_PKG_VERSION_MINOR": "3",
         "CARGO_PKG_VERSION_PATCH": "3",
-        "CARGO_PKG_VERSION_PRE": "",
-        "CARGO_TARGET_TMPDIR": "buckgen/tmp"
+        "CARGO_PKG_VERSION_PRE": ""
     },
     features = [
         "default"
     ],
+    labels = [
+        "tier-1"
+    ],
     mapped_srcs = {
-        "//buckgen/inputs:input-0": "Cargo.lock",
-        "//buckgen/inputs:input-1": "Cargo.toml",
-        "//buckgen/inputs:input-8": "crates/lys-core/tests/harness/cache.rs",
+        "//:input-Cargo.lock": "Cargo.lock",
+        "//:input-Cargo.toml": "Cargo.toml",
+        "//crates/lys-core:input-tests__harness__cache.rs": "crates/lys-core/tests/harness/cache.rs",
         "Cargo.toml": "crates/lys-anchor/Cargo.toml",
         "src/admission/certificate.rs": "crates/lys-anchor/src/admission/certificate.rs",
         "src/admission/certificate_tests.rs": "crates/lys-anchor/src/admission/certificate_tests.rs",
@@ -261,6 +266,13 @@ workspace_rust_test(
         "tempfile": "//third-party:tempfile",
         "thiserror": "//third-party:thiserror"
     },
+    nextest = {
+        "binary": "lys_anchor",
+        "binary_id": "lys-anchor",
+        "dir": "crates/lys-anchor",
+        "kind": "lib",
+        "package": "lys-anchor"
+    },
     srcs = [],
     visibility = [
         "PUBLIC"
@@ -269,14 +281,16 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-workspace",
     _test_toolchain = ":test-toolchain",
     crate = "anchor_receipt_conformance",
     crate_root = "crates/lys-anchor/tests/anchor_receipt_conformance/main.rs",
     edition = "2024",
     env = {
+        "BUCKGEN_ROOT_CARGO_MANIFEST_DIR": "crates/lys-anchor",
+        "BUCKGEN_ROOT_CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "CARGO": "cargo",
         "CARGO_CRATE_NAME": "anchor_receipt_conformance",
-        "CARGO_MANIFEST_DIR": "crates/lys-anchor",
         "CARGO_PKG_AUTHORS": "Tom Whiting \u003ctom@ablative.com.au\u003e",
         "CARGO_PKG_DESCRIPTION": "A lys transparency anchor: an append-only log with a genesis leaf, over any LeafStore.",
         "CARGO_PKG_HOMEPAGE": "",
@@ -289,17 +303,19 @@ workspace_rust_test(
         "CARGO_PKG_VERSION_MAJOR": "0",
         "CARGO_PKG_VERSION_MINOR": "3",
         "CARGO_PKG_VERSION_PATCH": "3",
-        "CARGO_PKG_VERSION_PRE": "",
-        "CARGO_TARGET_TMPDIR": "buckgen/tmp"
+        "CARGO_PKG_VERSION_PRE": ""
     },
     features = [
         "default"
     ],
     framework = True,
+    labels = [
+        "tier-1"
+    ],
     mapped_srcs = {
-        "//buckgen/inputs:input-0": "Cargo.lock",
-        "//buckgen/inputs:input-1": "Cargo.toml",
-        "//buckgen/inputs:input-8": "crates/lys-core/tests/harness/cache.rs",
+        "//:input-Cargo.lock": "Cargo.lock",
+        "//:input-Cargo.toml": "Cargo.toml",
+        "//crates/lys-core:input-tests__harness__cache.rs": "crates/lys-core/tests/harness/cache.rs",
         "Cargo.toml": "crates/lys-anchor/Cargo.toml",
         "src/admission/certificate.rs": "crates/lys-anchor/src/admission/certificate.rs",
         "src/admission/certificate_tests.rs": "crates/lys-anchor/src/admission/certificate_tests.rs",
@@ -390,6 +406,16 @@ workspace_rust_test(
         "tempfile": "//third-party:tempfile",
         "thiserror": "//third-party:thiserror"
     },
+    nextest = {
+        "binary": "anchor_receipt_conformance",
+        "binary_id": "lys-anchor::anchor_receipt_conformance",
+        "dir": "crates/lys-anchor",
+        "kind": "test",
+        "package": "lys-anchor"
+    },
+    setup = {
+        "go-fixture": "//buckgen:setup-go-fixture"
+    },
     srcs = [],
     visibility = [
         "PUBLIC"
@@ -398,14 +424,16 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-workspace",
     _test_toolchain = ":test-toolchain",
     crate = "cascade",
     crate_root = "crates/lys-anchor/tests/cascade.rs",
     edition = "2024",
     env = {
+        "BUCKGEN_ROOT_CARGO_MANIFEST_DIR": "crates/lys-anchor",
+        "BUCKGEN_ROOT_CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "CARGO": "cargo",
         "CARGO_CRATE_NAME": "cascade",
-        "CARGO_MANIFEST_DIR": "crates/lys-anchor",
         "CARGO_PKG_AUTHORS": "Tom Whiting \u003ctom@ablative.com.au\u003e",
         "CARGO_PKG_DESCRIPTION": "A lys transparency anchor: an append-only log with a genesis leaf, over any LeafStore.",
         "CARGO_PKG_HOMEPAGE": "",
@@ -418,17 +446,19 @@ workspace_rust_test(
         "CARGO_PKG_VERSION_MAJOR": "0",
         "CARGO_PKG_VERSION_MINOR": "3",
         "CARGO_PKG_VERSION_PATCH": "3",
-        "CARGO_PKG_VERSION_PRE": "",
-        "CARGO_TARGET_TMPDIR": "buckgen/tmp"
+        "CARGO_PKG_VERSION_PRE": ""
     },
     features = [
         "default"
     ],
     framework = True,
+    labels = [
+        "tier-1"
+    ],
     mapped_srcs = {
-        "//buckgen/inputs:input-0": "Cargo.lock",
-        "//buckgen/inputs:input-1": "Cargo.toml",
-        "//buckgen/inputs:input-8": "crates/lys-core/tests/harness/cache.rs",
+        "//:input-Cargo.lock": "Cargo.lock",
+        "//:input-Cargo.toml": "Cargo.toml",
+        "//crates/lys-core:input-tests__harness__cache.rs": "crates/lys-core/tests/harness/cache.rs",
         "Cargo.toml": "crates/lys-anchor/Cargo.toml",
         "src/admission/certificate.rs": "crates/lys-anchor/src/admission/certificate.rs",
         "src/admission/certificate_tests.rs": "crates/lys-anchor/src/admission/certificate_tests.rs",
@@ -519,6 +549,13 @@ workspace_rust_test(
         "tempfile": "//third-party:tempfile",
         "thiserror": "//third-party:thiserror"
     },
+    nextest = {
+        "binary": "cascade",
+        "binary_id": "lys-anchor::cascade",
+        "dir": "crates/lys-anchor",
+        "kind": "test",
+        "package": "lys-anchor"
+    },
     srcs = [],
     visibility = [
         "PUBLIC"
@@ -527,14 +564,16 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-workspace",
     _test_toolchain = ":test-toolchain",
     crate = "checkpoint_note_conformance",
     crate_root = "crates/lys-anchor/tests/checkpoint_note_conformance.rs",
     edition = "2024",
     env = {
+        "BUCKGEN_ROOT_CARGO_MANIFEST_DIR": "crates/lys-anchor",
+        "BUCKGEN_ROOT_CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "CARGO": "cargo",
         "CARGO_CRATE_NAME": "checkpoint_note_conformance",
-        "CARGO_MANIFEST_DIR": "crates/lys-anchor",
         "CARGO_PKG_AUTHORS": "Tom Whiting \u003ctom@ablative.com.au\u003e",
         "CARGO_PKG_DESCRIPTION": "A lys transparency anchor: an append-only log with a genesis leaf, over any LeafStore.",
         "CARGO_PKG_HOMEPAGE": "",
@@ -547,17 +586,19 @@ workspace_rust_test(
         "CARGO_PKG_VERSION_MAJOR": "0",
         "CARGO_PKG_VERSION_MINOR": "3",
         "CARGO_PKG_VERSION_PATCH": "3",
-        "CARGO_PKG_VERSION_PRE": "",
-        "CARGO_TARGET_TMPDIR": "buckgen/tmp"
+        "CARGO_PKG_VERSION_PRE": ""
     },
     features = [
         "default"
     ],
     framework = True,
+    labels = [
+        "tier-1"
+    ],
     mapped_srcs = {
-        "//buckgen/inputs:input-0": "Cargo.lock",
-        "//buckgen/inputs:input-1": "Cargo.toml",
-        "//buckgen/inputs:input-8": "crates/lys-core/tests/harness/cache.rs",
+        "//:input-Cargo.lock": "Cargo.lock",
+        "//:input-Cargo.toml": "Cargo.toml",
+        "//crates/lys-core:input-tests__harness__cache.rs": "crates/lys-core/tests/harness/cache.rs",
         "Cargo.toml": "crates/lys-anchor/Cargo.toml",
         "src/admission/certificate.rs": "crates/lys-anchor/src/admission/certificate.rs",
         "src/admission/certificate_tests.rs": "crates/lys-anchor/src/admission/certificate_tests.rs",
@@ -648,6 +689,16 @@ workspace_rust_test(
         "tempfile": "//third-party:tempfile",
         "thiserror": "//third-party:thiserror"
     },
+    nextest = {
+        "binary": "checkpoint_note_conformance",
+        "binary_id": "lys-anchor::checkpoint_note_conformance",
+        "dir": "crates/lys-anchor",
+        "kind": "test",
+        "package": "lys-anchor"
+    },
+    setup = {
+        "go-fixture": "//buckgen:setup-go-fixture"
+    },
     srcs = [],
     visibility = [
         "PUBLIC"
@@ -656,14 +707,16 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-workspace",
     _test_toolchain = ":test-toolchain",
     crate = "standalone_is_complete",
     crate_root = "crates/lys-anchor/tests/standalone_is_complete.rs",
     edition = "2024",
     env = {
+        "BUCKGEN_ROOT_CARGO_MANIFEST_DIR": "crates/lys-anchor",
+        "BUCKGEN_ROOT_CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "CARGO": "cargo",
         "CARGO_CRATE_NAME": "standalone_is_complete",
-        "CARGO_MANIFEST_DIR": "crates/lys-anchor",
         "CARGO_PKG_AUTHORS": "Tom Whiting \u003ctom@ablative.com.au\u003e",
         "CARGO_PKG_DESCRIPTION": "A lys transparency anchor: an append-only log with a genesis leaf, over any LeafStore.",
         "CARGO_PKG_HOMEPAGE": "",
@@ -676,17 +729,19 @@ workspace_rust_test(
         "CARGO_PKG_VERSION_MAJOR": "0",
         "CARGO_PKG_VERSION_MINOR": "3",
         "CARGO_PKG_VERSION_PATCH": "3",
-        "CARGO_PKG_VERSION_PRE": "",
-        "CARGO_TARGET_TMPDIR": "buckgen/tmp"
+        "CARGO_PKG_VERSION_PRE": ""
     },
     features = [
         "default"
     ],
     framework = True,
+    labels = [
+        "tier-1"
+    ],
     mapped_srcs = {
-        "//buckgen/inputs:input-0": "Cargo.lock",
-        "//buckgen/inputs:input-1": "Cargo.toml",
-        "//buckgen/inputs:input-8": "crates/lys-core/tests/harness/cache.rs",
+        "//:input-Cargo.lock": "Cargo.lock",
+        "//:input-Cargo.toml": "Cargo.toml",
+        "//crates/lys-core:input-tests__harness__cache.rs": "crates/lys-core/tests/harness/cache.rs",
         "Cargo.toml": "crates/lys-anchor/Cargo.toml",
         "src/admission/certificate.rs": "crates/lys-anchor/src/admission/certificate.rs",
         "src/admission/certificate_tests.rs": "crates/lys-anchor/src/admission/certificate_tests.rs",
@@ -777,6 +832,13 @@ workspace_rust_test(
         "tempfile": "//third-party:tempfile",
         "thiserror": "//third-party:thiserror"
     },
+    nextest = {
+        "binary": "standalone_is_complete",
+        "binary_id": "lys-anchor::standalone_is_complete",
+        "dir": "crates/lys-anchor",
+        "kind": "test",
+        "package": "lys-anchor"
+    },
     srcs = [],
     visibility = [
         "PUBLIC"
@@ -785,14 +847,16 @@ workspace_rust_test(
 
 workspace_rust_test(
     _remote_test_execution_toolchain = ":remote-test-toolchain",
+    _rust_toolchain = "toolchains//:rust-workspace",
     _test_toolchain = ":test-toolchain",
     crate = "stranger_verification",
     crate_root = "crates/lys-anchor/tests/stranger_verification/main.rs",
     edition = "2024",
     env = {
+        "BUCKGEN_ROOT_CARGO_MANIFEST_DIR": "crates/lys-anchor",
+        "BUCKGEN_ROOT_CARGO_TARGET_TMPDIR": "buckgen/tmp",
         "CARGO": "cargo",
         "CARGO_CRATE_NAME": "stranger_verification",
-        "CARGO_MANIFEST_DIR": "crates/lys-anchor",
         "CARGO_PKG_AUTHORS": "Tom Whiting \u003ctom@ablative.com.au\u003e",
         "CARGO_PKG_DESCRIPTION": "A lys transparency anchor: an append-only log with a genesis leaf, over any LeafStore.",
         "CARGO_PKG_HOMEPAGE": "",
@@ -805,17 +869,19 @@ workspace_rust_test(
         "CARGO_PKG_VERSION_MAJOR": "0",
         "CARGO_PKG_VERSION_MINOR": "3",
         "CARGO_PKG_VERSION_PATCH": "3",
-        "CARGO_PKG_VERSION_PRE": "",
-        "CARGO_TARGET_TMPDIR": "buckgen/tmp"
+        "CARGO_PKG_VERSION_PRE": ""
     },
     features = [
         "default"
     ],
     framework = True,
+    labels = [
+        "tier-1"
+    ],
     mapped_srcs = {
-        "//buckgen/inputs:input-0": "Cargo.lock",
-        "//buckgen/inputs:input-1": "Cargo.toml",
-        "//buckgen/inputs:input-8": "crates/lys-core/tests/harness/cache.rs",
+        "//:input-Cargo.lock": "Cargo.lock",
+        "//:input-Cargo.toml": "Cargo.toml",
+        "//crates/lys-core:input-tests__harness__cache.rs": "crates/lys-core/tests/harness/cache.rs",
         "Cargo.toml": "crates/lys-anchor/Cargo.toml",
         "src/admission/certificate.rs": "crates/lys-anchor/src/admission/certificate.rs",
         "src/admission/certificate_tests.rs": "crates/lys-anchor/src/admission/certificate_tests.rs",
@@ -906,6 +972,13 @@ workspace_rust_test(
         "tempfile": "//third-party:tempfile",
         "thiserror": "//third-party:thiserror"
     },
+    nextest = {
+        "binary": "stranger_verification",
+        "binary_id": "lys-anchor::stranger_verification",
+        "dir": "crates/lys-anchor",
+        "kind": "test",
+        "package": "lys-anchor"
+    },
     srcs = [],
     visibility = [
         "PUBLIC"
@@ -914,6 +987,7 @@ workspace_rust_test(
 load("@build//buck:checks.bzl", "file_check")
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-anchor/Cargo.toml",
     name = "check-length-Cargo.toml",
@@ -923,6 +997,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-anchor/Cargo.toml",
     name = "check-portable-Cargo.toml",
@@ -954,6 +1029,7 @@ file_check(
     src = "Cargo.toml",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-anchor/src/admission/certificate.rs",
     name = "check-length-src__admission__certificate.rs",
@@ -964,6 +1040,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-anchor/src/admission/certificate.rs",
     name = "check-portable-src__admission__certificate.rs",
@@ -972,6 +1049,7 @@ file_check(
     src = "src/admission/certificate.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-anchor/src/admission/context.rs",
     name = "check-length-src__admission__context.rs",
@@ -982,6 +1060,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-anchor/src/admission/context.rs",
     name = "check-portable-src__admission__context.rs",
@@ -990,6 +1069,7 @@ file_check(
     src = "src/admission/context.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-anchor/src/admission/mod.rs",
     name = "check-length-src__admission__mod.rs",
@@ -1000,6 +1080,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-anchor/src/admission/mod.rs",
     name = "check-portable-src__admission__mod.rs",
@@ -1008,6 +1089,7 @@ file_check(
     src = "src/admission/mod.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-anchor/src/admission/policy.rs",
     name = "check-length-src__admission__policy.rs",
@@ -1018,6 +1100,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-anchor/src/admission/policy.rs",
     name = "check-portable-src__admission__policy.rs",
@@ -1026,6 +1109,7 @@ file_check(
     src = "src/admission/policy.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-anchor/src/admission/trivial.rs",
     name = "check-length-src__admission__trivial.rs",
@@ -1036,6 +1120,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-anchor/src/admission/trivial.rs",
     name = "check-portable-src__admission__trivial.rs",
@@ -1044,6 +1129,7 @@ file_check(
     src = "src/admission/trivial.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-anchor/src/anchor/append.rs",
     name = "check-length-src__anchor__append.rs",
@@ -1054,6 +1140,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-anchor/src/anchor/append.rs",
     name = "check-portable-src__anchor__append.rs",
@@ -1062,6 +1149,7 @@ file_check(
     src = "src/anchor/append.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-anchor/src/anchor/artifact.rs",
     name = "check-length-src__anchor__artifact.rs",
@@ -1072,6 +1160,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-anchor/src/anchor/artifact.rs",
     name = "check-portable-src__anchor__artifact.rs",
@@ -1080,6 +1169,7 @@ file_check(
     src = "src/anchor/artifact.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-anchor/src/anchor/checkpoint.rs",
     name = "check-length-src__anchor__checkpoint.rs",
@@ -1090,6 +1180,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-anchor/src/anchor/checkpoint.rs",
     name = "check-portable-src__anchor__checkpoint.rs",
@@ -1098,6 +1189,7 @@ file_check(
     src = "src/anchor/checkpoint.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-anchor/src/anchor/genesis.rs",
     name = "check-length-src__anchor__genesis.rs",
@@ -1108,6 +1200,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-anchor/src/anchor/genesis.rs",
     name = "check-portable-src__anchor__genesis.rs",
@@ -1116,6 +1209,7 @@ file_check(
     src = "src/anchor/genesis.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-anchor/src/anchor/genesis/constructors.rs",
     name = "check-length-src__anchor__genesis__constructors.rs",
@@ -1126,6 +1220,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-anchor/src/anchor/genesis/constructors.rs",
     name = "check-portable-src__anchor__genesis__constructors.rs",
@@ -1134,6 +1229,7 @@ file_check(
     src = "src/anchor/genesis/constructors.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-anchor/src/anchor/mod.rs",
     name = "check-length-src__anchor__mod.rs",
@@ -1144,6 +1240,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-anchor/src/anchor/mod.rs",
     name = "check-portable-src__anchor__mod.rs",
@@ -1152,6 +1249,7 @@ file_check(
     src = "src/anchor/mod.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-anchor/src/anchor/open.rs",
     name = "check-length-src__anchor__open.rs",
@@ -1162,6 +1260,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-anchor/src/anchor/open.rs",
     name = "check-portable-src__anchor__open.rs",
@@ -1170,6 +1269,7 @@ file_check(
     src = "src/anchor/open.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-anchor/src/anchor/proof_nodes.rs",
     name = "check-length-src__anchor__proof_nodes.rs",
@@ -1180,6 +1280,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-anchor/src/anchor/proof_nodes.rs",
     name = "check-portable-src__anchor__proof_nodes.rs",
@@ -1188,6 +1289,7 @@ file_check(
     src = "src/anchor/proof_nodes.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-anchor/src/anchor/read_only.rs",
     name = "check-length-src__anchor__read_only.rs",
@@ -1198,6 +1300,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-anchor/src/anchor/read_only.rs",
     name = "check-portable-src__anchor__read_only.rs",
@@ -1206,6 +1309,7 @@ file_check(
     src = "src/anchor/read_only.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-anchor/src/anchor/status.rs",
     name = "check-length-src__anchor__status.rs",
@@ -1216,6 +1320,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-anchor/src/anchor/status.rs",
     name = "check-portable-src__anchor__status.rs",
@@ -1224,6 +1329,7 @@ file_check(
     src = "src/anchor/status.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-anchor/src/anchor/submit.rs",
     name = "check-length-src__anchor__submit.rs",
@@ -1234,6 +1340,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-anchor/src/anchor/submit.rs",
     name = "check-portable-src__anchor__submit.rs",
@@ -1242,6 +1349,7 @@ file_check(
     src = "src/anchor/submit.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-anchor/src/config.rs",
     name = "check-length-src__config.rs",
@@ -1252,6 +1360,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-anchor/src/config.rs",
     name = "check-portable-src__config.rs",
@@ -1260,6 +1369,7 @@ file_check(
     src = "src/config.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-anchor/src/error.rs",
     name = "check-length-src__error.rs",
@@ -1270,6 +1380,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-anchor/src/error.rs",
     name = "check-portable-src__error.rs",
@@ -1278,6 +1389,7 @@ file_check(
     src = "src/error.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-anchor/src/error/cascade.rs",
     name = "check-length-src__error__cascade.rs",
@@ -1288,6 +1400,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-anchor/src/error/cascade.rs",
     name = "check-portable-src__error__cascade.rs",
@@ -1296,6 +1409,7 @@ file_check(
     src = "src/error/cascade.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-anchor/src/error/genesis.rs",
     name = "check-length-src__error__genesis.rs",
@@ -1306,6 +1420,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-anchor/src/error/genesis.rs",
     name = "check-portable-src__error__genesis.rs",
@@ -1314,6 +1429,7 @@ file_check(
     src = "src/error/genesis.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-anchor/src/error/proof.rs",
     name = "check-length-src__error__proof.rs",
@@ -1324,6 +1440,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-anchor/src/error/proof.rs",
     name = "check-portable-src__error__proof.rs",
@@ -1332,6 +1449,7 @@ file_check(
     src = "src/error/proof.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-anchor/src/error/signing.rs",
     name = "check-length-src__error__signing.rs",
@@ -1342,6 +1460,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-anchor/src/error/signing.rs",
     name = "check-portable-src__error__signing.rs",
@@ -1350,6 +1469,7 @@ file_check(
     src = "src/error/signing.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-anchor/src/keys/file_signer.rs",
     name = "check-length-src__keys__file_signer.rs",
@@ -1360,6 +1480,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-anchor/src/keys/file_signer.rs",
     name = "check-portable-src__keys__file_signer.rs",
@@ -1368,6 +1489,7 @@ file_check(
     src = "src/keys/file_signer.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-anchor/src/keys/mod.rs",
     name = "check-length-src__keys__mod.rs",
@@ -1378,6 +1500,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-anchor/src/keys/mod.rs",
     name = "check-portable-src__keys__mod.rs",
@@ -1386,6 +1509,7 @@ file_check(
     src = "src/keys/mod.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-anchor/src/keys/signer.rs",
     name = "check-length-src__keys__signer.rs",
@@ -1396,6 +1520,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-anchor/src/keys/signer.rs",
     name = "check-portable-src__keys__signer.rs",
@@ -1404,6 +1529,7 @@ file_check(
     src = "src/keys/signer.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-anchor/src/lib.rs",
     name = "check-length-src__lib.rs",
@@ -1414,6 +1540,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-anchor/src/lib.rs",
     name = "check-portable-src__lib.rs",
@@ -1422,6 +1549,7 @@ file_check(
     src = "src/lib.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-anchor/src/upward/bundle.rs",
     name = "check-length-src__upward__bundle.rs",
@@ -1432,6 +1560,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-anchor/src/upward/bundle.rs",
     name = "check-portable-src__upward__bundle.rs",
@@ -1440,6 +1569,7 @@ file_check(
     src = "src/upward/bundle.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-anchor/src/upward/mod.rs",
     name = "check-length-src__upward__mod.rs",
@@ -1450,6 +1580,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-anchor/src/upward/mod.rs",
     name = "check-portable-src__upward__mod.rs",
@@ -1458,6 +1589,7 @@ file_check(
     src = "src/upward/mod.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-anchor/src/upward/pin.rs",
     name = "check-length-src__upward__pin.rs",
@@ -1468,6 +1600,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-anchor/src/upward/pin.rs",
     name = "check-portable-src__upward__pin.rs",
@@ -1476,6 +1609,7 @@ file_check(
     src = "src/upward/pin.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-anchor/src/wire/mod.rs",
     name = "check-length-src__wire__mod.rs",
@@ -1486,6 +1620,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-anchor/src/wire/mod.rs",
     name = "check-portable-src__wire__mod.rs",
@@ -1494,6 +1629,7 @@ file_check(
     src = "src/wire/mod.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-anchor/src/wire/submission.rs",
     name = "check-length-src__wire__submission.rs",
@@ -1504,6 +1640,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-anchor/src/wire/submission.rs",
     name = "check-portable-src__wire__submission.rs",
@@ -1512,6 +1649,7 @@ file_check(
     src = "src/wire/submission.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-anchor/src/witness/mod.rs",
     name = "check-length-src__witness__mod.rs",
@@ -1522,6 +1660,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-anchor/src/witness/mod.rs",
     name = "check-portable-src__witness__mod.rs",
@@ -1530,6 +1669,7 @@ file_check(
     src = "src/witness/mod.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-anchor/src/witness/observe.rs",
     name = "check-length-src__witness__observe.rs",
@@ -1540,6 +1680,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-anchor/src/witness/observe.rs",
     name = "check-portable-src__witness__observe.rs",
@@ -1548,6 +1689,7 @@ file_check(
     src = "src/witness/observe.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-anchor/src/witness/projection.rs",
     name = "check-length-src__witness__projection.rs",
@@ -1558,6 +1700,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-anchor/src/witness/projection.rs",
     name = "check-portable-src__witness__projection.rs",
@@ -1566,6 +1709,7 @@ file_check(
     src = "src/witness/projection.rs",
 )
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "length",
     logical = "crates/lys-anchor/src/witness/report.rs",
     name = "check-length-src__witness__report.rs",
@@ -1576,6 +1720,7 @@ file_check(
 )
 
 file_check(
+    changes_base = "//buckgen:checks-base",
     kind = "portable",
     logical = "crates/lys-anchor/src/witness/report.rs",
     name = "check-portable-src__witness__report.rs",

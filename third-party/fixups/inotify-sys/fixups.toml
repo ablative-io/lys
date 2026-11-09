@@ -1,0 +1,2 @@
+# Linux only. Cargo runs this build script, so Buck does too.
+buildscript.run = true

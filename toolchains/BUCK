@@ -1,20 +1,43 @@
 load("@prelude//toolchains:cxx.bzl", "system_cxx_toolchain")
 load("@prelude//toolchains:genrule.bzl", "system_genrule_toolchain")
 load("@prelude//toolchains:python.bzl", "system_python_bootstrap_toolchain")
-load(":rust.bzl", "bin_exe_rust_toolchain", "host_rust_toolchain", "runtime_manifest_rust_toolchain")
+load(":rust.bzl", "host_rust_toolchain", "runtime_manifest_rust_toolchain", "workspace_rust_toolchain")
+
+# A static musl target (build//buck:linux-x86_64-musl) compiles and links C
+# and C++ with zig's musl; bucksetup writes host_tools.musl_cc and musl_cxx
+# where zig is on PATH.
+_MUSL_UNSET = "host_tools.musl_cc-is-unset:run-bucksetup-with-zig-on-PATH"
+
+_musl_cc = read_root_config("host_tools", "musl_cc", _MUSL_UNSET)
+
+_musl_cxx = read_root_config("host_tools", "musl_cxx", _MUSL_UNSET)
 
 system_cxx_toolchain(
     name = "cxx",
-    compiler = read_root_config("host_tools", "cc"),
-    cxx_compiler = read_root_config("host_tools", "cxx"),
-    linker = read_root_config("host_tools", "cxx"),
+    compiler = select({"DEFAULT": read_root_config("host_tools", "cc"), "prelude//abi:musl": _musl_cc}),
+    cxx_compiler = select({"DEFAULT": read_root_config("host_tools", "cxx"), "prelude//abi:musl": _musl_cxx}),
+    linker = select({"DEFAULT": read_root_config("host_tools", "cxx"), "prelude//abi:musl": _musl_cxx}),
     archiver = read_root_config("host_tools", "ar"),
+    link_style = select({"DEFAULT": "shared", "prelude//abi:musl": "static"}),
     visibility = ["PUBLIC"],
 )
+
+# zig supplies musl's start files and libc, so rustc's own copies stay out.
+# zig's musl is 1.2.5, so the libc crate's musl 1.2.3 API (statx) is the true
+# one; libc keeps it behind this cfg.
+# A release build (build//buck:release) is Cargo's release profile: optimised,
+# no debug assertions or overflow checks, and std's debuginfo stripped.
+_RELEASE = ["-Copt-level=3", "-Cdebuginfo=0", "-Cstrip=debuginfo", "-Cdebug-assertions=off", "-Coverflow-checks=off"]
+
+_rust_platform = {
+    "rustc_flags": select({"DEFAULT": [], "prelude//abi:musl": ["-Clink-self-contained=no", "--cfg", "libc_unstable_musl_v1_2_3"]}) +
+                   select({"DEFAULT": [], "build//buck:optimised": _RELEASE}),
+    "target_triple": select({"DEFAULT": None, "prelude//abi:musl": read_root_config("host_tools", "rust_musl_target", _MUSL_UNSET)}),
+}
 system_genrule_toolchain(name = "genrule", visibility = ["PUBLIC"])
-host_rust_toolchain(name = "rust", visibility = ["PUBLIC"])
-runtime_manifest_rust_toolchain(name = "rust-runtime-manifest", visibility = ["PUBLIC"])
-bin_exe_rust_toolchain(name = "rust-bin-exe", visibility = ["PUBLIC"])
+host_rust_toolchain(name = "rust", visibility = ["PUBLIC"], **_rust_platform)
+runtime_manifest_rust_toolchain(name = "rust-runtime-manifest", visibility = ["PUBLIC"], **_rust_platform)
+workspace_rust_toolchain(name = "rust-workspace", visibility = ["PUBLIC"], **_rust_platform)
 system_python_bootstrap_toolchain(
     name = "python_bootstrap",
     interpreter = read_root_config("host_tools", "python"),
