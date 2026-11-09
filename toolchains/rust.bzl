@@ -1,12 +1,12 @@
 """Host executables are discovered into ignored machine-local config."""
 load("@prelude//rust:rust_toolchain.bzl", "PanicRuntime", "RustToolchainInfo")
 
-def _toolchain(ctx, compiler, rustdoc = None):
+def _toolchain(ctx, compiler, rustdoc = None, clippy = None):
     return [
         DefaultInfo(),
         RustToolchainInfo(
             compiler = compiler,
-            clippy_driver = RunInfo(args = [read_root_config("host_tools", "clippy")]),
+            clippy_driver = clippy or RunInfo(args = [read_root_config("host_tools", "clippy")]),
             rustdoc = rustdoc or RunInfo(args = [ctx.attrs._runner[RunInfo], "--rustdoc", read_root_config("host_tools", "rustdoc"), "--"]),
             rustc_target_triple = ctx.attrs.target_triple or read_root_config("host_tools", "rust_target"),
             rustc_flags = ctx.attrs.rustc_flags,
@@ -27,7 +27,10 @@ def _runtime_manifest_impl(ctx):
 
 # Workspace crates compile, as Cargo compiles them, with CARGO_MANIFEST_DIR
 # naming the package in the checkout (see @build//buck/buckrun/workspace.go).
-# The checkout's path is in the command line, so it is in the cache key.
+# The checkout's path is in the command line, so it is in the cache key. Clippy
+# compiles them too, so it goes through the same resolution: a crate reading
+# env!("CARGO_MANIFEST_DIR") is linted as it is built (liminal, 10 Nov: 13
+# liminal-server test files aborted clippy, so no test code was linted).
 def _workspace_impl(ctx):
     root = read_root_config("host_tools", "project_root")
     if not root:
@@ -36,7 +39,29 @@ def _workspace_impl(ctx):
         ctx,
         RunInfo(args = [ctx.attrs._runner[RunInfo], "--root", root, "--rustc", read_root_config("host_tools", "rustc"), "--"]),
         RunInfo(args = [ctx.attrs._runner[RunInfo], "--root", root, "--test-builder", read_root_config("host_tools", "rustc"), "--rustdoc", read_root_config("host_tools", "rustdoc"), "--"]),
+        _workspace_clippy(ctx, root),
     )
+
+# The prelude writes the clippy driver into a wrapper script one argument per
+# line (rust/context.bzl, _clippy_wrapper), so a driver must be one
+# executable: this script, which runs clippy-driver as the workspace compiler
+# runs rustc.
+def _workspace_clippy(ctx, root):
+    runner = ctx.attrs._runner[RunInfo]
+    script, _ = ctx.actions.write(
+        "clippy-workspace.sh",
+        [
+            "#!/usr/bin/env bash",
+            cmd_args(
+                cmd_args("exec", runner, "--root", root, "--rustc", read_root_config("host_tools", "clippy"), "--", delimiter = " ", quote = "shell"),
+                '"$@"',
+                delimiter = " ",
+            ),
+        ],
+        is_executable = True,
+        allow_args = True,
+    )
+    return RunInfo(args = cmd_args(script, hidden = runner))
 
 # target_triple and rustc_flags are selected per target platform in BUCK: a
 # static musl deployable (build//buck:linux-x86_64-musl) names its own triple

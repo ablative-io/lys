@@ -16,7 +16,7 @@
   build = git
 [external_cell_build]
   git_origin = https://github.com/tomWhiting/build.git
-  commit_hash = 2bc04ec62a7fa3ab116bed196fe60e49265dd89f
+  commit_hash = 4fd0427f7af1901f4be1b28a18001ee646cd9143
 [parser]
   target_platform_detector_spec = target:root//...->prelude//platforms:default target:prelude//...->prelude//platforms:default target:toolchains//...->prelude//platforms:default target:build//...->prelude//platforms:default
 [build]
