@@ -72,6 +72,9 @@ system_python_bootstrap_toolchain(
 # Binaries built/discovered by the shared bootstrap; their bytes are action inputs.
 sh_binary(name = "buckcheck", main = "_local/buckcheck", visibility = ["PUBLIC"])
 sh_binary(name = "buckrun", main = "_local/buckrun", visibility = ["PUBLIC"])
+# bun builds and tests, and wasm-bindgen packages: kept out of buckrun, which
+# wraps every rustc, so a change to them never changes a compile's key.
+sh_binary(name = "buckpack", main = "_local/buckpack", visibility = ["PUBLIC"])
 sh_binary(name = "tokei", main = "_local/tokei", visibility = ["PUBLIC"])
 sh_binary(name = "ast-grep", main = "_local/ast-grep", visibility = ["PUBLIC"])
 
