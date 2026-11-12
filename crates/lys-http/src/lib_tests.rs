@@ -177,6 +177,15 @@ async fn a_certificate_for_another_name_is_refused_under_a_trusted_root() -> Tes
 /// The control: the same construction, a trusted root and the right name,
 /// completes the handshake and is answered. Without it, the two refusals
 /// above could be the harness failing rather than the certificate.
+///
+/// The root is one these tests issued a moment ago, which no machine's store
+/// holds, so the answer also shows the client verifies through the roots
+/// lys-http hands it and not through the platform verifier: had reqwest
+/// consulted the machine's store, this handshake would have been refused as an
+/// unknown issuer. With
+/// [`production_trusts_exactly_the_bundled_roots`], which shows the roots
+/// production hands it are exactly the bundled set, that is "the bundled
+/// roots, not the machine's".
 #[tokio::test]
 async fn a_certificate_for_the_name_under_a_trusted_root_is_answered() -> TestResult<()> {
     let issued = issue("127.0.0.1")?;
@@ -188,4 +197,15 @@ async fn a_certificate_for_the_name_under_a_trusted_root_is_answered() -> TestRe
     assert_eq!(answer.status(), reqwest::StatusCode::NO_CONTENT);
     assert!(serving.join().map_err(|_| "the server thread panicked")?);
     Ok(())
+}
+
+/// The roots `builder` and `client` hand rustls are every bundled webpki root
+/// and nothing else. The count is read from webpki-roots itself, so a change
+/// to how the store is filled (an extra source, a filter, a machine's store
+/// merged in) is refused here.
+#[test]
+fn production_trusts_exactly_the_bundled_roots() {
+    let roots = super::bundled_roots();
+    assert!(!webpki_roots::TLS_SERVER_ROOTS.is_empty());
+    assert_eq!(roots.len(), webpki_roots::TLS_SERVER_ROOTS.len());
 }
