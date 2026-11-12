@@ -15,7 +15,9 @@
 //! - [`distinguished_name`] builds the single-common-name subject form used by
 //!   every certificate and request this crate produces.
 
-use rcgen::{DistinguishedName, DnType, PKCS_ED25519, PublicKeyData, SignatureAlgorithm, SigningKey};
+use rcgen::{
+    DistinguishedName, DnType, PKCS_ED25519, PublicKeyData, SignatureAlgorithm, SigningKey,
+};
 
 use crate::keys::Ed25519Identity;
 

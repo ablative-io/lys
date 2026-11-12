@@ -52,8 +52,11 @@ impl Screens {
                     return Err(refused("a bundle entry is not a regular file or directory"));
                 }
                 let bytes = std::fs::read(child.path()).map_err(refused)?;
-                let etag = HeaderValue::from_str(&format!("\"{}\"", crate::routes::hex(&Sha256::digest(&bytes))))
-                    .map_err(refused)?;
+                let etag = HeaderValue::from_str(&format!(
+                    "\"{}\"",
+                    crate::routes::hex(&Sha256::digest(&bytes))
+                ))
+                .map_err(refused)?;
                 files.insert(
                     path,
                     Asset {

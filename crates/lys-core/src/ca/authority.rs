@@ -128,11 +128,11 @@ impl CertificateAuthority {
         })?;
 
         let params = leaf_params(subject, issued_at, expires_at, extensions)?;
-        let certificate = params
-            .signed_by(&subject_key, &issuer)
-            .map_err(|e| TrustError::CertificateGeneration {
+        let certificate = params.signed_by(&subject_key, &issuer).map_err(|e| {
+            TrustError::CertificateGeneration {
                 reason: format!("failed to sign certificate: {e}"),
-            })?;
+            }
+        })?;
 
         IssuedCertificate::from_der_and_keypair(
             certificate.der().to_vec(),
@@ -234,11 +234,11 @@ impl CertificateAuthority {
 
         let presented = PresentedKey::new(*request.subject_public_key());
         let params = leaf_params(subject, issued_at, expires_at, extensions)?;
-        let certificate = params
-            .signed_by(&presented, &issuer)
-            .map_err(|e| TrustError::CertificateGeneration {
+        let certificate = params.signed_by(&presented, &issuer).map_err(|e| {
+            TrustError::CertificateGeneration {
                 reason: format!("failed to sign certificate: {e}"),
-            })?;
+            }
+        })?;
 
         CertifiedKey::from_der_and_public_key(
             certificate.der().to_vec(),
@@ -290,7 +290,10 @@ impl CertificateAuthority {
     /// [`SigningKey`](rcgen::SigningKey) adapter, so the private seed is never
     /// serialised.
     fn issuer(&self) -> TrustResult<Issuer<'_, IdentitySigner<'_>>> {
-        Ok(Issuer::new(self.issuer_params()?, IdentitySigner::new(&self.identity)))
+        Ok(Issuer::new(
+            self.issuer_params()?,
+            IdentitySigner::new(&self.identity),
+        ))
     }
 
     /// The parameters of the self-signed issuer certificate, whose subject DN

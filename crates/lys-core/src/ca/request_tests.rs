@@ -83,5 +83,9 @@ fn patch_last(bytes: &[u8], needle: &[u8], replacement: &[u8]) -> Vec<u8> {
 /// Builds a request through rcgen directly, so tests can construct shapes
 /// `create_certificate_request` deliberately never produces.
 fn request_with_params(identity: &Arc<Ed25519Identity>, params: &CertificateParams) -> Vec<u8> {
-    params.serialize_request(&IdentitySigner::new(identity)).unwrap().der().to_vec()
+    params
+        .serialize_request(&IdentitySigner::new(identity))
+        .unwrap()
+        .der()
+        .to_vec()
 }

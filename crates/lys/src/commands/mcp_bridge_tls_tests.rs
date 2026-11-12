@@ -46,7 +46,8 @@ fn issue(root_name: &str) -> TestResult<Issued> {
     let root = root_params.self_signed(&root_key)?;
     let issuer = Issuer::new(root_params, root_key);
     let leaf_key = KeyPair::generate()?;
-    let leaf = CertificateParams::new(vec!["localhost".to_owned()])?.signed_by(&leaf_key, &issuer)?;
+    let leaf =
+        CertificateParams::new(vec!["localhost".to_owned()])?.signed_by(&leaf_key, &issuer)?;
     Ok(Issued {
         root: root.der().clone(),
         leaf: leaf.der().clone(),

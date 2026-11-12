@@ -179,12 +179,11 @@ pub fn create_certificate_request(
     })?;
     params.distinguished_name = distinguished_name(subject);
 
-    let request =
-        params
-            .serialize_request(&IdentitySigner::new(identity))
-            .map_err(|e| TrustError::CertificateGeneration {
-                reason: format!("failed to sign certificate-signing request: {e}"),
-            })?;
+    let request = params
+        .serialize_request(&IdentitySigner::new(identity))
+        .map_err(|e| TrustError::CertificateGeneration {
+            reason: format!("failed to sign certificate-signing request: {e}"),
+        })?;
 
     Ok(request.der().to_vec())
 }
