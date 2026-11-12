@@ -128,13 +128,13 @@ fn agent_pass_table_of_two_thousand_opens_and_takes_another_without_dropping_one
     let file = dir.path().join("passes.json");
     let agent = AgentId::from_bytes([1; 16]);
     let pass = "a".repeat(43);
-    let key = format!("{:x}", Sha256::digest(pass.as_bytes()));
+    let key = crate::routes::hex(&Sha256::digest(pass.as_bytes()));
     let mut entries = serde_json::Map::new();
     for index in 0..2000 {
         let digest = if index == 0 {
             key.clone()
         } else {
-            format!("{:x}", Sha256::digest(index.to_string().as_bytes()))
+            crate::routes::hex(&Sha256::digest(index.to_string().as_bytes()))
         };
         entries.insert(digest, serde_json::json!({"agent":agent.to_string(), "launch":format!("launch-{index}"), "session":format!("session-{index}")}));
     }

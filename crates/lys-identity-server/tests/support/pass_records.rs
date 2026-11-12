@@ -245,7 +245,7 @@ impl Fixture {
         self.service.dir.path().join("agent-passes.json")
     }
     pub fn key(&self) -> String {
-        format!("{:x}", Sha256::digest(self.pass.as_bytes()))
+        lower_hex(&Sha256::digest(self.pass.as_bytes()))
     }
     pub fn contains(&self) -> Result<bool, Box<dyn Error>> {
         let table: Value = serde_json::from_slice(&std::fs::read(self.file())?)?;
@@ -335,4 +335,13 @@ fn signed_in_cookie(
         .ok_or("fixture session cookie is absent")?
         .to_owned();
     Ok(cookie)
+}
+
+/// Lowercase hex of a digest (sha2 0.11's output has no `{:x}`).
+fn lower_hex(bytes: &[u8]) -> String {
+    use std::fmt::Write as _;
+    bytes.iter().fold(String::with_capacity(bytes.len() * 2), |mut text, byte| {
+        let _ = write!(text, "{byte:02x}");
+        text
+    })
 }

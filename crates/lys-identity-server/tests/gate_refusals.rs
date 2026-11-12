@@ -90,7 +90,7 @@ fn an_enabled_uninstalled_plugin_refuses_before_publication_or_spawn() -> TestRe
         "directory":directory.path(), "columns":80, "rows":24,
         "environment":{"CLAUDE_CONFIG_DIR":config_home.path()},
         "config":{"files":[{"path":"settings.json", "text":settings,
-            "sha256":format!("{:x}", Sha256::digest(settings.as_bytes()))}],
+            "sha256":lower_hex(&Sha256::digest(settings.as_bytes()))}],
             "argument_files":{}, "environment_paths":{}, "working_directory":false, "harness":"claude_code"}
     }))?;
     let error = sessions
@@ -106,4 +106,13 @@ fn an_enabled_uninstalled_plugin_refuses_before_publication_or_spawn() -> TestRe
     );
     sessions.stop_all()?;
     Ok(())
+}
+
+/// Lowercase hex of a digest (sha2 0.11's output has no `{:x}`).
+fn lower_hex(bytes: &[u8]) -> String {
+    use std::fmt::Write as _;
+    bytes.iter().fold(String::with_capacity(bytes.len() * 2), |mut text, byte| {
+        let _ = write!(text, "{byte:02x}");
+        text
+    })
 }

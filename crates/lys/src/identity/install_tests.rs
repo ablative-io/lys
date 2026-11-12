@@ -263,7 +263,7 @@ fn package(dir: &Path, files: &[(&str, &[u8])]) -> Result<(), Box<dyn Error>> {
         entries.push(serde_json::json!({
             "path": path,
             "bytes": bytes.len(),
-            "sha256": format!("{:x}", Sha256::digest(bytes)),
+            "sha256": crate::commands::hex::hex_lower(&Sha256::digest(bytes)),
         }));
     }
     let manifest = serde_json::json!({

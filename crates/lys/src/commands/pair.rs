@@ -29,7 +29,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use lys_core::ca::{certificate_subject_public_key, create_certificate_request};
 use lys_core::keys::Ed25519Identity;
 use lys_core::seat_file::SeatFile;
-use rand::RngCore;
+use rand::Rng;
 use serde_json::{Value, json};
 use zeroize::Zeroizing;
 

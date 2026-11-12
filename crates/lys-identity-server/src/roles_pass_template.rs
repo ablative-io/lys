@@ -156,7 +156,7 @@ pub(super) fn restore(
         .join("tmp")
         .join("role-fixtures");
     std::fs::create_dir_all(&cache)?;
-    let name = format!("{:x}", hash.finalize());
+    let name = crate::routes::hex(&hash.finalize());
     let lock = std::fs::File::options()
         .create(true)
         .truncate(false)

@@ -177,7 +177,7 @@ fn rotation_account_value_reaches_only_the_child_environment() -> TestResult {
         let child = Sessions::spawn_account(&spawn, &rotation, variable, |handle, place| {
             broker.use_account(handle, place)
         })?;
-        assert!(output(child)?.starts_with(&format!("{:x}", Sha256::digest(VALUE))));
+        assert!(output(child)?.starts_with(&lower_hex(&Sha256::digest(VALUE))));
         assert!(environment.is_empty());
     }
     Ok(())
@@ -208,7 +208,7 @@ fn rotation_account_successor_is_resolved_after_usage_limit_words() -> TestResul
                 broker.use_account(handle, place)
             },
         )?;
-        assert!(output(child)?.starts_with(&format!("{:x}", Sha256::digest(value))));
+        assert!(output(child)?.starts_with(&lower_hex(&Sha256::digest(value))));
         assert!(rotation.words_in("usage limit"));
         rotation.trip();
         rotation.advance(1);
@@ -278,7 +278,7 @@ fn rotation_account_value_never_reaches_rendered_files_or_captured_logs() -> Tes
         "CLAUDE_CODE_OAUTH_TOKEN",
         |handle, place| broker.use_account(handle, place),
     )?;
-    assert!(output(child)?.starts_with(&format!("{:x}", Sha256::digest(VALUE))));
+    assert!(output(child)?.starts_with(&lower_hex(&Sha256::digest(VALUE))));
     assert_eq!(before, format!("{rendered:?}"));
     assert!(!contains_value(before.as_bytes()));
     assert!(!contains_value(template.as_bytes()));
@@ -377,4 +377,13 @@ fn rotation_account_readable_secret_remains_refused() -> TestResult {
     .expect_err("readable account secret admitted");
     assert!(error.contains("readable"));
     Ok(())
+}
+
+/// Lowercase hex of a digest (sha2 0.11's output has no `{:x}`).
+fn lower_hex(bytes: &[u8]) -> String {
+    use std::fmt::Write as _;
+    bytes.iter().fold(String::with_capacity(bytes.len() * 2), |mut text, byte| {
+        let _ = write!(text, "{byte:02x}");
+        text
+    })
 }

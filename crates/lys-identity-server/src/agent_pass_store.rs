@@ -2,7 +2,7 @@
 use crate::error::ServerError;
 use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
 use lys_identity::{AgentId, Provenance};
-use rand::{TryRngCore, rngs::OsRng};
+use rand::{TryRng, rngs::SysRng};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::{HashMap, HashSet};
@@ -229,7 +229,7 @@ impl Passes {
             return Err(unavailable("invalid launch or session identifier"));
         }
         let mut random = Zeroizing::new([0; 32]);
-        OsRng
+        SysRng
             .try_fill_bytes(&mut *random)
             .map_err(|error| unavailable(format!("random source failed: {error}")))?;
         let pass = Zeroizing::new(URL_SAFE_NO_PAD.encode(*random));

@@ -75,7 +75,7 @@ impl Ed25519Identity {
     /// Make a fresh signing identity held only in memory for ephemeral work.
     #[must_use]
     pub fn ephemeral() -> Self {
-        use rand::RngCore;
+        use rand::Rng;
         let mut seed = Zeroizing::new([0u8; 32]);
         rand::rng().fill_bytes(&mut *seed);
         Self::from_seed(&seed)

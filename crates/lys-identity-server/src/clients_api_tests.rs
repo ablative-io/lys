@@ -8,7 +8,7 @@ use sha2::{Digest, Sha256};
 async fn public_clients_list_download_digest_and_unknown_platform()
 -> Result<(), Box<dyn std::error::Error>> {
     let bytes = b"a real downloadable fixture executable\n";
-    let digest = format!("{:x}", Sha256::digest(bytes));
+    let digest = crate::routes::hex(&Sha256::digest(bytes));
     let commit = "0123456789abcdef";
     let platform = "aarch64-apple-darwin";
     let (service, folder) = Service::start_with(|config| {
@@ -49,7 +49,7 @@ async fn public_clients_list_download_digest_and_unknown_platform()
     );
     let served = response.bytes().await?;
     assert_eq!(served.as_ref(), bytes);
-    assert_eq!(format!("{:x}", Sha256::digest(&served)), digest);
+    assert_eq!(crate::routes::hex(&Sha256::digest(&served)), digest);
     let (status, answer) = service.get("/clients/unknown-platform/lys", None).await?;
     assert_eq!(status, 409);
     assert_eq!(answer["refusal"], "client_platform_unknown");
@@ -76,7 +76,7 @@ async fn a_client_manifest_cannot_name_a_path_outside_the_install()
     let dir = tempfile::tempdir()?;
     let root = dir.path();
     std::fs::create_dir(root.join("install"))?;
-    let digest = format!("{:x}", Sha256::digest(b"original"));
+    let digest = crate::routes::hex(&Sha256::digest(b"original"));
     std::fs::write(
         root.join("install/build.json"),
         serde_json::to_vec(&json!({

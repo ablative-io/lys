@@ -101,7 +101,7 @@ pub fn package(dir: &Path, commit: &str) -> TestResult {
         "files": [{
             "path": "index.html",
             "bytes": index.len(),
-            "sha256": format!("{:x}", Sha256::digest(index.as_bytes())),
+            "sha256": crate::commands::hex::hex_lower(&Sha256::digest(index.as_bytes())),
         }],
     });
     std::fs::write(dir.join("surface-manifest.json"), manifest.to_string())?;

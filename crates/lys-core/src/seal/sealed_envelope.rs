@@ -41,7 +41,7 @@
 use aes_gcm::aead::{Aead, KeyInit, Payload};
 use aes_gcm::{Aes256Gcm, Key, Nonce};
 use hkdf::Hkdf;
-use rand::RngCore;
+use rand::Rng;
 use serde::{Deserialize, Serialize};
 use sha2::Sha256;
 use x25519_dalek::{PublicKey, StaticSecret};
@@ -148,13 +148,13 @@ impl SealedEnvelope {
 /// output produced here), or if AES-GCM encryption fails (only possible if
 /// the payload length exceeds `2^39 - 256` bytes, the AES-GCM hard limit).
 pub fn seal(payload: &[u8], recipient_public_key: &[u8; 32]) -> TrustResult<SealedEnvelope> {
-    // `x25519-dalek 2`'s `EphemeralSecret::random_from_rng` requires an RNG
-    // matching the rand_core version it was compiled against, which does
-    // not line up with the pinned `rand 0.9`. Generating the 32-byte
-    // ephemeral scalar from `rand` first and constructing a single-use
-    // `StaticSecret` is the same workaround the sibling crypto crates
-    // already use. The secret is dropped at end of scope, so forward
-    // secrecy per envelope is preserved.
+    // The 32-byte ephemeral scalar is generated from `rand` first and made
+    // into a single-use `StaticSecret`. This began as a workaround: under
+    // `x25519-dalek 2` and `rand 0.9`, `EphemeralSecret::random_from_rng`
+    // took a different rand_core. `x25519-dalek 3` and `rand 0.10` share
+    // rand_core 0.10; the construction is kept unchanged by that version
+    // lift. The secret is dropped at end of scope, so forward secrecy per
+    // envelope is preserved.
     let mut ephemeral_seed = Zeroizing::new([0u8; 32]);
     rand::rng().fill_bytes(ephemeral_seed.as_mut_slice());
     let ephemeral_secret = StaticSecret::from(*ephemeral_seed);

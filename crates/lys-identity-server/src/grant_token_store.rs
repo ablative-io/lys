@@ -4,7 +4,7 @@
 use crate::grant_tokens::{Issued, TokenError};
 use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
 use lys_identity::grants::GrantId;
-use rand::{TryRngCore, rngs::OsRng};
+use rand::{TryRng, rngs::SysRng};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
@@ -184,7 +184,7 @@ impl Tokens {
         }
         self.prune(at);
         let mut random = [0; 32];
-        OsRng.try_fill_bytes(&mut random).map_err(unavailable)?;
+        SysRng.try_fill_bytes(&mut random).map_err(unavailable)?;
         let token = URL_SAFE_NO_PAD.encode(random);
         let id = digest(&token);
         if self.stored.tokens.contains_key(&id) {

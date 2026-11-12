@@ -53,7 +53,7 @@ fn io(action: &'static str, path: &Path, error: &std::io::Error) -> IdentityErro
 /// The SHA-256 of the file at `path`, lowercase hex.
 fn digest_of(path: &Path) -> IdentityResult<String> {
     let bytes = Zeroizing::new(std::fs::read(path).map_err(|error| io("read back", path, &error))?);
-    Ok(format!("{:x}", Sha256::digest(bytes.as_slice())))
+    Ok(crate::commands::hex::hex_lower(&Sha256::digest(bytes.as_slice())))
 }
 
 /// Reads the copy at `placing` back and refuses it, removing it, unless its
@@ -161,7 +161,7 @@ pub fn place_file(target: &Path, bytes: &[u8], private: bool) -> IdentityResult<
         .and_then(|()| file.sync_all())
         .map_err(|error| io("place", &placing, &error))?;
     drop(file);
-    check_copy(&placing, &format!("{:x}", Sha256::digest(bytes)), &name)?;
+    check_copy(&placing, &crate::commands::hex::hex_lower(&Sha256::digest(bytes)), &name)?;
     rename(&placing, target, "place")?;
     if let Some(parent) = target.parent() {
         File::open(parent)

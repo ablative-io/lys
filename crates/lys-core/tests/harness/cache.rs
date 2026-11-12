@@ -156,7 +156,7 @@ pub fn build(
     field(&mut hash, &source);
     field(&mut hash, go.as_os_str().as_encoded_bytes());
     field(&mut hash, &environment);
-    let key = format!("{:x}", hash.finalize());
+    let key = lower_hex(&hash.finalize());
     let lock = File::options()
         .create(true)
         .truncate(false)
@@ -222,4 +222,13 @@ pub fn profile(phase: &str, started: Instant) {
             started.elapsed().as_micros()
         );
     }
+}
+
+/// Lowercase hex of a digest (sha2 0.11's output has no `{:x}`).
+fn lower_hex(bytes: &[u8]) -> String {
+    use std::fmt::Write as _;
+    bytes.iter().fold(String::with_capacity(bytes.len() * 2), |mut text, byte| {
+        let _ = write!(text, "{byte:02x}");
+        text
+    })
 }

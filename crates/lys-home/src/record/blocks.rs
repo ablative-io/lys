@@ -317,7 +317,7 @@ fn discard(tmp: &Path) -> Result<(), HomeError> {
 }
 
 fn fresh_nonce() -> String {
-    use rand::RngCore;
+    use rand::Rng;
     let mut bytes = [0u8; 8];
     rand::rng().fill_bytes(&mut bytes);
     hex_of(&bytes)

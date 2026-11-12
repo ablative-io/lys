@@ -12,8 +12,8 @@
 
 use axum::http::{HeaderMap, header};
 use lys_identity::{Actor, AuthMethod};
-use rand::TryRngCore;
-use rand::rngs::OsRng;
+use rand::TryRng;
+use rand::rngs::SysRng;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
@@ -140,7 +140,7 @@ impl Acting {
 /// Refuses a failed secure random source.
 pub fn new_secret() -> Result<(String, String), ServerError> {
     let mut bytes = [0u8; 32];
-    OsRng
+    SysRng
         .try_fill_bytes(&mut bytes)
         .map_err(|error| AppError::AppsUnavailable {
             reason: format!("the secure random source failed: {error}"),

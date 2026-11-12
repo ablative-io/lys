@@ -90,7 +90,7 @@ fn server(
     let issued = rcgen::generate_simple_self_signed(vec!["localhost".to_owned()])?;
     std::fs::write(authority, issued.cert.pem())?;
     let certificate = CertificateDer::from(issued.cert.der().to_vec());
-    let key = PrivateKeyDer::Pkcs8(PrivatePkcs8KeyDer::from(issued.key_pair.serialize_der()));
+    let key = PrivateKeyDer::Pkcs8(PrivatePkcs8KeyDer::from(issued.signing_key.serialize_der()));
     let config = Arc::new(
         ServerConfig::builder_with_provider(Arc::new(rustls::crypto::ring::default_provider()))
             .with_safe_default_protocol_versions()?

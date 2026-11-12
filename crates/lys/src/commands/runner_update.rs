@@ -125,7 +125,7 @@ fn digest(path: &Path) -> CliResult<String> {
         }
         hash.update(&buffer[..count]);
     }
-    Ok(format!("{:x}", hash.finalize()))
+    Ok(crate::commands::hex::hex_lower(&hash.finalize()))
 }
 
 fn verify(path: &Path, expected: &str) -> CliResult<()> {

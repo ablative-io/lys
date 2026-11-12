@@ -28,7 +28,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use lys_core::attestation::sign_attestation;
 use lys_core::keys::Ed25519Identity;
 use lys_core::seat_file::{SeatFile, identity_from_pem};
-use rand::RngCore;
+use rand::Rng;
 use sha2::{Digest, Sha256};
 use zeroize::Zeroizing;
 

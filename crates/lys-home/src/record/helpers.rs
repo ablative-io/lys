@@ -76,7 +76,7 @@ pub fn now() -> String {
 /// A fresh entry id: 16 random bytes as hex, which Pi accepts as an id.
 #[must_use]
 pub fn fresh_id() -> String {
-    use rand::RngCore;
+    use rand::Rng;
     let mut bytes = [0u8; 16];
     rand::rng().fill_bytes(&mut bytes);
     blocks::hex_of(&bytes)

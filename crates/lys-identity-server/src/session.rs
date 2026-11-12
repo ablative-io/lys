@@ -21,8 +21,8 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use lys_core::clock::{Clock, ClockSource};
 use lys_identity::Actor;
-use rand::TryRngCore;
-use rand::rngs::OsRng;
+use rand::TryRng;
+use rand::rngs::SysRng;
 use sha2::{Digest, Sha256};
 
 use crate::error::ServerError;
@@ -85,7 +85,7 @@ fn key_of(secret: &str) -> String {
 /// `N` bytes from the secure random source, as lowercase hex.
 fn random_hex<const N: usize>() -> Result<String, ServerError> {
     let mut bytes = [0u8; N];
-    OsRng
+    SysRng
         .try_fill_bytes(&mut bytes)
         .map_err(|error| ServerError::SignInFailed {
             reason: format!("the secure random source failed: {error}"),

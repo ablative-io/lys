@@ -39,7 +39,7 @@ use lys_pass::membership_pages::{
     self, MembershipPage, PageBounds, PageOutcome, PageRow, RecipientPageRequest,
     ResourcePageRequest,
 };
-use rand::RngCore;
+use rand::Rng;
 
 use crate::channel_membership::{Named, contract_resource, named, pass_mode, served_log, within};
 use crate::channel_membership_counts::{Counts, Membership};

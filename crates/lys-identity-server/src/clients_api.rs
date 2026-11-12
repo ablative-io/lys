@@ -165,7 +165,7 @@ pub(crate) fn executable(
         .join(name);
     let bytes = std::fs::read(&path)
         .map_err(|error| refused("clients_unreadable", format!("{}: {error}", path.display())))?;
-    let digest = format!("{:x}", Sha256::digest(&bytes));
+    let digest = crate::routes::hex(&Sha256::digest(&bytes));
     if digest != *expected {
         return Err(refused(
             "client_digest_mismatch",

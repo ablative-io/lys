@@ -34,7 +34,7 @@ fn fingerprint() -> Result<&'static str, Box<dyn Error>> {
             digest.update(metadata.len().to_le_bytes());
             digest.update(metadata.mtime().to_le_bytes());
             digest.update(metadata.mtime_nsec().to_le_bytes());
-            Ok(format!("{:x}", digest.finalize()))
+            Ok(lower_hex(&digest.finalize()))
         };
         result().map_err(|error| format!("hashing paging fixture: {error}"))
     })
@@ -72,7 +72,7 @@ fn cached<T: Serialize + DeserializeOwned>(
         config.administrator.as_ref().map(|login| &login.subject),
     ))?);
     digest.update(fs::read(&config.event_key_file)?);
-    let key = format!("{:x}", digest.finalize());
+    let key = lower_hex(&digest.finalize());
     let cache = Path::new(env!("CARGO_TARGET_TMPDIR")).join("list-paging-cache");
     fs::create_dir_all(&cache)?;
     let lock = File::options()
@@ -233,4 +233,13 @@ pub(super) fn scale(config: &Config) -> Result<scale::Fixture, Box<dyn Error>> {
         [(fixture.people[0].id.clone(), ADMINISTRATOR.to_owned())],
     )?);
     Ok(fixture)
+}
+
+/// Lowercase hex of a digest (sha2 0.11's output has no `{:x}`).
+fn lower_hex(bytes: &[u8]) -> String {
+    use std::fmt::Write as _;
+    bytes.iter().fold(String::with_capacity(bytes.len() * 2), |mut text, byte| {
+        let _ = write!(text, "{byte:02x}");
+        text
+    })
 }

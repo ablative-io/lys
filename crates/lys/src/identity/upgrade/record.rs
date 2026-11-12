@@ -65,7 +65,7 @@ pub fn record_build(
                 )
                 .at(&manifest_path)
             })?;
-            let digest = format!("{:x}", Sha256::digest(&bytes));
+            let digest = crate::commands::hex::hex_lower(&Sha256::digest(&bytes));
             say(&format!(
                 "build screens {} manifest sha256 {digest}",
                 manifest.commit

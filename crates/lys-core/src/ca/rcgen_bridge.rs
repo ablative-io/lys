@@ -5,8 +5,8 @@
 //! drift apart in how they present keys to rcgen:
 //!
 //! - [`IdentitySigner`] exposes an [`Ed25519Identity`]'s public key and `sign`
-//!   operation to rcgen through [`RemoteKeyPair`], so the private seed is
-//!   never serialised into an rcgen `KeyPair`.
+//!   operation to rcgen through [`SigningKey`], so the private seed is never
+//!   serialised into an rcgen `KeyPair`.
 //! - [`PresentedKey`] carries a bare 32-byte Ed25519 public key whose private
 //!   half this process has never seen, so a certificate can be signed over a
 //!   key the *holder* controls. It is deliberately incapable of signing:
@@ -15,29 +15,24 @@
 //! - [`distinguished_name`] builds the single-common-name subject form used by
 //!   every certificate and request this crate produces.
 
-use std::sync::Arc;
-
-use rcgen::{
-    DistinguishedName, DnType, PKCS_ED25519, PublicKeyData, RemoteKeyPair, SignatureAlgorithm,
-};
+use rcgen::{DistinguishedName, DnType, PKCS_ED25519, PublicKeyData, SignatureAlgorithm, SigningKey};
 
 use crate::keys::Ed25519Identity;
 
-/// rcgen [`RemoteKeyPair`] adapter over an [`Ed25519Identity`].
+/// rcgen [`SigningKey`] adapter over an [`Ed25519Identity`].
 ///
 /// Exposes the identity's public key and `sign` operation to rcgen without
-/// revealing the private seed. Held behind an [`Arc`] so it satisfies rcgen's
-/// `'static` boxed-trait requirement while sharing one identity — cloning the
-/// identity instead would put a second copy of the private seed in memory.
-pub(crate) struct IdentitySigner {
-    identity: Arc<Ed25519Identity>,
-    public_key: Vec<u8>,
+/// revealing the private seed. It borrows the identity: cloning it instead
+/// would put a second copy of the private seed in memory.
+pub(crate) struct IdentitySigner<'a> {
+    identity: &'a Ed25519Identity,
+    public_key: [u8; 32],
 }
 
-impl IdentitySigner {
-    /// Wraps a shared identity as an rcgen remote keypair.
-    pub(crate) fn new(identity: Arc<Ed25519Identity>) -> Self {
-        let public_key = identity.public_key_bytes().to_vec();
+impl<'a> IdentitySigner<'a> {
+    /// Wraps an identity as an rcgen signing key.
+    pub(crate) fn new(identity: &'a Ed25519Identity) -> Self {
+        let public_key = identity.public_key_bytes();
         Self {
             identity,
             public_key,
@@ -45,17 +40,20 @@ impl IdentitySigner {
     }
 }
 
-impl RemoteKeyPair for IdentitySigner {
-    fn public_key(&self) -> &[u8] {
+impl PublicKeyData for IdentitySigner<'_> {
+    /// The raw 32-byte Ed25519 point (RFC 8410), as for [`PresentedKey`].
+    fn der_bytes(&self) -> &[u8] {
         &self.public_key
     }
 
+    fn algorithm(&self) -> &SignatureAlgorithm {
+        &PKCS_ED25519
+    }
+}
+
+impl SigningKey for IdentitySigner<'_> {
     fn sign(&self, msg: &[u8]) -> Result<Vec<u8>, rcgen::Error> {
         Ok(self.identity.sign(msg).to_vec())
-    }
-
-    fn algorithm(&self) -> &'static SignatureAlgorithm {
-        &PKCS_ED25519
     }
 }
 

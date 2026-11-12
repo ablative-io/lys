@@ -1,8 +1,8 @@
 //! Canonical length-prefixed encoding, hex, digests, secure random bytes and
 //! constant-time comparison.
 
-use rand::TryRngCore;
-use rand::rngs::OsRng;
+use rand::TryRng;
+use rand::rngs::SysRng;
 use sha2::{Digest, Sha256};
 
 use crate::error::SecretsError;
@@ -55,7 +55,7 @@ pub(crate) fn ct_eq(a: &[u8; 32], b: &[u8; 32]) -> bool {
 /// `N` bytes from the operating system's secure random source.
 pub(crate) fn random_bytes<const N: usize>() -> Result<[u8; N], SecretsError> {
     let mut bytes = [0u8; N];
-    OsRng
+    SysRng
         .try_fill_bytes(&mut bytes)
         .map_err(|source| SecretsError::Random {
             reason: source.to_string(),

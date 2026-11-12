@@ -16,7 +16,7 @@ use std::sync::Arc;
 use std::thread::{self, JoinHandle};
 
 use lys_core::keys::Ed25519Identity;
-use rcgen::{BasicConstraints, CertificateParams, DnType, IsCa, KeyPair};
+use rcgen::{BasicConstraints, CertificateParams, DnType, IsCa, Issuer, KeyPair};
 use rustls::pki_types::{CertificateDer, PrivateKeyDer, PrivatePkcs8KeyDer};
 use rustls::{ServerConfig, ServerConnection, StreamOwned};
 use zeroize::Zeroizing;
@@ -44,9 +44,9 @@ fn issue(root_name: &str) -> TestResult<Issued> {
         .push(DnType::CommonName, root_name);
     let root_key = KeyPair::generate()?;
     let root = root_params.self_signed(&root_key)?;
+    let issuer = Issuer::new(root_params, root_key);
     let leaf_key = KeyPair::generate()?;
-    let leaf = CertificateParams::new(vec!["localhost".to_owned()])?
-        .signed_by(&leaf_key, &root, &root_key)?;
+    let leaf = CertificateParams::new(vec!["localhost".to_owned()])?.signed_by(&leaf_key, &issuer)?;
     Ok(Issued {
         root: root.der().clone(),
         leaf: leaf.der().clone(),

@@ -5,7 +5,7 @@
 use std::path::Path;
 use std::sync::atomic::{AtomicU64, Ordering};
 
-use rand::RngCore;
+use rand::Rng;
 use zeroize::Zeroizing;
 
 use super::Ed25519Identity;

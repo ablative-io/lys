@@ -58,7 +58,7 @@ fn executable(source: &Path) -> Result<PathBuf, Box<dyn Error>> {
             hash.update(fs::read(entry.path())?);
         }
     }
-    let key = format!("{:x}", hash.finalize());
+    let key = lys::commands::hex::hex_lower(&hash.finalize());
     let cache = Path::new(env!("CARGO_TARGET_TMPDIR")).join("version-stamps");
     fs::create_dir_all(&cache)?;
     let lock = OpenOptions::new()

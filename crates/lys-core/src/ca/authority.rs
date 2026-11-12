@@ -4,7 +4,7 @@
 //! The authority wraps an [`Ed25519Identity`] and issues short-lived X.509
 //! certificates for arbitrary subjects. All certificates use Ed25519
 //! exclusively, and the certificate is signed by the authority's Ed25519 key,
-//! surfaced to rcgen through a [`RemoteKeyPair`](rcgen::RemoteKeyPair) adapter
+//! surfaced to rcgen through a [`SigningKey`](rcgen::SigningKey) adapter
 //! so the authority's private seed is never exposed.
 //!
 //! # Two issuance paths, one certificate shape
@@ -38,8 +38,8 @@ use std::time::Duration;
 
 use chrono::{DateTime, Timelike, Utc};
 use rcgen::{
-    BasicConstraints, Certificate, CertificateParams, CustomExtension, IsCa, KeyPair,
-    KeyUsagePurpose, PKCS_ED25519,
+    BasicConstraints, CertificateParams, CustomExtension, IsCa, Issuer, KeyPair, KeyUsagePurpose,
+    PKCS_ED25519,
 };
 use time::OffsetDateTime;
 
@@ -119,8 +119,7 @@ impl CertificateAuthority {
         validate_issuance(subject, ttl)?;
         let (issued_at, expires_at) = validity_window(ttl, self.creation_time()?)?;
 
-        let issuer_key = self.issuer_key_pair()?;
-        let issuer_cert = self.issuer_certificate(&issuer_key)?;
+        let issuer = self.issuer()?;
 
         let subject_key = KeyPair::generate_for(&PKCS_ED25519).map_err(|e| {
             TrustError::CertificateGeneration {
@@ -130,7 +129,7 @@ impl CertificateAuthority {
 
         let params = leaf_params(subject, issued_at, expires_at, extensions)?;
         let certificate = params
-            .signed_by(&subject_key, &issuer_cert, &issuer_key)
+            .signed_by(&subject_key, &issuer)
             .map_err(|e| TrustError::CertificateGeneration {
                 reason: format!("failed to sign certificate: {e}"),
             })?;
@@ -231,13 +230,12 @@ impl CertificateAuthority {
             });
         }
 
-        let issuer_key = self.issuer_key_pair()?;
-        let issuer_cert = self.issuer_certificate(&issuer_key)?;
+        let issuer = self.issuer()?;
 
         let presented = PresentedKey::new(*request.subject_public_key());
         let params = leaf_params(subject, issued_at, expires_at, extensions)?;
         let certificate = params
-            .signed_by(&presented, &issuer_cert, &issuer_key)
+            .signed_by(&presented, &issuer)
             .map_err(|e| TrustError::CertificateGeneration {
                 reason: format!("failed to sign certificate: {e}"),
             })?;
@@ -278,22 +276,25 @@ impl CertificateAuthority {
     /// Returns [`TrustError::CertificateGeneration`] if the issuer
     /// certificate cannot be built or signed, or creation time is unavailable.
     pub fn issuer_certificate_der(&self) -> TrustResult<Vec<u8>> {
-        let issuer_key = self.issuer_key_pair()?;
-        Ok(self.issuer_certificate(&issuer_key)?.der().to_vec())
+        let certificate = self
+            .issuer_params()?
+            .self_signed(&IdentitySigner::new(&self.identity))
+            .map_err(|e| TrustError::CertificateGeneration {
+                reason: format!("failed to build issuer certificate: {e}"),
+            })?;
+        Ok(certificate.der().to_vec())
     }
 
-    /// Builds an rcgen [`KeyPair`] backed by this authority's identity through
-    /// a [`RemoteKeyPair`](rcgen::RemoteKeyPair) adapter, so the private seed
-    /// is never serialised.
-    fn issuer_key_pair(&self) -> TrustResult<KeyPair> {
-        let remote = IdentitySigner::new(Arc::clone(&self.identity));
-        KeyPair::from_remote(Box::new(remote)).map_err(|e| TrustError::CertificateGeneration {
-            reason: format!("failed to construct issuer key from identity: {e}"),
-        })
+    /// The rcgen issuer every certificate is signed by: the issuer
+    /// certificate's parameters with this authority's identity behind a
+    /// [`SigningKey`](rcgen::SigningKey) adapter, so the private seed is never
+    /// serialised.
+    fn issuer(&self) -> TrustResult<Issuer<'_, IdentitySigner<'_>>> {
+        Ok(Issuer::new(self.issuer_params()?, IdentitySigner::new(&self.identity)))
     }
 
-    /// Builds the self-signed issuer certificate whose subject DN is derived
-    /// from this authority's public key.
+    /// The parameters of the self-signed issuer certificate, whose subject DN
+    /// is derived from this authority's public key.
     ///
     /// It is the trust anchor [`Self::issuer_certificate_der`] hands out, so
     /// every field that matters to a relying party is set explicitly rather
@@ -306,7 +307,7 @@ impl CertificateAuthority {
     ///
     /// None of this reaches the certificates it signs: rcgen takes only the
     /// issuer's distinguished name and key identifier method from it.
-    fn issuer_certificate(&self, issuer_key: &KeyPair) -> TrustResult<Certificate> {
+    fn issuer_params(&self) -> TrustResult<CertificateParams> {
         let created_at = self.creation_time()?;
         let mut params = CertificateParams::new(Vec::<String>::new()).map_err(|e| {
             TrustError::CertificateGeneration {
@@ -323,11 +324,7 @@ impl CertificateAuthority {
                 reason: format!("issuer certificate notAfter is out of range: {e}"),
             }
         })?;
-        params
-            .self_signed(issuer_key)
-            .map_err(|e| TrustError::CertificateGeneration {
-                reason: format!("failed to build issuer certificate: {e}"),
-            })
+        Ok(params)
     }
 
     fn creation_time(&self) -> TrustResult<DateTime<Utc>> {

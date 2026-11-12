@@ -42,8 +42,8 @@ use std::sync::{Mutex, MutexGuard};
 use base64::Engine;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use lys_identity::PersonId;
-use rand::TryRngCore;
-use rand::rngs::OsRng;
+use rand::TryRng;
+use rand::rngs::SysRng;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
@@ -229,7 +229,7 @@ fn held<T>(slot: &Mutex<T>) -> Result<MutexGuard<'_, T>, ServerError> {
 /// `N` bytes from the secure random source, base64url.
 fn random<const N: usize>() -> Result<String, ServerError> {
     let mut bytes = [0u8; N];
-    OsRng
+    SysRng
         .try_fill_bytes(&mut bytes)
         .map_err(|error| unavailable(format!("the secure random source failed: {error}")))?;
     Ok(URL_SAFE_NO_PAD.encode(bytes))

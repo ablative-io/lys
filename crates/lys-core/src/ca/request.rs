@@ -101,7 +101,7 @@
 use std::sync::Arc;
 
 use ed25519_dalek::{Signature, VerifyingKey};
-use rcgen::{CertificateParams, KeyPair};
+use rcgen::CertificateParams;
 use x509_parser::certification_request::X509CertificationRequest;
 use x509_parser::oid_registry::OID_SIG_ED25519;
 use x509_parser::prelude::FromDer;
@@ -179,15 +179,9 @@ pub fn create_certificate_request(
     })?;
     params.distinguished_name = distinguished_name(subject);
 
-    let signer = IdentitySigner::new(Arc::clone(identity));
-    let key_pair =
-        KeyPair::from_remote(Box::new(signer)).map_err(|e| TrustError::CertificateGeneration {
-            reason: format!("failed to construct request key from identity: {e}"),
-        })?;
-
     let request =
         params
-            .serialize_request(&key_pair)
+            .serialize_request(&IdentitySigner::new(identity))
             .map_err(|e| TrustError::CertificateGeneration {
                 reason: format!("failed to sign certificate-signing request: {e}"),
             })?;

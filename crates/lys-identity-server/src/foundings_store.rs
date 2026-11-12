@@ -9,7 +9,7 @@
 //! the clock.
 
 use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
-use rand::{TryRngCore, rngs::OsRng};
+use rand::{TryRng, rngs::SysRng};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
@@ -124,7 +124,7 @@ pub fn digest(token: &str) -> String {
 /// Names the operating system's refusal to give random bytes.
 pub fn new_token() -> Result<String, ServerError> {
     let mut bytes = [0_u8; 32];
-    OsRng
+    SysRng
         .try_fill_bytes(&mut bytes)
         .map_err(|error| ServerError::DirectoryUnavailable {
             reason: format!(

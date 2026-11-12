@@ -8,8 +8,8 @@
 
 use lys_core::Ed25519Identity;
 use lys_core::attestation::sign_attestation;
-use rand::TryRngCore;
-use rand::rngs::OsRng;
+use rand::TryRng;
+use rand::rngs::SysRng;
 use sha2::{Digest, Sha256};
 
 use crate::error::ServerError;
@@ -44,7 +44,7 @@ pub struct Asked<'a> {
 /// to encode.
 pub fn headers(asked: &Asked<'_>, key: &Ed25519Identity) -> Result<[String; 5], ServerError> {
     let mut operation = [0_u8; 16];
-    OsRng
+    SysRng
         .try_fill_bytes(&mut operation)
         .map_err(|error| ServerError::SecretsUnavailable {
             reason: format!("the secure random source failed: {error}"),

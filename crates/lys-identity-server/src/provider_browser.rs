@@ -3,7 +3,7 @@
 //! with the flow. The callback must present exactly one matching cookie.
 use axum::http::{HeaderMap, header};
 use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
-use rand::{TryRngCore, rngs::OsRng};
+use rand::{TryRng, rngs::SysRng};
 use sha2::{Digest, Sha256};
 
 use crate::error::ServerError;
@@ -12,7 +12,7 @@ const COOKIE: &str = "lys_provider";
 
 pub(crate) fn begin(secure: bool) -> Result<(String, [u8; 32]), ServerError> {
     let mut bytes = [0u8; 32];
-    OsRng
+    SysRng
         .try_fill_bytes(&mut bytes)
         .map_err(|error| ServerError::SignInFailed {
             reason: format!("the secure random source failed: {error}"),

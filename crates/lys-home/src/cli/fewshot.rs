@@ -6,7 +6,7 @@
 use std::io::Write;
 use std::path::Path;
 
-use rand::RngCore;
+use rand::Rng;
 use serde_json::json;
 
 use crate::error::HomeError;

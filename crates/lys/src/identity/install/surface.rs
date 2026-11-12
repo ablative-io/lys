@@ -95,7 +95,7 @@ pub fn verify(package: &Path) -> IdentityResult<(Manifest, Verified)> {
         let path = package.join(&relative);
         let bytes = std::fs::read(&path)
             .map_err(|error| refuse(ErrorKind::ConfigUnreadable, error.to_string()).at(&path))?;
-        let digest = format!("{:x}", Sha256::digest(&bytes));
+        let digest = crate::commands::hex::hex_lower(&Sha256::digest(&bytes));
         if bytes.len() as u64 != entry.bytes || digest != entry.sha256 {
             return Err(refuse(
                 ErrorKind::ReadBackMismatch,

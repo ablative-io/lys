@@ -232,7 +232,7 @@ fn an_interrupted_import_resumes_from_its_reservation() -> TestResult {
 }
 
 fn digest(path: &std::path::Path) -> Result<String, Box<dyn Error>> {
-    Ok(format!("{:x}", Sha256::digest(std::fs::read(path)?)))
+    Ok(lower_hex(&Sha256::digest(std::fs::read(path)?)))
 }
 
 #[test]
@@ -327,4 +327,13 @@ fn seat_import_preserves_edits() -> TestResult {
         .collect::<Result<Vec<_>, _>>()?;
     assert_eq!(before, after, "no source is changed by an import");
     Ok(())
+}
+
+/// Lowercase hex of a digest (sha2 0.11's output has no `{:x}`).
+fn lower_hex(bytes: &[u8]) -> String {
+    use std::fmt::Write as _;
+    bytes.iter().fold(String::with_capacity(bytes.len() * 2), |mut text, byte| {
+        let _ = write!(text, "{byte:02x}");
+        text
+    })
 }

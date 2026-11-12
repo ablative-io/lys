@@ -48,7 +48,7 @@ pub(super) fn clients(root: &Path) -> TestResult {
         let mut files = BTreeMap::new();
         for name in ["lys", "lys-containment-entry"] {
             let bytes = fixture_executable(platform, name);
-            files.insert(name, format!("{:x}", Sha256::digest(&bytes)));
+            files.insert(name, crate::routes::hex(&Sha256::digest(&bytes)));
             std::fs::write(folder.join(name), bytes)?;
         }
         releases.insert(platform, json!({"commit": COMMIT, "files": files}));

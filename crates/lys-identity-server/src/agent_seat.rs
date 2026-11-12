@@ -12,7 +12,7 @@ use lys_core::Ed25519Identity;
 use lys_core::attestation::{sign_attestation, verify_attestation_bytes_by_signer};
 use lys_home::harness::lys_mcp::{SEAT_HEADER, Seat, delegation_bytes, hex, pass_bytes, unhex};
 use lys_identity::AgentId;
-use rand::{TryRngCore, rngs::OsRng};
+use rand::{TryRng, rngs::SysRng};
 use zeroize::Zeroizing;
 
 use crate::certificate_keys::SigningCertificate;
@@ -57,7 +57,7 @@ pub(crate) fn seat(
     let path = path.ok_or_else(|| unavailable("the certificate's key is kept nowhere"))?;
     let certificate = Ed25519Identity::load(&path).map_err(unavailable)?;
     let mut seed = Zeroizing::new([0_u8; 32]);
-    OsRng
+    SysRng
         .try_fill_bytes(&mut *seed)
         .map_err(|error| unavailable(format!("random source failed: {error}")))?;
     let seat_key = Ed25519Identity::from_seed(&seed);

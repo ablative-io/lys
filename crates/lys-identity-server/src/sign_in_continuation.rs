@@ -6,8 +6,8 @@
 
 use base64::Engine;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
-use rand::TryRngCore;
-use rand::rngs::OsRng;
+use rand::TryRng;
+use rand::rngs::SysRng;
 
 use super::failed;
 use crate::error::ServerError;
@@ -62,7 +62,7 @@ impl Refused {
 /// A PKCE verifier: 32 bytes from the secure random source, base64url.
 pub(super) fn verifier() -> Result<String, ServerError> {
     let mut bytes = [0u8; 32];
-    OsRng
+    SysRng
         .try_fill_bytes(&mut bytes)
         .map_err(|error| failed(format!("the secure random source failed: {error}")))?;
     Ok(URL_SAFE_NO_PAD.encode(bytes))

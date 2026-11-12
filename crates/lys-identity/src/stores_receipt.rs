@@ -348,7 +348,7 @@ pub fn store(name: &str) -> Option<&'static Named> {
 /// The lowercase hex SHA-256 of `bytes`.
 #[must_use]
 pub fn digest(bytes: &[u8]) -> String {
-    format!("{:x}", Sha256::digest(bytes))
+    crate::id::to_hex(&Sha256::digest(bytes))
 }
 
 /// Now, RFC 3339 UTC to the microsecond: a receipt and an acceptance made

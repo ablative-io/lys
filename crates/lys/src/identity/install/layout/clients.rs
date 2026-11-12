@@ -210,7 +210,7 @@ pub fn prepare_clients(
                     format!("client_binary_empty: {platform} holds an empty {name}"),
                 ));
             }
-            files.insert(name.to_owned(), format!("{:x}", Sha256::digest(&bytes)));
+            files.insert(name.to_owned(), crate::commands::hex::hex_lower(&Sha256::digest(&bytes)));
             set.files.push(ClientFile {
                 platform: platform.clone(),
                 name,

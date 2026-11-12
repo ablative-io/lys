@@ -27,8 +27,8 @@ use hyper::header::{HeaderName, HeaderValue};
 use hyper::{HeaderMap, Request, Response, StatusCode};
 use lys_core::Ed25519Identity;
 use lys_core::attestation::sign_attestation;
-use rand::TryRngCore;
-use rand::rngs::OsRng;
+use rand::TryRng;
+use rand::rngs::SysRng;
 use sha2::{Digest, Sha256};
 
 use super::error::ProxyError;
@@ -190,7 +190,7 @@ pub fn presentation(
     key: &Ed25519Identity,
 ) -> Result<[(&'static str, String); 5], ProxyError> {
     let mut operation = [0_u8; 16];
-    OsRng
+    SysRng
         .try_fill_bytes(&mut operation)
         .map_err(|error| unread(&format!("the secure random source failed: {error}")))?;
     let signed_at = std::time::SystemTime::now()

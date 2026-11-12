@@ -19,8 +19,8 @@ use axum::{Json, Router};
 use base64::Engine;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use lys_identity::{AgentId, IdentityId, OperationId, Profile, Transition};
-use rand::TryRngCore;
-use rand::rngs::OsRng;
+use rand::TryRng;
+use rand::rngs::SysRng;
 use serde_json::json;
 use sha2::{Digest, Sha256};
 
@@ -105,7 +105,7 @@ fn malformed(reason: &str) -> ServerError {
 
 fn random() -> Result<String, ServerError> {
     let mut bytes = [0_u8; 32];
-    OsRng
+    SysRng
         .try_fill_bytes(&mut bytes)
         .map_err(|error| ServerError::ConfigInvalid {
             reason: format!("no randomness for a connected-app token: {error}"),

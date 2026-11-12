@@ -9,8 +9,8 @@
 use std::fmt;
 use std::str::FromStr;
 
-use rand::TryRngCore;
-use rand::rngs::OsRng;
+use rand::TryRng;
+use rand::rngs::SysRng;
 
 use crate::error::IdentityError;
 pub use crate::organisation::OrganisationId;
@@ -21,7 +21,7 @@ pub const ID_LEN: usize = 16;
 /// Sixteen bytes from the operating system's secure random source.
 pub(crate) fn random_bytes() -> Result<[u8; ID_LEN], IdentityError> {
     let mut bytes = [0u8; ID_LEN];
-    OsRng
+    SysRng
         .try_fill_bytes(&mut bytes)
         .map_err(|error| IdentityError::RandomSourceUnavailable {
             reason: error.to_string(),

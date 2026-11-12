@@ -53,7 +53,7 @@ use std::sync::Arc;
 use axum::Router;
 use axum::routing::post;
 use lys_identity::MachineId;
-use rand::{TryRngCore, rngs::OsRng};
+use rand::{TryRng, rngs::SysRng};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use zeroize::Zeroize;
@@ -270,7 +270,7 @@ impl JoinStore {
             .into());
         }
         let mut random = [0_u8; 32];
-        OsRng.try_fill_bytes(&mut random).map_err(|error| {
+        SysRng.try_fill_bytes(&mut random).map_err(|error| {
             unavailable(format!(
                 "no random bytes could be read for a connection code: {error}"
             ))

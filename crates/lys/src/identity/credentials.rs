@@ -8,7 +8,7 @@
 use std::fmt;
 
 use base64::Engine;
-use rand::{Rng, RngCore};
+use rand::{Rng, RngExt};
 use zeroize::Zeroizing;
 
 use super::error::{ErrorKind, IdentityError, IdentityResult};

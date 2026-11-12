@@ -32,7 +32,7 @@ pub fn credential_path(layout: &Layout) -> PathBuf {
 /// # Errors
 /// Returns named configuration, credential-file or provider API failures.
 pub fn prepare_credential(layout: &Layout) -> IdentityResult<()> {
-    use rand::RngCore;
+    use rand::Rng;
     use std::io::Write;
     use std::os::unix::fs::OpenOptionsExt;
 

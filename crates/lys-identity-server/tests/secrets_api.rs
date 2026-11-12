@@ -88,7 +88,7 @@ async fn broker(State(log): State<Log>, request: Request) -> Response {
             let prefix = format!("lys-app-{owner}-{app}");
             let mut answer = json!({"app":app,"client_secret_ref":format!("{prefix}-client"),"api_credential_ref":format!("{prefix}-api")});
             answer["client_secret_sha256"] =
-                json!(format!("{:x}", Sha256::digest("ab".repeat(32).as_bytes())));
+                json!(lower_hex(&Sha256::digest("ab".repeat(32).as_bytes())));
             if app == "fixture_bad_custody" {
                 answer["client_secret_ref"] = json!("another-app");
             }
@@ -96,7 +96,7 @@ async fn broker(State(log): State<Log>, request: Request) -> Response {
         }
         "/_lys/apps/client/issue" => axum::Json(json!({
             "app": app, "credential_id": CREDENTIAL_ID, "owner": owner,
-            "client_secret_sha256": format!("{:x}", Sha256::digest("ab".repeat(32).as_bytes())),
+            "client_secret_sha256": lower_hex(&Sha256::digest("ab".repeat(32).as_bytes())),
             "value": format!("lys-client.{app}.{}", "cd".repeat(32)),
         }))
         .into_response(),
@@ -436,3 +436,12 @@ async fn without_a_broker_configured_the_routes_say_so() -> TestResult {
 
 #[path = "shared/secrets_custody.rs"]
 mod secrets_custody;
+
+/// Lowercase hex of a digest (sha2 0.11's output has no `{:x}`).
+fn lower_hex(bytes: &[u8]) -> String {
+    use std::fmt::Write as _;
+    bytes.iter().fold(String::with_capacity(bytes.len() * 2), |mut text, byte| {
+        let _ = write!(text, "{byte:02x}");
+        text
+    })
+}

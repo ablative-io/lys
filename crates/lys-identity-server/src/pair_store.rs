@@ -16,7 +16,7 @@ use std::io::Write;
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 
-use rand::{TryRngCore, rngs::OsRng};
+use rand::{TryRng, rngs::SysRng};
 use serde::{Deserialize, Serialize};
 use tokio::sync::watch;
 
@@ -172,7 +172,7 @@ impl PairStore {
     pub fn ask(&mut self, name: String, request: String) -> Result<(String, String), ServerError> {
         let code = loop {
             let mut bytes = [0_u8; 4];
-            OsRng.try_fill_bytes(&mut bytes).map_err(|error| {
+            SysRng.try_fill_bytes(&mut bytes).map_err(|error| {
                 ServerError::DirectoryUnavailable {
                     reason: format!(
                         "the operating system gave no random bytes for a pairing code: {error}"
