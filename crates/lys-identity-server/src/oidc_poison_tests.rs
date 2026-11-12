@@ -19,7 +19,7 @@ fn relying_party() -> Result<Oidc, Box<dyn Error>> {
         secret: ClientSecret::new("fixture".to_owned()),
         redirect: RedirectUrl::new("https://lys.example.test/callback".to_owned())?,
         public_origin: "https://lys.example.test".to_owned(),
-        http: reqwest::Client::new(),
+        http: lys_http::client().expect("lys-http builds the client"),
         in_flight: Mutex::new(Flights::default()),
         provider_flights: Mutex::new(Flights::default()),
     })

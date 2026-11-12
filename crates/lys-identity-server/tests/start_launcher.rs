@@ -243,7 +243,7 @@ impl Served {
         Ok(Self {
             base,
             planned,
-            client: reqwest::Client::new(),
+            client: lys_http::client().expect("lys-http builds the client"),
             dir,
         })
     }

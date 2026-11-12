@@ -211,21 +211,21 @@ pub(super) fn routes(config: &Config) -> Result<Router, ServerError> {
             "the native issuer address must name its auth API without credentials or query",
         ));
     }
-    let http = crate::outbound::http()
-        .redirect(reqwest::redirect::Policy::none())
-        .no_proxy()
-        .no_gzip()
-        .no_brotli()
-        .no_deflate()
-        .no_zstd()
-        .user_agent("lys-issuer-admin")
-        .build()
-        .map_err(|error| {
-            refused(&format!(
-                "the native issuer HTTP client could not be built: {}",
-                error.without_url()
-            ))
-        })?;
+    let http = crate::outbound::client(|http| {
+        http.redirect(reqwest::redirect::Policy::none())
+            .no_proxy()
+            .no_gzip()
+            .no_brotli()
+            .no_deflate()
+            .no_zstd()
+            .user_agent("lys-issuer-admin")
+    })
+    .map_err(|error| {
+        refused(&format!(
+            "the native issuer HTTP client could not be built: {}",
+            error.without_url()
+        ))
+    })?;
     let origin = public.origin().ascii_serialization();
     let host = origin
         .split_once("://")

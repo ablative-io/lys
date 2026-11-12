@@ -191,7 +191,7 @@ async fn scope_details_keep_the_http_refusal_admission() -> Result {
     let (service, cookie) = member_fixture().await?;
     let (direct_status, direct_body) = service.get("/directory/people", Some(&cookie)).await?;
     assert_eq!(direct_status, 403, "{direct_body}");
-    let client = reqwest::Client::new();
+    let client = lys_http::client()?;
     let message = json!({"jsonrpc":"2.0", "id":4, "method":"tools/call", "params":{
         "name":"read", "arguments":{"method":"GET", "path":"/directory/people"}
     }});

@@ -407,6 +407,10 @@ pub enum SecretsError {
     /// An app's virtual client credential refused.
     #[error(transparent)]
     AppClient(#[from] AppClientRefusal),
+    /// lys-http could not build the HTTP client every upstream call goes
+    /// through (its TLS configuration, or reqwest's client).
+    #[error("HttpClient: {0} (act: report it; the client is built the one way lys-http builds it)")]
+    HttpClient(#[from] lys_http::Error),
     /// An owner change refused for its operation id.
     #[error(transparent)]
     OwnerChange(#[from] OwnerChangeRefusal),

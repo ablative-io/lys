@@ -105,7 +105,8 @@ async fn table(mail: bool) -> Result<(Service, FakeRauthy, String, MailSink), Bo
     )
     .await?;
     rauthy.link(service.issuer.clone())?;
-    let made = reqwest::Client::new()
+    let made = lys_http::client()
+        .expect("lys-http builds the client")
         .post(format!("{}/setup/administrator", service.base))
         .header(reqwest::header::CONTENT_TYPE, "application/json")
         .body(
@@ -129,7 +130,8 @@ async fn table(mail: bool) -> Result<(Service, FakeRauthy, String, MailSink), Bo
 /// the one `accounts::make` sends.
 async fn account_held(rauthy: &FakeRauthy, email: &str, name: &str) -> TestResult {
     let key = std::fs::read_to_string(rauthy.api_key_file())?;
-    let answer = reqwest::Client::new()
+    let answer = lys_http::client()
+        .expect("lys-http builds the client")
         .post(format!("{}/users", rauthy.api()))
         .header(
             reqwest::header::AUTHORIZATION,

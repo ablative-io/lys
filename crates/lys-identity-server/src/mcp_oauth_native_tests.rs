@@ -8,7 +8,7 @@ use sha2::{Digest, Sha256};
 async fn native_pkce_approves_the_same_person_after_browser_session_renewal_and_refuses_foreign_redirects()
 -> Result<(), Box<dyn std::error::Error>> {
     let (service, cookie) = crate::mcp_oauth::tests::service().await?;
-    let client = reqwest::Client::builder()
+    let client = lys_http::builder()?
         .redirect(reqwest::redirect::Policy::none())
         .build()?;
     let verifier =
@@ -143,7 +143,7 @@ async fn assert_native_person_access(
 async fn malformed_person_payloads_keep_the_decoders_named_refusal()
 -> Result<(), Box<dyn std::error::Error>> {
     let service = crate::mcp_oauth::tests::service().await?.0;
-    let client = reqwest::Client::new();
+    let client = lys_http::client()?;
     let encoding = base64::engine::general_purpose::URL_SAFE_NO_PAD;
     let header = encoding.encode(serde_json::to_vec(&serde_json::json!({ "alg": "ES256" }))?);
     let signature = encoding.encode(rand::random::<[u8; 32]>());

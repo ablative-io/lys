@@ -134,12 +134,11 @@ pub(super) async fn read(
     let origin = url.origin().ascii_serialization();
     let mut call = crate::waits::Call::begin("app", &origin, "manifest", &query.address)?;
     let reading = async {
-        let client = crate::outbound::http()
-            .redirect(reqwest::redirect::Policy::none())
-            .build()
-            .map_err(|error| {
-                unavailable(&format!("the manifest reader could not start: {error}"))
-            })?;
+        let client =
+            crate::outbound::client(|http| http.redirect(reqwest::redirect::Policy::none()))
+                .map_err(|error| {
+                    unavailable(&format!("the manifest reader could not start: {error}"))
+                })?;
         let mut answer = match client
             .get(url)
             .header(header::ACCEPT, "application/json")

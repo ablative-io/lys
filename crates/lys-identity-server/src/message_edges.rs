@@ -133,9 +133,7 @@ fn bridge(settings: &Settings) -> Result<Bridge, ServerError> {
         reason: format!("message_service: {reason}"),
     };
     let checked = settings.check().map_err(invalid)?;
-    let client = crate::outbound::http()
-        .redirect(reqwest::redirect::Policy::none())
-        .build()
+    let client = crate::outbound::client(|http| http.redirect(reqwest::redirect::Policy::none()))
         .map_err(|error| invalid(error.to_string()))?;
     Ok(Bridge {
         url: checked.url,

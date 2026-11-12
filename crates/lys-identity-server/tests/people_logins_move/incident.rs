@@ -35,7 +35,8 @@ async fn october_26_link_email_and_google_each_refuse_becoming_dean() -> TestRes
     // The unpatched issuer joins equal Google/account emails, while Lys
     // still holds Dean's admission address for Dean's person.
     historical_email(&rauthy, subject, "annabel@example.test", true).await?;
-    let google: Value = reqwest::Client::new()
+    let google: Value = lys_http::client()
+        .expect("lys-http builds the client")
         .post(format!("{}/providers/create", rauthy.api()))
         .header(reqwest::header::AUTHORIZATION, format!("API-Key {API_KEY}"))
         .json(&json!({"name":"Google", "enabled":true, "client_id":"google-client"}))
@@ -54,7 +55,8 @@ async fn october_26_link_email_and_google_each_refuse_becoming_dean() -> TestRes
             provider,
         )
         .await?;
-    let response = reqwest::Client::builder()
+    let response = lys_http::builder()
+        .expect("lys-http builds the client")
         .redirect(reqwest::redirect::Policy::none())
         .build()?
         .get(format!("{}{back}", service.base))

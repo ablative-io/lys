@@ -136,7 +136,7 @@ pub(super) async fn post_signed(
     bytes: Vec<u8>,
     signature: &str,
 ) -> Result<reqwest::Response, Box<dyn Error>> {
-    Ok(reqwest::Client::new()
+    Ok(lys_http::client()?
         .post(format!("{base}/mcp"))
         .header("content-type", "application/json")
         .header("accept", "application/json, text/event-stream")

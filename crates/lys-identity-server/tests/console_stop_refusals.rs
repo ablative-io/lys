@@ -82,7 +82,8 @@ impl Desk {
         body: Vec<u8>,
         headers: &[(&str, &str)],
     ) -> Result<(u16, Value), Box<dyn Error>> {
-        let mut request = reqwest::Client::new()
+        let mut request = lys_http::client()
+            .expect("lys-http builds the client")
             .post(format!("{}{path}", self.service.base))
             .header("content-type", "application/json")
             .body(body);

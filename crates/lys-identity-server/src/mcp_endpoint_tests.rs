@@ -29,7 +29,7 @@ async fn a_signed_mcp_call_cannot_borrow_an_administrator_cookie() -> Result<(),
     let signature = crate::routes::hex(
         &lys_core::attestation::sign_attestation(&payload, &key).to_cose_bytes(),
     );
-    let response = reqwest::Client::new()
+    let response = lys_http::client()?
         .post(format!("{}/mcp", service.base))
         .header("content-type", "application/json")
         .header("accept", "application/json, text/event-stream")
@@ -294,7 +294,7 @@ async fn a_signed_message_cannot_also_carry_a_grant_token() -> Result<(), Box<dy
     let (service, _cookie, agent, key) = certified_agent().await?;
     let bytes = tree_call(14)?;
     let signature = signed(&agent, &key, &bytes)?;
-    let response = reqwest::Client::new()
+    let response = lys_http::client()?
         .post(format!("{}/mcp", service.base))
         .header("content-type", "application/json")
         .header("accept", "application/json, text/event-stream")

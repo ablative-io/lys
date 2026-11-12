@@ -288,7 +288,8 @@ impl Table {
         };
         let table = Self {
             service,
-            client: reqwest::Client::builder()
+            client: lys_http::builder()
+                .expect("lys-http builds the client")
                 .redirect(reqwest::redirect::Policy::none())
                 .build()?,
             cookie,

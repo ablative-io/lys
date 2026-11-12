@@ -199,7 +199,7 @@ impl Table {
         assert_eq!(status, 200, "{answer}");
         Ok(Self {
             service,
-            client: reqwest::Client::new(),
+            client: lys_http::client().expect("lys-http builds the client"),
             cookie,
             person,
             target,

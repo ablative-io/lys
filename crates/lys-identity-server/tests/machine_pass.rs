@@ -130,7 +130,8 @@ async fn ask(
     let route = pass_route(computer);
     let bytes = serde_json::to_vec(body)?;
     let signature = hex(&key.sign(&dial_signed_bytes("POST", &route, &epoch, once, &bytes)));
-    let answer = reqwest::Client::new()
+    let answer = lys_http::client()
+        .expect("lys-http builds the client")
         .post(format!("{}{route}", service.base))
         .header(EPOCH_HEADER, &epoch)
         .header(NONCE_HEADER, once)

@@ -25,7 +25,7 @@ async fn a_trusted_proxy_does_not_put_all_password_clients_in_one_bucket()
         password: "Correct-Password-For-Test1".into(),
         second_factor: false,
     })?;
-    let client = reqwest::Client::new();
+    let client = lys_http::client().expect("lys-http builds the client");
     let request = |forwarded: &str| {
         client
             .post(format!("{}/sign-in", service.base))
@@ -61,7 +61,8 @@ async fn a_trusted_proxy_with_no_client_address_returns_its_named_refusal()
         |_| Ok(()),
     )
     .await?;
-    let client = reqwest::Client::builder()
+    let client = lys_http::builder()
+        .expect("lys-http builds the client")
         .redirect(reqwest::redirect::Policy::none())
         .build()?;
     let direct = client

@@ -36,7 +36,8 @@ async fn the_empty_answer_names_lyss_own_origin() -> Result {
 #[tokio::test]
 async fn the_listed_answer_names_lyss_own_origin() -> Result {
     let rauthy = FakeRauthy::start().await?;
-    reqwest::Client::new()
+    lys_http::client()
+        .expect("lys-http builds the client")
         .post(format!("{}/providers/create", rauthy.api()))
         .header(reqwest::header::AUTHORIZATION, format!("API-Key {API_KEY}"))
         .json(&json!({"name": "Google", "enabled": true, "client_id": "google-client"}))

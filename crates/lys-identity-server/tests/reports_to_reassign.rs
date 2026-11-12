@@ -39,7 +39,7 @@ impl Table {
             })
             .await?;
         Ok(Self {
-            client: reqwest::Client::new(),
+            client: lys_http::client().expect("lys-http builds the client"),
             service,
             seeded,
             administrator,
@@ -532,7 +532,8 @@ async fn an_inactive_reporting_link_blocks_and_reinstatement_restores_agent_call
         })
         .await?;
     let body = edge(&parent)?;
-    let response = reqwest::Client::new()
+    let response = lys_http::client()
+        .expect("lys-http builds the client")
         .post(format!("{}/agents/{child}/reports-to", service.base))
         .header(reqwest::header::COOKIE, &administrator)
         .json(&body)

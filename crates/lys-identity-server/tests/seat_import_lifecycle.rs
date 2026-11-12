@@ -233,7 +233,8 @@ impl Scene {
     /// Open an attach, read its first bytes, and close it: the attachment
     /// exits by the test's own hand.
     async fn attach_and_exit(&self) -> TestResult {
-        let mut answer = reqwest::Client::new()
+        let mut answer = lys_http::client()
+            .expect("lys-http builds the client")
             .post(format!("{}/seats/{SEAT}/attach", self.table.service.base))
             .header(reqwest::header::COOKIE, &self.table.ada)
             .header(reqwest::header::CONTENT_TYPE, "application/json")

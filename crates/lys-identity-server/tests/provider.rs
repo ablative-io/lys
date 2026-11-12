@@ -155,7 +155,8 @@ async fn table_kept_saying(
 }
 
 fn browser() -> Result<reqwest::Client, Box<dyn Error>> {
-    Ok(reqwest::Client::builder()
+    Ok(lys_http::builder()
+        .expect("lys-http builds the client")
         .redirect(reqwest::redirect::Policy::none())
         .build()?)
 }
@@ -219,7 +220,8 @@ async fn exchange_at(
     verifier: &str,
     redirect: &str,
 ) -> Result<(u16, Value), Box<dyn Error>> {
-    let answer = reqwest::Client::new()
+    let answer = lys_http::client()
+        .expect("lys-http builds the client")
         .post(format!("{}/oauth/token", service.base))
         .header(
             reqwest::header::AUTHORIZATION,
@@ -247,7 +249,7 @@ async fn replaying_a_code_revokes_the_access_it_issued() -> TestResult {
     let (status, answer) = exchange(&service, &given, "verifier").await?;
     assert_eq!(status, 200);
     let access = answer["access_token"].as_str().ok_or("no access token")?;
-    let client = reqwest::Client::new();
+    let client = lys_http::client().expect("lys-http builds the client");
     assert_eq!(
         client
             .get(format!("{}/oauth/userinfo", service.base))
@@ -279,7 +281,8 @@ async fn an_issued_access_token_survives_a_service_restart() -> TestResult {
     assert_eq!(status, 200);
     let access = answer["access_token"].as_str().ok_or("no access token")?;
     service.restart().await?;
-    let answer = reqwest::Client::new()
+    let answer = lys_http::client()
+        .expect("lys-http builds the client")
         .get(format!("{}/oauth/userinfo", service.base))
         .bearer_auth(access)
         .send()
@@ -294,9 +297,12 @@ async fn an_issued_access_token_survives_a_service_restart() -> TestResult {
 #[tokio::test]
 async fn a_product_signs_in_through_lys_and_verifies_the_token_against_lys_keys() -> TestResult {
     let (service, cookie, person) = table(CODE_SECONDS).await?;
-    let http = openidconnect::reqwest::ClientBuilder::new()
-        .redirect(openidconnect::reqwest::redirect::Policy::none())
-        .build()?;
+    let http = lys_identity_server::oidc_http::OidcHttp::new(
+        lys_http::builder()
+            .expect("lys-http builds the client")
+            .redirect(reqwest::redirect::Policy::none())
+            .build()?,
+    );
     let metadata =
         CoreProviderMetadata::discover_async(IssuerUrl::new(service.base.clone())?, &http).await?;
     assert_eq!(metadata.issuer().as_str(), service.base);
@@ -363,7 +369,8 @@ async fn a_product_signs_in_through_lys_and_verifies_the_token_against_lys_keys(
     let claims = token.claims(&checker, &nonce)?;
     assert_eq!(claims.issuer().as_str(), service.base);
     assert_eq!(claims.subject().as_str(), person);
-    let info = reqwest::Client::new()
+    let info = lys_http::client()
+        .expect("lys-http builds the client")
         .get(format!("{}/oauth/userinfo", service.base))
         .bearer_auth(answer.access_token().secret())
         .send()
@@ -479,7 +486,8 @@ async fn an_app_is_a_client_from_its_approval_to_its_retirement_with_no_restart(
         .map(|(_, value)| value.into_owned())
         .ok_or("the product is given a code")?;
     // A wrong secret at the exchange: credential_refused, naming no secret.
-    let wrong = reqwest::Client::new()
+    let wrong = lys_http::client()
+        .expect("lys-http builds the client")
         .post(format!("{}/oauth/token", service.base))
         .header(
             reqwest::header::AUTHORIZATION,
@@ -513,7 +521,8 @@ async fn an_app_is_a_client_from_its_approval_to_its_retirement_with_no_restart(
     let (status, location, refusal) = authorize_answer(&service, &cookie, SECOND, BACK).await?;
     assert_eq!((status, location), (403, None), "{refusal}");
     assert_eq!(refusal["refusal"], "app_retired");
-    let late = reqwest::Client::new()
+    let late = lys_http::client()
+        .expect("lys-http builds the client")
         .post(format!("{}/oauth/token", service.base))
         .header(
             reqwest::header::AUTHORIZATION,
@@ -699,7 +708,8 @@ async fn a_declined_apps_client_id_is_refused_app_not_approved_at_authorize_and_
             .as_str()
             .is_some_and(|words| words.contains(SECOND))
     );
-    let token = reqwest::Client::new()
+    let token = lys_http::client()
+        .expect("lys-http builds the client")
         .post(format!("{}/oauth/token", service.base))
         .header(
             reqwest::header::AUTHORIZATION,
@@ -798,7 +808,8 @@ async fn a_code_exchanged_for_another_redirect_is_refused_and_not_used_up() -> T
 }
 
 async fn userinfo_with(service: &Service, token: &str) -> Result<(u16, Value), Box<dyn Error>> {
-    let response = reqwest::Client::new()
+    let response = lys_http::client()
+        .expect("lys-http builds the client")
         .get(format!("{}/oauth/userinfo", service.base))
         .bearer_auth(token)
         .send()
@@ -1200,7 +1211,8 @@ async fn a_wildcard_entry_admits_one_label_under_its_suffix_at_authorize_and_at_
         let base = service.base.clone();
         let code = code.clone();
         async move {
-            let answer = reqwest::Client::new()
+            let answer = lys_http::client()
+                .expect("lys-http builds the client")
                 .post(format!("{base}/oauth/token"))
                 .header(
                     reqwest::header::AUTHORIZATION,

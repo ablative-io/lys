@@ -10,9 +10,7 @@ use std::error::Error;
 const REDIRECT: &str = "https://app.example/callback";
 const VERIFIER: &str = "a-verifier-of-at-least-forty-three-characters-long";
 pub(super) fn client() -> Result<reqwest::Client, Box<dyn Error>> {
-    Ok(reqwest::Client::builder()
-        .redirect(Policy::none())
-        .build()?)
+    Ok(lys_http::builder()?.redirect(Policy::none()).build()?)
 }
 
 async fn located(response: reqwest::Response) -> Result<reqwest::Url, Box<dyn Error>> {

@@ -117,7 +117,10 @@ async fn administrator_pages_and_native_callback_keep_issuer_authentication() ->
     let fixture = Arc::new(Fixture {
         seen: Arc::clone(&seen),
         discovery_api: Mutex::new(None),
-        http: reqwest::Client::builder().no_proxy().build()?,
+        http: lys_http::builder()
+            .expect("lys-http builds the client")
+            .no_proxy()
+            .build()?,
     });
     let configuring = Arc::clone(&fixture);
     let (stop, stopped) = oneshot::channel::<()>();
@@ -173,7 +176,8 @@ async fn administrator_pages_and_native_callback_keep_issuer_authentication() ->
 }
 
 async fn assert_forwarded_authentication(service: &Service, seen: &Seen) -> TestResult {
-    let client = reqwest::Client::builder()
+    let client = lys_http::builder()
+        .expect("lys-http builds the client")
         .redirect(reqwest::redirect::Policy::none())
         .build()?;
     for path in [

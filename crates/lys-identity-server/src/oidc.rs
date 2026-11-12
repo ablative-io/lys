@@ -17,8 +17,10 @@ use openidconnect::core::{
 };
 use openidconnect::{
     AuthorizationCode, ClientId, ClientSecret, CsrfToken, Nonce, PkceCodeChallenge,
-    PkceCodeVerifier, RedirectUrl, TokenResponse, reqwest,
+    PkceCodeVerifier, RedirectUrl, TokenResponse,
 };
+
+use crate::oidc_http::OidcHttp;
 
 use crate::config::Config;
 use crate::error::ServerError;
@@ -46,7 +48,7 @@ pub struct Oidc {
     secret: ClientSecret,
     redirect: RedirectUrl,
     public_origin: String,
-    http: reqwest::Client,
+    http: OidcHttp,
     in_flight: Mutex<Flights<(PkceCodeVerifier, Nonce)>>,
     provider_flights: Mutex<Flights<(PkceCodeVerifier, Nonce)>>,
 }
@@ -68,16 +70,20 @@ impl Oidc {
     /// that differs from configuration, invalid endpoint origins, an unreadable
     /// client secret or an invalid client redirect address.
     pub async fn discover(config: &Config) -> Result<Self, ServerError> {
-        let http = crate::outbound::http()
-            .redirect(reqwest::redirect::Policy::none())
-            .build()
-            .map_err(|error| failed(&error))?;
+        let http = OidcHttp::new(
+            crate::outbound::http()
+                .map_err(|error| failed(&error))?
+                .redirect(reqwest::redirect::Policy::none())
+                .build()
+                .map_err(|error| failed(&error))?,
+        );
         let api = config.sign_in_api();
         let mut discovery =
             crate::waits::Call::begin("issuer", &api, "OIDC discovery", &config.issuer)?;
         let text = discovery
             .until(async {
-                http.get(format!("{api}/.well-known/openid-configuration"))
+                http.client()
+                    .get(format!("{api}/.well-known/openid-configuration"))
                     .header(reqwest::header::ACCEPT, "application/json")
                     .send()
                     .await

@@ -274,7 +274,8 @@ async fn held_confirm(
     let body = confirm_body(plan, confirming).to_string();
     let cookie = scene.table.ada.clone();
     let in_flight = tokio::spawn(async move {
-        let answer = reqwest::Client::new()
+        let answer = lys_http::client()
+            .expect("lys-http builds the client")
             .post(url)
             .header(reqwest::header::COOKIE, cookie)
             .header(reqwest::header::CONTENT_TYPE, "application/json")
@@ -295,7 +296,7 @@ async fn competing_load(
     cookie: String,
     mut stop: watch::Receiver<bool>,
 ) -> Result<u64, String> {
-    let client = reqwest::Client::new();
+    let client = lys_http::client().expect("lys-http builds the client");
     let cookie = reqwest::header::HeaderValue::try_from(cookie)
         .map_err(|error| format!("the session cookie is not a header: {error}"))?;
     let mut seats = base;

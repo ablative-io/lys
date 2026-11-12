@@ -181,7 +181,8 @@ impl Held {
         method: &str,
         params: Value,
     ) -> TestResult<(u16, Value)> {
-        let mut request = reqwest::Client::new()
+        let mut request = lys_http::client()
+            .expect("lys-http builds the client")
             .post(url)
             .header("content-type", "application/json")
             .header("accept", "application/json, text/event-stream")
@@ -421,7 +422,8 @@ fn custody_broker(custody: String) -> Router {
                       body: axum::body::Bytes| {
                     let custody = custody.clone();
                     async move {
-                        match reqwest::Client::new()
+                        match lys_http::client()
+                            .expect("lys-http builds the client")
                             .post(format!("{custody}{}", uri.path()))
                             .headers(headers)
                             .body(body)

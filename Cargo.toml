@@ -5,6 +5,7 @@ members = [
     "crates/lys-anchor-cli",
     "crates/lys-core",
     "crates/lys-home",
+    "crates/lys-http",
     "crates/lys-identity",
     "crates/lys-identity-server",
     "crates/lys-log-store",
@@ -28,6 +29,7 @@ rust-version = "1.88" # rcgen 0.14.10 and sha2 0.11.1
 # Internal
 lys-core = { version = "0.3.3", path = "crates/lys-core" }
 lys-home = { version = "0.3.3", path = "crates/lys-home" }
+lys-http = { version = "0.3.3", path = "crates/lys-http" }
 lys-identity = { version = "0.3.3", path = "crates/lys-identity" }
 lys-identity-server = { version = "0.3.3", path = "crates/lys-identity-server" }
 lys-log-store = { version = "0.3.3", path = "crates/lys-log-store" }
@@ -83,11 +85,13 @@ zeroize = { version = "1", features = ["derive"] }
 
 # The directory service. Each pinned, and TLS is rustls only.
 axum = "=0.8.9"
-openidconnect = { version = "=4.0.1", default-features = false, features = ["reqwest", "rustls-tls"] }
+# Without its "reqwest" feature, which ties it to reqwest 0.12: lys-identity-server hands it
+# lys-http's client through oidc_http.rs.
+openidconnect = { version = "=4.1.0", default-features = false }
 tokio = { version = "=1.53.1", features = ["macros", "net", "rt-multi-thread", "signal", "sync"] }
 tower = { version = "=0.5.3", features = ["util"] }
-# The contract tests' HTTP client, the version openidconnect already carries, with no TLS.
-reqwest = { version = "=0.12.28", default-features = false }
+# Every client is built by lys-http (rustls on ring, the bundled webpki-roots); no TLS here.
+reqwest = { version = "=0.13.5", default-features = false }
 # The one sender (DIRECTORY-110 R3): the message builder and the SMTP transport over tokio with rustls, nothing else.
 lettre = { version = "=0.11.22", default-features = false }
 # The Cambium message connection's base URL, the version reqwest already carries.

@@ -308,7 +308,8 @@ async fn seat_import_upgrade_failure_named() -> TestResult {
     let body = json!({
         "plan_id": plan["plan_id"], "plan_revision": revision, "operation": confirming,
     });
-    let lost = reqwest::Client::new()
+    let lost = lys_http::client()
+        .expect("lys-http builds the client")
         .post(url)
         .header(reqwest::header::COOKIE, &scene.table.ada)
         .header(reqwest::header::CONTENT_TYPE, "application/json")

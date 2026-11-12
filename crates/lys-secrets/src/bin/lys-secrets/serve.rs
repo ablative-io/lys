@@ -69,7 +69,7 @@ pub fn serve(mut broker: Broker<Grants>, layout: Layout, listen: &str) -> Result
     let shared = Arc::new(Shared {
         broker: Mutex::new(broker),
         layout,
-        client: reqwest::Client::new(),
+        client: lys_http::client()?,
         window: Mutex::new(lys_secrets::ServiceWindow::new()),
         permissions,
     });

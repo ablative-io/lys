@@ -749,7 +749,7 @@ async fn forged_mark_is_refused(content_type: &str, foreign_origin: bool) -> Tes
     let id = set["goal"]["id"].as_str().ok_or("no goal id")?;
     let path = format!("/goals/{id}/mark");
     let body = json!({ "operation": operation()?, "standing": "met", "words": "forged completion", "evidence": "a=b" });
-    let client = reqwest::Client::new();
+    let client = lys_http::client().expect("lys-http builds the client");
     let mut request = client
         .post(format!("{}{path}", table.service.base))
         .header("cookie", &table.bea)

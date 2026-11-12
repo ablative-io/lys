@@ -170,7 +170,8 @@ pub fn revoke_after_drop(broker: &mut Broker<Grants>, id: &HandleId) -> Result<b
             context: "starting the revocation call".to_owned(),
             source,
         })?;
-    let answer = runtime.block_on(revoke(&reqwest::Client::new(), &grant));
+    let client = lys_http::client()?;
+    let answer = runtime.block_on(revoke(&client, &grant));
     let confirmed = answer.is_ok();
     broker.record_upstream_revocation(id, answer)?;
     Ok(confirmed)

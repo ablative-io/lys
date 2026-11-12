@@ -241,7 +241,7 @@ async fn forged_browser_reports_cannot_change_an_agents_session() -> TestResult 
     let session = operation()?;
     let path = format!("/agents/{agent}/runtime/sessions/{session}/reports");
     let body = table.body("starting", "")?;
-    let client = reqwest::Client::new();
+    let client = lys_http::client().expect("lys-http builds the client");
     for (kind, origin) in [
         ("text/plain", None),
         ("application/json", Some("http://127.0.0.1:1")),

@@ -145,7 +145,8 @@ pub(super) async fn download(
     id: &str,
     kind: &str,
 ) -> Result<Vec<u8>, Box<dyn Error>> {
-    let answer = reqwest::Client::new()
+    let answer = lys_http::client()
+        .expect("lys-http builds the client")
         .post(format!(
             "{}/network/machines/{id}/installer/{kind}",
             service.base

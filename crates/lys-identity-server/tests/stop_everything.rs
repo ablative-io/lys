@@ -261,7 +261,8 @@ impl Table {
             return service.sign_in(login(subject)).await;
         }
         service.issuer.sign_in_as(login(subject))?;
-        let response = reqwest::Client::new()
+        let response = lys_http::client()
+            .expect("lys-http builds the client")
             .post(format!("{}/api/sign-in", service.base))
             .json(&json!({
                 "email": "shared@example.test",
@@ -403,7 +404,8 @@ impl Table {
         signature: Option<&str>,
         cookie: Option<&str>,
     ) -> Result<(u16, Value), Box<dyn Error>> {
-        let mut request = reqwest::Client::new()
+        let mut request = lys_http::client()
+            .expect("lys-http builds the client")
             .post(format!(
                 "{}{}",
                 self.service.base,

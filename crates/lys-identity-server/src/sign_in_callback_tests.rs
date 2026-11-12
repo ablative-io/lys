@@ -16,7 +16,8 @@ async fn table(
     held: Option<&str>,
 ) -> Result<(Service, FakeRauthy, Login, String)> {
     let rauthy = FakeRauthy::start().await?;
-    let provider: Value = reqwest::Client::new()
+    let provider: Value = lys_http::client()
+        .expect("lys-http builds the client")
         .post(format!("{}/providers/create", rauthy.api()))
         .header(reqwest::header::AUTHORIZATION, format!("API-Key {API_KEY}"))
         .json(&json!({"name":"Google", "enabled":true, "client_id":"google-client"}))
@@ -26,7 +27,8 @@ async fn table(
         .json()
         .await?;
     assert_eq!(provider["id"], "provider-1");
-    let made: Value = reqwest::Client::new()
+    let made: Value = lys_http::client()
+        .expect("lys-http builds the client")
         .post(format!("{}/users", rauthy.api()))
         .header(reqwest::header::AUTHORIZATION, format!("API-Key {API_KEY}"))
         .json(
@@ -72,7 +74,8 @@ async fn table(
 
 async fn callback(service: &Service, login: Login) -> Result<(Option<String>, String)> {
     let (back, binding) = service.issuer_answer_from(login, "provider-1").await?;
-    let response = reqwest::Client::builder()
+    let response = lys_http::builder()
+        .expect("lys-http builds the client")
         .redirect(reqwest::redirect::Policy::none())
         .build()?
         .get(format!("{}{back}", service.base))
@@ -170,7 +173,8 @@ async fn the_first_provider_sign_in_records_a_missing_address_durably_and_labels
     service.restart().await?;
     let mut user = rauthy.users()?[0].clone();
     user["email"] = json!("dean@example.test");
-    reqwest::Client::new()
+    lys_http::client()
+        .expect("lys-http builds the client")
         .put(format!("{}/users/{}", rauthy.api(), login.subject))
         .header(reqwest::header::AUTHORIZATION, format!("API-Key {API_KEY}"))
         .json(&user)

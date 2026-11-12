@@ -109,7 +109,8 @@ async fn posted(
     email: &str,
     password: &str,
 ) -> Result<(u16, Value), Box<dyn Error>> {
-    let answer = reqwest::Client::new()
+    let answer = lys_http::client()
+        .expect("lys-http builds the client")
         .post(format!("{}/sign-in", service.base))
         .header(reqwest::header::CONTENT_TYPE, "application/json")
         .body(json!({ "email": email, "password": password }).to_string())

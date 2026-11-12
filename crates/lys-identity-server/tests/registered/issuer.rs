@@ -22,7 +22,7 @@ async fn issuer_account_fixture(
     use lys_identity_server::sign_in_providers::SignInProvidersSettings;
 
     let rauthy = FakeRauthy::start().await?;
-    let client = reqwest::Client::new();
+    let client = lys_http::client().expect("lys-http builds the client");
     let response = client
         .post(format!("{}/users", rauthy.api()))
         .header(reqwest::header::AUTHORIZATION, format!("API-Key {API_KEY}"))

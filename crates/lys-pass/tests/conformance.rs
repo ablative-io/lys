@@ -131,7 +131,7 @@ async fn every_shipped_vector_is_green_through_the_crates_own_observer()
     let gone = listener.local_addr()?;
     drop(listener);
     let client = lys_pass::Client::new(
-        reqwest::Client::new(),
+        lys_http::client().expect("lys-http builds the client"),
         url::Url::parse(&format!("http://{gone}/"))?,
     )?;
     let mut live = std::collections::BTreeMap::new();

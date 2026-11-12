@@ -395,7 +395,8 @@ async fn a_standing_give_after_agent_roots_leaves_the_agent_five_grants() -> Tes
     let cose =
         sign_attestation(&payload("GET", "/agent/grants", &[], at, &nonce), &key).to_cose_bytes();
     let signature = format!("{agent} {at} {nonce} {}", hex(&cose));
-    let read: Value = reqwest::Client::new()
+    let read: Value = lys_http::client()
+        .expect("lys-http builds the client")
         .get(format!("{}/agent/grants", service.base))
         .header(HEADER, signature)
         .send()

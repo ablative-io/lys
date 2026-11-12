@@ -42,7 +42,9 @@ async fn token(
     grant: &[(&str, &str)],
 ) -> Result<(u16, Value), Box<dyn Error>> {
     let mut form: Vec<(&str, &str)> = grant.to_vec();
-    let mut request = reqwest::Client::new().post(format!("{}/oauth/token", service.base));
+    let mut request = lys_http::client()
+        .expect("lys-http builds the client")
+        .post(format!("{}/oauth/token", service.base));
     if basic {
         request = request.header(
             reqwest::header::AUTHORIZATION,
@@ -345,7 +347,8 @@ async fn missing_approved_client_custody_is_prepared_and_the_issue_is_replayed_w
 -> TestResult {
     let (service, cookie, _person, custody) = table_kept(CODE_SECONDS).await?;
     custody.lose(PRODUCT)?;
-    let missing = reqwest::Client::new()
+    let missing = lys_http::client()
+        .expect("lys-http builds the client")
         .post(format!("{}/_lys/apps/client/issue", custody.base))
         .json(&json!({ "app": PRODUCT }))
         .send()

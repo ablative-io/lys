@@ -116,7 +116,10 @@ async fn a_connection_missing_a_grant_names_its_resource_action_route_and_granto
     let cookie = service
         .sign_in(identity_contract::apps::login(ADMINISTRATOR))
         .await?;
-    let client = Client::builder().redirect(Policy::none()).build()?;
+    let client = lys_http::builder()
+        .expect("lys-http builds the client")
+        .redirect(Policy::none())
+        .build()?;
     let tokens = connection(&service, &cookie, &client).await?;
     let token = tokens["access_token"].as_str().ok_or("no access token")?;
     let target = seeded.people[0].agents[0].id.to_string();
@@ -165,7 +168,10 @@ async fn an_undeclared_sign_in_providers_scope_names_the_route_and_service_decla
     let cookie = service
         .sign_in(identity_contract::apps::login(ADMINISTRATOR))
         .await?;
-    let client = Client::builder().redirect(Policy::none()).build()?;
+    let client = lys_http::builder()
+        .expect("lys-http builds the client")
+        .redirect(Policy::none())
+        .build()?;
     let tokens = connection(&service, &cookie, &client).await?;
     let token = tokens["access_token"].as_str().ok_or("no access token")?;
     let answer = read(&client, &service, token, "/sign-in-providers").await?;

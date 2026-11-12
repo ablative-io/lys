@@ -114,7 +114,8 @@ async fn post(
     api_key: &str,
     body: &serde_json::Value,
 ) -> Result<(u16, String), Box<dyn Error>> {
-    let answer = reqwest::Client::new()
+    let answer = lys_http::client()
+        .expect("lys-http builds the client")
         .post(url)
         .header(reqwest::header::AUTHORIZATION, format!("API-Key {api_key}"))
         .json(body)

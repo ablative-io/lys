@@ -106,7 +106,7 @@ async fn under_the_screens_every_signed_in_route_refuses_an_anonymous_caller_too
 #[tokio::test]
 async fn a_head_on_every_signed_in_get_route_is_refused_before_its_query_is_read() -> TestResult {
     let service = Service::start().await?;
-    let client = reqwest::Client::new();
+    let client = lys_http::client().expect("lys-http builds the client");
     let mut wrong = Vec::new();
     let mut asked = 0;
     for route in api().routes() {
@@ -149,7 +149,7 @@ async fn nested_api_authentication_precedes_json_extraction_while_static_screen_
         |_| Ok(()),
     )
     .await?;
-    let client = reqwest::Client::new();
+    let client = lys_http::client().expect("lys-http builds the client");
     let public = client.get(format!("{}/", service.base)).send().await?;
     assert_eq!(public.status(), 200);
     assert_eq!(public.text().await?, PAGE);

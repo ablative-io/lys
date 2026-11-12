@@ -184,7 +184,9 @@ impl Table {
         ));
         let signed = crate::agent_signature::payload("PUT", &path, &bytes, at, &nonce);
         let signature = crate::routes::hex(&sign_attestation(&signed, &self.key).to_cose_bytes());
-        let mut request = reqwest::Client::new().put(format!("{}{path}", self.service.base));
+        let mut request = lys_http::client()
+            .expect("lys-http builds the client")
+            .put(format!("{}{path}", self.service.base));
         if cookie {
             request = request.header(reqwest::header::COOKIE, &self.cookie);
         }

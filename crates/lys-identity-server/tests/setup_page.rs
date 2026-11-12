@@ -121,7 +121,8 @@ async fn post_raw(
     path: &str,
     body: &Value,
 ) -> Result<(u16, String, Option<String>), Box<dyn Error>> {
-    let answer = reqwest::Client::new()
+    let answer = lys_http::client()
+        .expect("lys-http builds the client")
         .post(format!("{}{path}", service.base))
         .header(reqwest::header::CONTENT_TYPE, "application/json")
         .body(body.to_string())
@@ -184,7 +185,8 @@ async fn a_setup_retried_after_its_account_was_made_signs_in_with_the_password_i
     let table = table().await?;
     let key = format!("API-Key {API_KEY}");
     let send = |method: reqwest::Method, path: String, body: &Value| {
-        reqwest::Client::new()
+        lys_http::client()
+            .expect("lys-http builds the client")
             .request(method, format!("{}{path}", table.rauthy.api()))
             .header(reqwest::header::AUTHORIZATION, &key)
             .header(reqwest::header::CONTENT_TYPE, "application/json")
@@ -362,7 +364,8 @@ async fn a_password_code_sets_the_administrator_a_new_password() -> TestResult {
         "the page names whose password is set"
     );
     let renewed = "Difference-Engine-1822";
-    let reset = reqwest::Client::new()
+    let reset = lys_http::client()
+        .expect("lys-http builds the client")
         .post(format!("{}/setup/password", service.base))
         .header(reqwest::header::CONTENT_TYPE, "application/json")
         .body(json!({ "code": fresh, "password": renewed }).to_string())

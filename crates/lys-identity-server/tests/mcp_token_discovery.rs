@@ -53,7 +53,8 @@ async fn a_token_discovers_its_one_grant_and_unscoped_rules_without_borrowing_a_
     )
     .await?)?;
     let token = issued["token"].as_str().ok_or("no grant token")?;
-    let response = reqwest::Client::new()
+    let response = lys_http::client()
+        .expect("lys-http builds the client")
         .post(format!("{}/mcp", service.base))
         .header("accept", "application/json, text/event-stream")
         .header("lys-grant-token", token)

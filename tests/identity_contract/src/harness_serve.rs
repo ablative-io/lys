@@ -202,7 +202,7 @@ pub(crate) async fn serve(
     }));
     drop(stage);
     let stage = StageTimer::new("serve.client_build");
-    let client = reqwest::Client::builder()
+    let client = lys_http::builder()?
         .redirect(reqwest::redirect::Policy::none())
         .build()?;
     drop(stage);

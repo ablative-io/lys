@@ -1,0 +1,25 @@
+[package]
+name = "lys-http"
+description = "The one way Lys builds an HTTP client: rustls on ring with the bundled webpki-roots"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+# Built without reqwest's own crypto provider (its "rustls" feature is aws-lc-rs);
+# the TLS configuration is made in this crate on ring and handed to reqwest.
+reqwest = { workspace = true, features = ["rustls-no-provider"] }
+rustls = { version = "=0.23.45", default-features = false, features = ["ring", "std", "tls12"] }
+thiserror.workspace = true
+webpki-roots = "=1.0.9"
+
+[dev-dependencies]
+# The refusal tests' own root and server certificates.
+rcgen.workspace = true
+tokio.workspace = true
+
+[lints]
+workspace = true

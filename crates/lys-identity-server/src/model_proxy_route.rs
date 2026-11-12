@@ -149,7 +149,7 @@ pub async fn forward(local: &str, request: Request) -> Response {
 /// Each carried call owns its client. A model call's stream
 /// ends when the provider ends it or a side closes, never on a clock.
 fn client() -> Result<reqwest::Client, reqwest::Error> {
-    crate::outbound::http().build()
+    crate::outbound::client(std::convert::identity)
 }
 
 /// Headers that belong to one connection, not to the call: never carried.

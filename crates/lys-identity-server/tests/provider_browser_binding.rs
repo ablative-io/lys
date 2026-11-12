@@ -25,7 +25,8 @@ async fn the_provider_round_trip_keeps_the_original_authorize_request() -> TestR
             subject: "person".to_owned(),
             email: "person@example.test".to_owned(),
         })?;
-        let browser = Client::builder()
+        let browser = lys_http::builder()
+            .expect("lys-http builds the client")
             .redirect(reqwest::redirect::Policy::none())
             .build()?;
         let start = browser
@@ -68,7 +69,8 @@ async fn the_provider_round_trip_keeps_the_original_authorize_request() -> TestR
 #[tokio::test]
 async fn unsafe_provider_continuations_are_refused_before_a_flight_begins() -> TestResult {
     let service = Service::start().await?;
-    let browser = Client::builder()
+    let browser = lys_http::builder()
+        .expect("lys-http builds the client")
         .redirect(reqwest::redirect::Policy::none())
         .build()?;
     for target in [
@@ -143,7 +145,8 @@ async fn a_callback_without_the_initiating_browser_cookie_never_creates_a_sessio
         subject: "victim".to_owned(),
         email: "victim@example.test".to_owned(),
     })?;
-    let browser = Client::builder()
+    let browser = lys_http::builder()
+        .expect("lys-http builds the client")
         .redirect(reqwest::redirect::Policy::none())
         .build()?;
     let callback = callback_url(&service, &browser).await?;
@@ -163,7 +166,8 @@ async fn a_callback_with_another_browsers_cookie_never_creates_a_session() -> Te
         subject: "victim".to_owned(),
         email: "victim@example.test".to_owned(),
     })?;
-    let browser = Client::builder()
+    let browser = lys_http::builder()
+        .expect("lys-http builds the client")
         .redirect(reqwest::redirect::Policy::none())
         .build()?;
     let callback = callback_url(&service, &browser).await?;
@@ -188,7 +192,8 @@ async fn the_bound_browser_can_finish_once_and_a_replay_cannot_sign_in() -> Test
         subject: "person".to_owned(),
         email: "person@example.test".to_owned(),
     })?;
-    let browser = Client::builder()
+    let browser = lys_http::builder()
+        .expect("lys-http builds the client")
         .redirect(reqwest::redirect::Policy::none())
         .build()?;
     let start = browser
@@ -235,7 +240,8 @@ async fn duplicate_browser_cookies_are_refused_even_with_one_correct_value() -> 
         subject: "person".to_owned(),
         email: "person@example.test".to_owned(),
     })?;
-    let browser = Client::builder()
+    let browser = lys_http::builder()
+        .expect("lys-http builds the client")
         .redirect(reqwest::redirect::Policy::none())
         .build()?;
     let start = browser

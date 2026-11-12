@@ -102,7 +102,8 @@ pub(crate) async fn table(
     )
     .await?;
     rauthy.link(service.issuer.clone())?;
-    let made = reqwest::Client::new()
+    let made = lys_http::client()
+        .expect("lys-http builds the client")
         .post(format!("{}/setup/administrator", service.base))
         .header(reqwest::header::CONTENT_TYPE, "application/json")
         .body(
@@ -198,7 +199,8 @@ pub(crate) async fn prove(
     service: &Service,
     token: &str,
 ) -> Result<(u16, Value, Option<String>), Box<dyn Error>> {
-    let response = reqwest::Client::new()
+    let response = lys_http::client()
+        .expect("lys-http builds the client")
         .post(format!("{}{PROVE}", service.base))
         .header(reqwest::header::CONTENT_TYPE, "application/json")
         .body(json!({ "proof": token }).to_string())

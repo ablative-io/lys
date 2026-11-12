@@ -126,7 +126,8 @@ impl Table {
         let nonce = crate::routes::hex(&Sha256::digest(operation()?.as_bytes()));
         let signed = crate::agent_signature::payload("POST", path, &bytes, at, &nonce);
         let signature = crate::routes::hex(&sign_attestation(&signed, &self.key).to_cose_bytes());
-        let mut request = reqwest::Client::new()
+        let mut request = lys_http::client()
+            .expect("lys-http builds the client")
             .post(format!("{}{path}", self.service.base))
             .header(reqwest::header::CONTENT_TYPE, "application/json")
             .header(

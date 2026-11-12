@@ -25,7 +25,8 @@ async fn signed_out_help_names_only_the_configured_administrator()
 async fn an_issuer_error_return_is_a_readable_page_without_a_code()
 -> Result<(), Box<dyn std::error::Error>> {
     let service = Service::start().await?;
-    let answer = reqwest::Client::new()
+    let answer = lys_http::client()
+        .expect("lys-http builds the client")
         .get(format!(
             "{}/callback?error=access_denied&error_description=Permission%20was%20not%20given",
             service.base

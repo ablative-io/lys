@@ -20,7 +20,7 @@ async fn public_screens_do_not_exempt_unknown_or_wildcard_shaped_api_requests() 
         public_reader,
     )
     .await?;
-    let client = reqwest::Client::new();
+    let client = lys_http::client().expect("lys-http builds the client");
     for (path, expected) in [
         ("/", "public fixture screen"),
         ("/assets/app.js", "public fixture asset"),

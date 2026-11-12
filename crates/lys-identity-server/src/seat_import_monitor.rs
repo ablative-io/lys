@@ -300,7 +300,7 @@ fn asking(source: &MonitorSource) -> Result<Asking, Refusal> {
             Some((header_name, header))
         }
     };
-    let client = crate::outbound::http().build().map_err(|error| {
+    let client = crate::outbound::client(std::convert::identity).map_err(|error| {
         let detail = format!("the client that asks the monitor could not be built: {error}");
         refusal(SOURCE_UNAVAILABLE, &base, detail)
     })?;

@@ -17,7 +17,7 @@ use tokio::net::{TcpListener, TcpStream};
 async fn quiet_email_change_releases_admission_and_another_persons_change() -> Outcome {
     let quiet = TcpListener::bind("127.0.0.1:0").await?;
     let rauthy = FakeRauthy::start().await?;
-    let http = reqwest::Client::new();
+    let http = lys_http::client().expect("lys-http builds the client");
     let google: serde_json::Value = http
         .post(format!("{}/providers/create", rauthy.api()))
         .header("authorization", format!("API-Key {API_KEY}"))

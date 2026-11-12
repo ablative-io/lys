@@ -108,7 +108,8 @@ pub(super) async fn table_on(
     )
     .await?;
     rauthy.link(service.issuer.clone())?;
-    let made = reqwest::Client::new()
+    let made = lys_http::client()
+        .expect("lys-http builds the client")
         .post(format!("{}/setup/administrator", service.base))
         .header(reqwest::header::CONTENT_TYPE, "application/json")
         .body(
@@ -134,7 +135,8 @@ pub(super) async fn admit_with(
     pass: &str,
     body: &Value,
 ) -> Result<(u16, Value), Box<dyn Error>> {
-    let answer = reqwest::Client::new()
+    let answer = lys_http::client()
+        .expect("lys-http builds the client")
         .post(format!("{}/people/admit", service.base))
         .bearer_auth(pass)
         .json(body)

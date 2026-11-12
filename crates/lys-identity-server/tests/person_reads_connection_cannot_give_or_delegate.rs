@@ -46,7 +46,10 @@ impl Table {
             person,
             other,
             source,
-            client: Client::builder().redirect(Policy::none()).build()?,
+            client: lys_http::builder()
+                .expect("lys-http builds the client")
+                .redirect(Policy::none())
+                .build()?,
         })
     }
 

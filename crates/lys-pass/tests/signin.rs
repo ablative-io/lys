@@ -124,7 +124,7 @@ async fn double(discovered: Option<&str>, token: Option<(u16, Value)>) -> Result
 
 async fn sign_in(issuer: &Url) -> std::result::Result<SignIn, lys_pass::Error> {
     SignIn::connect(
-        reqwest::Client::new(),
+        lys_http::client().expect("lys-http builds the client"),
         issuer,
         "sample",
         "lys-client.sample",

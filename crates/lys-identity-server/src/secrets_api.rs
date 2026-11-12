@@ -67,7 +67,7 @@ impl SecretsBroker {
             base: settings.broker.trim_end_matches('/').to_owned(),
             service: settings.service.clone(),
             key,
-            client: crate::outbound::http().build().map_err(|error| {
+            client: crate::outbound::client(std::convert::identity).map_err(|error| {
                 ServerError::ConfigInvalid {
                     reason: error.to_string(),
                 }

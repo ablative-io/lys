@@ -270,7 +270,8 @@ async fn a_refresh_reads_the_live_grants_so_a_revoked_right_is_gone() -> TestRes
 
     // A refresh token is no access token, and one Lys never gave is refused.
     let refresh = answer["refresh_token"].as_str().ok_or("a refresh token")?;
-    let userinfo = reqwest::Client::new()
+    let userinfo = lys_http::client()
+        .expect("lys-http builds the client")
         .get(format!("{}/oauth/userinfo", service.base))
         .bearer_auth(refresh)
         .send()

@@ -202,6 +202,7 @@ mod network_machines;
 mod network_personal;
 pub mod network_store;
 pub mod oidc;
+pub mod oidc_http;
 pub mod openapi;
 mod openapi_accounts_types;
 mod openapi_agents_types;

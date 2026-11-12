@@ -7,7 +7,7 @@ use serde_json::json;
 async fn recovery_sets_only_password_and_keeps_disabled_unverified_and_other_factors()
 -> Result<(), Box<dyn std::error::Error>> {
     let issuer = FakeRauthy::start().await?;
-    let made: serde_json::Value = reqwest::Client::new()
+    let made: serde_json::Value = lys_http::client()?
         .post(format!("{}/users", issuer.api()))
         .header(reqwest::header::AUTHORIZATION, format!("API-Key {API_KEY}"))
         .json(&json!({

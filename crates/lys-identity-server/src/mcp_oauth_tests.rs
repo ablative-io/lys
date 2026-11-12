@@ -69,9 +69,7 @@ pub(super) async fn service_with_trusted(
 }
 
 fn client() -> Result<reqwest::Client, Box<dyn Error>> {
-    Ok(reqwest::Client::builder()
-        .redirect(Policy::none())
-        .build()?)
+    Ok(lys_http::builder()?.redirect(Policy::none()).build()?)
 }
 
 pub(super) async fn located(response: reqwest::Response) -> Result<reqwest::Url, Box<dyn Error>> {

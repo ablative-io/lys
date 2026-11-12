@@ -95,7 +95,7 @@ async fn a_call_on_a_model_account_goes_through_the_proxy_and_the_broker_with_th
     let proxy = Arc::clone(&started.proxy);
     tokio::spawn(async move { proxy.serve(listener).await });
 
-    let answer = reqwest::Client::new()
+    let answer = lys_http::client().expect("lys-http builds the client")
         .post(format!("{proxied}/anthropic/v1/messages"))
         .header("authorization", format!("Bearer {given}"))
         .header("content-type", "application/json")
@@ -125,7 +125,7 @@ async fn a_call_on_a_model_account_goes_through_the_proxy_and_the_broker_with_th
     // A call whose placeholder names a draw on another account opens
     // nothing, and nothing more reaches the upstream.
     let forged = given.replacen(&account, "model-account-elsewhere", 1);
-    let refused = reqwest::Client::new()
+    let refused = lys_http::client().expect("lys-http builds the client")
         .post(format!("{proxied}/anthropic/v1/messages"))
         .header("authorization", format!("Bearer {forged}"))
         .body("{}")

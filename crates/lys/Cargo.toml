@@ -75,7 +75,8 @@ lys-identity-server.workspace = true
 # The https bridge test issues its own root and server certificate (AGENTS-015 R3).
 rcgen.workspace = true
 # The mail leg makes an account at the pinned issuer over HTTP (DIRECTORY-110 R2).
-reqwest = { workspace = true, features = ["json", "rustls-tls"] }
+reqwest = { workspace = true, features = ["json"] }
+lys-http.workspace = true
 
 [target.'cfg(unix)'.dev-dependencies]
 nix = { version = "0.28", features = ["event", "fs", "time", "user"] }

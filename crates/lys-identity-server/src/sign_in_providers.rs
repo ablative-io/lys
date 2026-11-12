@@ -217,20 +217,19 @@ impl SignInProviders {
                         .to_owned(),
             });
         }
-        let probe = crate::outbound::http()
-            .redirect(reqwest::redirect::Policy::none())
-            .build()
-            .map_err(|error| ServerError::ConfigInvalid {
-                reason: format!("the provider check could not be made: {error}"),
-            })?;
+        let probe =
+            crate::outbound::client(|http| http.redirect(reqwest::redirect::Policy::none()))
+                .map_err(|error| ServerError::ConfigInvalid {
+                    reason: format!("the provider check could not be made: {error}"),
+                })?;
         Ok(Self {
             api: settings.api.trim_end_matches('/').to_owned(),
             authorization: format!("API-Key {key}"),
-            client: issuer_client()
-                .build()
-                .map_err(|error| ServerError::ConfigInvalid {
+            client: issuer_client(std::convert::identity).map_err(|error| {
+                ServerError::ConfigInvalid {
                     reason: format!("the issuer's API client could not be made: {error}"),
-                })?,
+                }
+            })?,
             origins: origins.unwrap_or_default(),
             probe,
             changes: account_changes::Changes::default(),

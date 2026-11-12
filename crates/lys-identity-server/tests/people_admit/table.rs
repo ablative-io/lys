@@ -100,7 +100,8 @@ pub(super) async fn table_with_mail(
     )
     .await?;
     rauthy.link(service.issuer.clone())?;
-    let made = reqwest::Client::new()
+    let made = lys_http::client()
+        .expect("lys-http builds the client")
         .post(format!("{}/setup/administrator", service.base))
         .header(reqwest::header::CONTENT_TYPE, "application/json")
         .body(

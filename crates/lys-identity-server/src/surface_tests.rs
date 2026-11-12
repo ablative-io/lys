@@ -26,7 +26,7 @@ async fn the_page_the_assets_and_the_api_share_one_origin() -> Result<(), Box<dy
     std::fs::create_dir(dir.path().join("assets"))?;
     std::fs::write(dir.path().join("assets").join("app.js"), "console.log(1)")?;
     let base = started(dir.path()).await?;
-    let client = reqwest::Client::new();
+    let client = lys_http::client().expect("lys-http builds the client");
 
     let page = client.get(format!("{base}/")).send().await?;
     assert_eq!(page.status(), 200);
@@ -67,7 +67,7 @@ async fn installed_bytes_remain_served_without_reading_the_files_again()
     let base = started(dir.path()).await?;
     std::fs::remove_file(dir.path().join("index.html"))?;
     std::fs::remove_file(dir.path().join("assets/app.js"))?;
-    let client = reqwest::Client::new();
+    let client = lys_http::client().expect("lys-http builds the client");
     for (path, expected) in [
         ("/", "installed page"),
         ("/assets/app.js", "installed asset"),
@@ -84,7 +84,7 @@ async fn a_matching_installed_etag_needs_no_body() -> Result<(), Box<dyn Error>>
     let dir = tempfile::TempDir::new()?;
     std::fs::write(dir.path().join("index.html"), "installed page")?;
     let base = started(dir.path()).await?;
-    let client = reqwest::Client::new();
+    let client = lys_http::client().expect("lys-http builds the client");
     let page = client.get(format!("{base}/")).send().await?;
     let tag = page
         .headers()
@@ -109,7 +109,7 @@ async fn a_path_outside_the_directory_is_never_read() -> Result<(), Box<dyn Erro
     std::fs::write(inside.join("index.html"), "<html></html>")?;
     std::fs::write(dir.path().join("outside.txt"), "private")?;
     let base = started(&inside).await?;
-    let client = reqwest::Client::new();
+    let client = lys_http::client().expect("lys-http builds the client");
     let answer = client
         .get(format!("{base}/assets/..%2F..%2Foutside.txt"))
         .send()

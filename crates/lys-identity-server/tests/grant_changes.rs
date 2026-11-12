@@ -322,7 +322,8 @@ async fn a_waiting_read_is_released_by_the_commit_and_sees_it_once() -> TestResu
     let base = world.service.base.clone();
     let credential = world.notes.clone();
     let waiting = tokio::spawn(async move {
-        reqwest::Client::new()
+        lys_http::client()
+            .expect("lys-http builds the client")
             .post(format!("{base}/grants/changes"))
             .bearer_auth(credential)
             .json(&body)

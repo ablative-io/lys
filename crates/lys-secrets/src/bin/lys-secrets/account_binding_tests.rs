@@ -133,7 +133,7 @@ async fn run_account_proxy_replaces_placeholder_records_source_and_never_exposes
     let proxy_url = format!("http://{}", listener.local_addr()?);
     let proxy = Arc::clone(&started.proxy);
     let proxy_task = tokio::spawn(async move { proxy.serve(listener).await });
-    let client = reqwest::Client::new();
+    let client = lys_http::client().expect("lys-http builds the client");
     let proxy_key = client
         .get(format!("{proxy_url}/_lys/account/key"))
         .send()

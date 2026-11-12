@@ -111,7 +111,8 @@ async fn a_browser_coming_back_from_sign_in_is_taken_to_the_screens_signed_in() 
 #[tokio::test]
 async fn a_first_visit_is_sent_to_lys_and_admits_nobody() -> TestResult {
     let service = Service::start().await?;
-    let browser = reqwest::Client::builder()
+    let browser = lys_http::builder()
+        .expect("lys-http builds the client")
         .redirect(reqwest::redirect::Policy::none())
         .build()?;
     let first = browser

@@ -197,7 +197,8 @@ async fn proxy(State(state): State<Proxy>, request: Request) -> Response {
     let Ok(bytes) = to_bytes(body, 1_048_576).await else {
         return StatusCode::BAD_REQUEST.into_response();
     };
-    let response = reqwest::Client::new()
+    let response = lys_http::client()
+        .expect("lys-http builds the client")
         .request(parts.method, format!("{}{}", state.upstream, parts.uri))
         .headers(parts.headers)
         .body(bytes)

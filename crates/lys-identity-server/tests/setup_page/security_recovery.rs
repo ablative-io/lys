@@ -116,7 +116,8 @@ async fn a_completed_reset_is_recorded_and_spent_even_when_the_account_cannot_si
         .ok_or("administrator id missing")?
         .to_owned();
     user["enabled"] = json!(false);
-    let disabled = reqwest::Client::new()
+    let disabled = lys_http::client()
+        .expect("lys-http builds the client")
         .put(format!("{}/users/{id}", table.rauthy.api()))
         .header(reqwest::header::AUTHORIZATION, format!("API-Key {API_KEY}"))
         .json(&user)

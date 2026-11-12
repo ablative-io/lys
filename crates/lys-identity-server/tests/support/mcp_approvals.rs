@@ -74,7 +74,7 @@ pub async fn post(
 
 impl Fixture {
     pub async fn new() -> Result<Self, Box<dyn Error>> {
-        let client = reqwest::Client::new();
+        let client = lys_http::client().expect("lys-http builds the client");
         let (service, (seeded, narrow, outside, profiles)) = Service::start_with(|config| {
             let seeded = seed_configured(config, [ADMINISTRATOR, HOLDER])?;
             let mut directory = open_directory(config)?;

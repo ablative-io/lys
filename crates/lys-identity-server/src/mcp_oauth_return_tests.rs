@@ -130,7 +130,8 @@ async fn forwarded_hosts_are_compared_only_from_a_configured_proxy() -> Result<(
             Vec::new()
         })
         .await?;
-        let client = reqwest::Client::builder()
+        let client = lys_http::builder()
+            .expect("lys-http builds the client")
             .no_proxy()
             .redirect(reqwest::redirect::Policy::none())
             .build()?;
@@ -222,7 +223,8 @@ async fn the_return_page_and_code_expiry_share_the_test_doors_clock() -> Result<
     let cookie = service
         .sign_in(identity_contract::apps::login(ADMINISTRATOR))
         .await?;
-    let client = reqwest::Client::builder()
+    let client = lys_http::builder()
+        .expect("lys-http builds the client")
         .no_proxy()
         .redirect(reqwest::redirect::Policy::none())
         .build()?;

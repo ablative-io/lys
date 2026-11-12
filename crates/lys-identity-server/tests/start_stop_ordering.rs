@@ -112,7 +112,8 @@ async fn start_refuses_until_stop_has_reaped_the_harness() -> Result<(), Box<dyn
 }
 
 async fn request_stop(stop_url: String, cookie: String) -> Result<(u16, Value), String> {
-    let response = reqwest::Client::new()
+    let response = lys_http::client()
+        .expect("lys-http builds the client")
         .post(stop_url)
         .header("cookie", cookie)
         .header("content-type", "application/json")

@@ -90,7 +90,7 @@ pub async fn send(
     auth: Auth<'_>,
     body: Option<&Value>,
 ) -> Result<Answer, Box<dyn Error>> {
-    let client = reqwest::Client::builder()
+    let client = lys_http::builder()?
         .redirect(reqwest::redirect::Policy::none())
         .build()?;
     let mut request = client.request(method, format!("{}{path}", service.base));

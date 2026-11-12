@@ -3,11 +3,20 @@
 
 use std::time::Duration;
 
-pub(crate) fn http() -> reqwest::ClientBuilder {
-    reqwest::Client::builder()
+/// A client builder carrying lys-http's TLS and the kernel keepalive.
+pub(crate) fn http() -> Result<reqwest::ClientBuilder, lys_http::Error> {
+    Ok(lys_http::builder()?
         .tcp_keepalive(Duration::from_secs(30))
         .tcp_keepalive_interval(Duration::from_secs(10))
-        .tcp_keepalive_retries(5)
+        .tcp_keepalive_retries(5))
+}
+
+/// A client from [`http`], with whatever `configure` sets on it (a redirect
+/// policy, a user agent) before it is built.
+pub(crate) fn client(
+    configure: impl FnOnce(reqwest::ClientBuilder) -> reqwest::ClientBuilder,
+) -> Result<reqwest::Client, lys_http::Error> {
+    Ok(configure(http()?).build()?)
 }
 
 pub(crate) fn keepalive(stream: &impl std::os::fd::AsFd) -> std::io::Result<()> {

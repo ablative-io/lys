@@ -165,7 +165,7 @@ async fn prepare_reconciles_after_reopen_and_never_returns_plaintext() -> Outcom
     let shared = Arc::new(Shared {
         broker: Mutex::new(broker),
         layout: layout.clone(),
-        client: reqwest::Client::new(),
+        client: lys_http::client().expect("lys-http builds the client"),
         window: Mutex::new(ServiceWindow::new()),
         permissions: Arc::new(grants.clone()),
     });
@@ -192,7 +192,7 @@ async fn prepare_reconciles_after_reopen_and_never_returns_plaintext() -> Outcom
     let shared = Arc::new(Shared {
         broker: Mutex::new(broker),
         layout,
-        client: reqwest::Client::new(),
+        client: lys_http::client().expect("lys-http builds the client"),
         window: Mutex::new(ServiceWindow::new()),
         permissions: Arc::new(grants),
     });
@@ -244,7 +244,7 @@ fn prepared_broker(
     let shared = Arc::new(Shared {
         broker: Mutex::new(broker),
         layout,
-        client: reqwest::Client::new(),
+        client: lys_http::client().expect("lys-http builds the client"),
         window: Mutex::new(ServiceWindow::new()),
         permissions: Arc::new(grants),
     });

@@ -14,7 +14,7 @@ async fn a_draft_made_through_mcp_keeps_the_signed_message_as_its_evidence() -> 
     let payload = crate::agent_signature::payload("POST", "/mcp", &message, at, &nonce);
     let signature = crate::routes::hex(&sign_attestation(&payload, &table.key).to_cose_bytes());
     let header = format!("{} {at} {nonce} {signature}", table.agent);
-    let answer: Value = reqwest::Client::new()
+    let answer: Value = lys_http::client()?
         .post(format!("{}/mcp", table.service.base))
         .header("content-type", "application/json")
         .header("accept", "application/json, text/event-stream")

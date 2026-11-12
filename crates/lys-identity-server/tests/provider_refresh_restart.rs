@@ -33,7 +33,8 @@ async fn token_answer(
     service: &Service,
     form: &[(&str, &str)],
 ) -> Result<(u16, Value), Box<dyn Error>> {
-    let response = reqwest::Client::new()
+    let response = lys_http::client()
+        .expect("lys-http builds the client")
         .post(format!("{}/oauth/token", service.base))
         .header(
             reqwest::header::AUTHORIZATION,
@@ -84,7 +85,8 @@ async fn a_refresh_issued_before_restart_renews_without_signing_in_again() -> Te
     let cookie = service.sign_in(login(ADMINISTRATOR)).await?;
     registered(&service, &cookie, NOTES).await?;
     let challenge = URL_SAFE_NO_PAD.encode(Sha256::digest(VERIFIER.as_bytes()));
-    let response = reqwest::Client::builder()
+    let response = lys_http::builder()
+        .expect("lys-http builds the client")
         .redirect(reqwest::redirect::Policy::none())
         .build()?
         .get(format!("{}/oauth/authorize", service.base))
@@ -154,7 +156,8 @@ async fn issued_refresh(service: &Service) -> Result<String, Box<dyn Error>> {
     let cookie = service.sign_in(login(ADMINISTRATOR)).await?;
     registered(service, &cookie, NOTES).await?;
     let challenge = URL_SAFE_NO_PAD.encode(Sha256::digest(VERIFIER.as_bytes()));
-    let response = reqwest::Client::builder()
+    let response = lys_http::builder()
+        .expect("lys-http builds the client")
         .redirect(reqwest::redirect::Policy::none())
         .build()?
         .get(format!("{}/oauth/authorize", service.base))

@@ -16,7 +16,8 @@ type Result<T = ()> = std::result::Result<T, Box<dyn std::error::Error>>;
 
 /// Call the issuer's administration API as the installation's key does.
 async fn issuer_api(rauthy: &FakeRauthy, path: &str, body: &Value) -> Result<Value> {
-    Ok(reqwest::Client::new()
+    Ok(lys_http::client()
+        .expect("lys-http builds the client")
         .post(format!("{}{path}", rauthy.api()))
         .header(reqwest::header::AUTHORIZATION, format!("API-Key {API_KEY}"))
         .json(body)
@@ -187,7 +188,8 @@ async fn an_unverified_address_stays_unverified_when_setting_a_first_password() 
     let mut user = rauthy.users()?[0].clone();
     let id = user["id"].as_str().ok_or("Gail's account")?.to_owned();
     user["email_verified"] = json!(false);
-    reqwest::Client::new()
+    lys_http::client()
+        .expect("lys-http builds the client")
         .put(format!("{}/users/{id}", rauthy.api()))
         .header(reqwest::header::AUTHORIZATION, format!("API-Key {API_KEY}"))
         .json(&user)
@@ -397,7 +399,8 @@ async fn the_departing_code_goes_to_lys_held_email_even_after_an_issuer_mix_up()
     let mut user = rauthy.users()?[0].clone();
     let id = user["id"].as_str().ok_or("Gail's account")?.to_owned();
     user["email"] = json!("annabel@example.test");
-    reqwest::Client::new()
+    lys_http::client()
+        .expect("lys-http builds the client")
         .put(format!("{}/users/{id}", rauthy.api()))
         .header(reqwest::header::AUTHORIZATION, format!("API-Key {API_KEY}"))
         .json(&user)

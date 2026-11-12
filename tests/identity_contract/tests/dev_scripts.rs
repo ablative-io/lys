@@ -218,7 +218,8 @@ async fn the_real_development_scripts_seed_their_named_grants_on_fresh_state() -
     assert!(held.state().join("grants.seeded").is_file());
     assert!(!held.logs().join("app-build.log").exists());
     let service = format!("http://127.0.0.1:{}", ports[1]);
-    let http = reqwest::Client::builder()
+    let http = lys_http::builder()
+        .expect("lys-http builds the client")
         .redirect(reqwest::redirect::Policy::none())
         .build()?;
     let login = http

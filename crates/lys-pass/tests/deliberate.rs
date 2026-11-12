@@ -2,7 +2,6 @@
 //! Deliberate routes never use cached rights to answer a live refusal.
 
 use lys_pass::{Client, Target};
-use reqwest::Client as Http;
 use url::Url;
 
 async fn serve(
@@ -71,7 +70,10 @@ async fn unreachable_lys_is_named_and_never_offline_allowed()
     let address = listener.local_addr()?;
     drop(listener);
     let client = Client::new(
-        Http::builder().no_proxy().build()?,
+        lys_http::builder()
+            .expect("lys-http builds the client")
+            .no_proxy()
+            .build()?,
         Url::parse(&format!("http://{address}"))?,
     )?;
     let error = client
@@ -98,7 +100,10 @@ async fn live_batch_preserves_held_mode_holder_and_revision()
         "{\"revision\":9,\"results\":[{\"allowed\":false,\"mode\":\"by_two\",\"grant\":\"grant\"}]}",
     ));
     let client = Client::new(
-        Http::builder().no_proxy().build()?,
+        lys_http::builder()
+            .expect("lys-http builds the client")
+            .no_proxy()
+            .build()?,
         Url::parse(&format!("http://{address}"))?,
     )?;
     let answer = client
@@ -132,7 +137,10 @@ async fn incomplete_live_population_is_a_named_refusal() -> Result<(), Box<dyn s
     let address = listener.local_addr()?;
     let server = tokio::spawn(serve(listener, "{\"revision\":9,\"results\":[]}"));
     let client = Client::new(
-        Http::builder().no_proxy().build()?,
+        lys_http::builder()
+            .expect("lys-http builds the client")
+            .no_proxy()
+            .build()?,
         Url::parse(&format!("http://{address}"))?,
     )?;
     let error = client
@@ -161,7 +169,10 @@ async fn token_fetch_and_refresh_send_their_distinct_grants()
             "{\"access_token\":\"signed-pass\",\"token_type\":\"Bearer\",\"expires_in\":100,\"refresh_token\":\"refresh\"}",
         ));
         let client = Client::new(
-            Http::builder().no_proxy().build()?,
+            lys_http::builder()
+                .expect("lys-http builds the client")
+                .no_proxy()
+                .build()?,
             Url::parse(&format!("http://{address}"))?,
         )?;
         let answer = if refresh {
@@ -203,7 +214,10 @@ async fn ended_holder_refresh_preserves_the_issuer_refusal_name()
         "400 Bad Request",
     ));
     let client = Client::new(
-        Http::builder().no_proxy().build()?,
+        lys_http::builder()
+            .expect("lys-http builds the client")
+            .no_proxy()
+            .build()?,
         Url::parse(&format!("http://{address}"))?,
     )?;
     let error = client

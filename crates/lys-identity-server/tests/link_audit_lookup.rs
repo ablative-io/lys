@@ -111,7 +111,7 @@ async fn a_foreign_origin_cannot_use_the_link_audit_sources_cookie() -> TestResu
     let (service, _) = seeded().await?;
     let cookie = service.sign_in(login(LINK_AUDIT_SOURCE)).await?;
     let body = json!({ "issuer": service.issuer.issuer(), "subject": ADA });
-    let client = reqwest::Client::new();
+    let client = lys_http::client().expect("lys-http builds the client");
     for (origin, status) in [("http://127.0.0.1:1", 400), (service.base.as_str(), 200)] {
         let response = client
             .post(format!("{}{PATH}", service.base))

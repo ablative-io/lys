@@ -44,7 +44,7 @@ fn fixture() -> Result<Fixture, Box<dyn std::error::Error>> {
         shared: Arc::new(Shared {
             broker: Mutex::new(broker),
             layout,
-            client: reqwest::Client::new(),
+            client: lys_http::client().expect("lys-http builds the client"),
             window: Mutex::new(ServiceWindow::new()),
             permissions: Arc::new(grants),
         }),
@@ -106,7 +106,7 @@ impl Fixture {
             shared: Arc::new(Shared {
                 broker: Mutex::new(broker),
                 layout,
-                client: reqwest::Client::new(),
+                client: lys_http::client().expect("lys-http builds the client"),
                 window: Mutex::new(ServiceWindow::new()),
                 permissions: Arc::new(grants),
             }),

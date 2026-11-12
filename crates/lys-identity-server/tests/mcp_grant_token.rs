@@ -113,7 +113,7 @@ impl Fixture {
             other,
             agent,
             lead,
-            client: reqwest::Client::new(),
+            client: lys_http::client().expect("lys-http builds the client"),
         })
     }
     async fn holding(&self) -> TestResult {

@@ -27,7 +27,7 @@ async fn public_clients_list_download_digest_and_unknown_platform()
     assert_eq!(status, 200);
     assert_eq!(listing["platforms"][platform]["commit"], commit);
     assert_eq!(listing["platforms"][platform]["files"]["lys"], digest);
-    let client = reqwest::Client::new();
+    let client = lys_http::client()?;
     let response = client
         .get(format!("{}/clients/{platform}/lys", service.base))
         .send()

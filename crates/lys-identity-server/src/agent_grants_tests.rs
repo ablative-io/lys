@@ -146,7 +146,7 @@ impl Fixture {
         let signature = crate::routes::hex(
             &lys_core::attestation::sign_attestation(&payload, &self.key).to_cose_bytes(),
         );
-        let mut request = reqwest::Client::new()
+        let mut request = lys_http::client()?
             .get(format!("{}/agent/grants", self.service.base))
             .header(
                 crate::agent_signature::HEADER,

@@ -12,7 +12,8 @@ async fn mcp(
     service: &Service,
     credential: Option<(&str, &str)>,
 ) -> Result<reqwest::Response, Box<dyn Error>> {
-    let mut request = reqwest::Client::new()
+    let mut request = lys_http::client()
+        .expect("lys-http builds the client")
         .post(format!("{}/api/mcp", service.base))
         .header("accept", "application/json, text/event-stream")
         .json(&json!({"jsonrpc": "2.0", "id": 1, "method": "initialize",

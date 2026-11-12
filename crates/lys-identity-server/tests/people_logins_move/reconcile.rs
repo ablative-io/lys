@@ -240,7 +240,8 @@ async fn the_administrator_with_two_addresses_held_still_signs_in() -> TestResul
         "several_addresses",
         "the administrator's record holds two addresses"
     );
-    let signed_in = reqwest::Client::new()
+    let signed_in = lys_http::client()
+        .expect("lys-http builds the client")
         .post(format!("{}/sign-in", service.base))
         .json(&json!({"email": ADMIN_EMAIL, "password": PASSWORD}))
         .send()

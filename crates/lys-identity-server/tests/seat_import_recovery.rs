@@ -331,11 +331,11 @@ fn seat_import_preserves_edits() -> TestResult {
 
 /// Lowercase hex of a digest (sha2 0.11's output has no `{:x}`).
 fn lower_hex(bytes: &[u8]) -> String {
-    use std::fmt::Write as _;
-    bytes
-        .iter()
-        .fold(String::with_capacity(bytes.len() * 2), |mut text, byte| {
-            let _ = write!(text, "{byte:02x}");
-            text
-        })
+    const DIGITS: &[u8; 16] = b"0123456789abcdef";
+    let mut text = String::with_capacity(bytes.len() * 2);
+    for byte in bytes {
+        text.push(char::from(DIGITS[usize::from(byte >> 4)]));
+        text.push(char::from(DIGITS[usize::from(byte & 0x0f)]));
+    }
+    text
 }

@@ -11,6 +11,26 @@ unreleased things cannot be used to tell what a published version contains.
 
 ## [Unreleased]
 
+### Changed — every crate: dependency versions lifted, and every HTTP client built one way (lys-http)
+
+- rand 0.10, rcgen 0.14, x509-parser 0.18, ed25519-dalek 3, x25519-dalek 3,
+  hkdf 0.13, ct-merkle 0.3, sha2 0.11 and sha1 0.11; openidconnect 4.1.0;
+  reqwest 0.13.5. rust-version is 1.88 (rcgen 0.14 and sha2 0.11 need it).
+  Signatures, hashes and wire formats are unchanged: Ed25519 with
+  `verify_strict`, SHA-256 and RFC 6962 as before.
+- New crate `lys-http`: the one way Lys builds a reqwest client. Its TLS is
+  rustls on ring with the bundled webpki-roots, as reqwest 0.12's
+  `rustls-tls` gave; reqwest 0.13 would otherwise verify through the
+  machine's certificate store. No process-wide crypto provider is installed.
+  A test refuses a reqwest client built anywhere else in the workspace.
+- `lys-pass`: `Client::new` takes a reqwest 0.13 `Client`. A product on
+  reqwest 0.12 cannot pass its client, so the next `lys-pass` release is a
+  breaking one.
+- `lys-identity-server`: openidconnect is used without its "reqwest" feature;
+  its HTTP calls go through `oidc_http::OidcHttp` over lys-http's client.
+- `lys-secrets`: `SecretsError::HttpClient` names a client lys-http could
+  not build, where `reqwest::Client::new()` panicked before.
+
 ### Changed — `lys-identity-server` and `lys`: an ended sign-in is named as ended, a sign-in lasts thirty days, and every refused sign-in is written down (DIRECTORY-099)
 
 - A refresh token whose Lys sign-in ended is refused `SessionEnded` with

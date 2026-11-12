@@ -197,7 +197,8 @@ async fn agent_tree(
     let at = u64::try_from(SystemTime::now().duration_since(UNIX_EPOCH)?.as_millis())?;
     let nonce = hex(&[nonce; 16]);
     let cose = sign_attestation(&payload("GET", "/tree", &[], at, &nonce), key).to_cose_bytes();
-    let response = reqwest::Client::new()
+    let response = lys_http::client()
+        .expect("lys-http builds the client")
         .get(format!("{}/tree", service.base))
         .header(HEADER, format!("{agent} {at} {nonce} {}", hex(&cose)))
         .send()

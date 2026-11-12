@@ -220,7 +220,8 @@ async fn ending_the_current_session_clears_the_cookie() -> TestResult {
     let cookie = service.sign_in(login(ADA)).await?;
     let view = list(&service, "/sessions", &cookie, &[&cookie]).await?;
     let id = id_of(&view, ADA, true)?;
-    let answer = reqwest::Client::new()
+    let answer = lys_http::client()
+        .expect("lys-http builds the client")
         .post(format!("{}/sessions/{id}/end", service.base))
         .header(reqwest::header::COOKIE, &cookie)
         .send()

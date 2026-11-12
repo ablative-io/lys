@@ -2,7 +2,6 @@
 //! One origin reaches provider and API routes; unexpected token refusals retain status without credentials.
 
 use lys_pass::{Client, Target};
-use reqwest::Client as Http;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use url::Url;
 
@@ -62,7 +61,10 @@ async fn answer(
 
 fn client(origin: &str) -> Result<Client, Box<dyn std::error::Error>> {
     Ok(Client::new(
-        Http::builder().no_proxy().build()?,
+        lys_http::builder()
+            .expect("lys-http builds the client")
+            .no_proxy()
+            .build()?,
         Url::parse(origin)?,
     )?)
 }
@@ -71,7 +73,10 @@ fn client(origin: &str) -> Result<Client, Box<dyn std::error::Error>> {
 fn an_api_mount_is_refused_as_an_origin_by_name() -> TestResult {
     for path in ["api", "api/", "prefix/api/", "other/"] {
         let error = Client::new(
-            Http::builder().no_proxy().build()?,
+            lys_http::builder()
+                .expect("lys-http builds the client")
+                .no_proxy()
+                .build()?,
             Url::parse(&format!("https://lys.example/{path}"))?,
         )
         .err()

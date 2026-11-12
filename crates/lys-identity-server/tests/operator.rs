@@ -184,7 +184,7 @@ async fn operator_admission_reaches_the_app_registration_route() -> TestResult {
     assert_eq!(answer["registered_by"]["kind"], "operator");
     assert_eq!(answer["registered_by"]["login"]["subject"], ADMINISTRATOR);
     service.restart().await?;
-    let client = reqwest::Client::new();
+    let client = lys_http::client().expect("lys-http builds the client");
     for (id, original) in [(FILES, old), (NOTES, answer)] {
         let response = client
             .get(format!("{}/apps/{id}", service.base))
@@ -285,7 +285,7 @@ async fn wrong_operator_cannot_be_bypassed_by_an_app_bearer() -> TestResult {
     assert!(approved["client"].is_null());
     assert_eq!(approved["credentials"]["app"], NOTES);
     let credential = identity_contract::app_custody::credential(NOTES);
-    let client = reqwest::Client::new();
+    let client = lys_http::client().expect("lys-http builds the client");
     let url = format!("{}/apps/me", service.base);
     assert_eq!(
         client
@@ -313,7 +313,7 @@ async fn wrong_operator_cannot_be_bypassed_by_an_app_bearer() -> TestResult {
 #[tokio::test]
 async fn every_start_route_preserves_the_operator_refusal() -> TestResult {
     let service = service(true).await?;
-    let client = reqwest::Client::new();
+    let client = lys_http::client().expect("lys-http builds the client");
     for (method, path) in [
         (reqwest::Method::POST, "/agents/agent/start"),
         (reqwest::Method::POST, "/launch-records/record/start-again"),
@@ -341,7 +341,7 @@ async fn every_start_route_preserves_the_operator_refusal() -> TestResult {
 async fn the_operator_has_no_personal_account_even_with_an_administrator_cookie() -> TestResult {
     let service = service(true).await?;
     let cookie = service.sign_in(login(ADMINISTRATOR)).await?;
-    let client = reqwest::Client::new();
+    let client = lys_http::client().expect("lys-http builds the client");
     for (method, path) in [
         (reqwest::Method::GET, "/me"),
         (reqwest::Method::GET, "/me/account"),

@@ -59,7 +59,8 @@ pub(super) async fn code(
     app: &str,
 ) -> Result<String, Box<dyn Error>> {
     let challenge = URL_SAFE_NO_PAD.encode(Sha256::digest(VERIFIER.as_bytes()));
-    let answer = reqwest::Client::builder()
+    let answer = lys_http::builder()
+        .expect("lys-http builds the client")
         .redirect(reqwest::redirect::Policy::none())
         .build()?
         .get(format!("{}/oauth/authorize", service.base))
@@ -94,7 +95,8 @@ pub(super) async fn token(
     app: &str,
     form: &[(&str, &str)],
 ) -> Result<(u16, Value), Box<dyn Error>> {
-    let answer = reqwest::Client::new()
+    let answer = lys_http::client()
+        .expect("lys-http builds the client")
         .post(format!("{}/oauth/token", service.base))
         .header(
             reqwest::header::AUTHORIZATION,

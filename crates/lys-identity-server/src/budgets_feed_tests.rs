@@ -174,7 +174,7 @@ async fn legacy_spend_never_supplies_context_for_a_live_session_without_complete
     let server = tokio::spawn(async move { axum::serve(listener, app).await });
     let result = async {
         let windows = Windows::from([("main".to_owned(), Some(200))]);
-        let client = reqwest::Client::new();
+        let client = lys_http::client().expect("lys-http builds the client");
         for (index, window) in [(1, 1000), (2, 0)] {
             let mut record = spend(Some("main"), 50, window);
             record.id = format!("source-{index}");

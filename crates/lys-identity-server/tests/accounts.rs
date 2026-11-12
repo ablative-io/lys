@@ -288,7 +288,8 @@ async fn table_with_mail(
     )
     .await?;
     rauthy.link(service.issuer.clone())?;
-    let made = reqwest::Client::new()
+    let made = lys_http::client()
+        .expect("lys-http builds the client")
         .post(format!("{}/setup/administrator", service.base))
         .header(reqwest::header::CONTENT_TYPE, "application/json")
         .body(
@@ -320,7 +321,8 @@ async fn issuer_api(
     path: &str,
     body: &Value,
 ) -> Result<Value, Box<dyn Error>> {
-    let text = reqwest::Client::new()
+    let text = lys_http::client()
+        .expect("lys-http builds the client")
         .request(method, format!("{}{path}", rauthy.api()))
         .header(reqwest::header::AUTHORIZATION, format!("API-Key {API_KEY}"))
         .header(reqwest::header::CONTENT_TYPE, "application/json")

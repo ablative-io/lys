@@ -162,7 +162,7 @@ impl Table {
             person,
             pass,
             cookie,
-            client: reqwest::Client::new(),
+            client: lys_http::client()?,
         })
     }
 

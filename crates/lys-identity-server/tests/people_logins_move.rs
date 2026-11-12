@@ -37,7 +37,8 @@ async fn historical_email(
         .ok_or("the historical account")?;
     user["email"] = json!(email);
     user["email_verified"] = json!(verified);
-    reqwest::Client::new()
+    lys_http::client()
+        .expect("lys-http builds the client")
         .put(format!("{}/users/{subject}", rauthy.api()))
         .header(reqwest::header::AUTHORIZATION, format!("API-Key {API_KEY}"))
         .json(&user)
@@ -67,7 +68,8 @@ async fn moving_a_historical_mix_up_records_one_batch_keeps_grants_and_ends_the_
         .as_str()
         .and_then(|s| s.split("/#/added/").nth(1))
         .ok_or("Dean's link")?;
-    let response = reqwest::Client::new()
+    let response = lys_http::client()
+        .expect("lys-http builds the client")
         .post(format!("{}/organisations/found/prove", service.base))
         .json(&json!({"proof":token}))
         .send()

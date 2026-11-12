@@ -30,7 +30,8 @@ const VERIFIER: &str = "a-pass-verifier-of-enough-length-0123456789-abcdefghij";
 /// The fixture app's person pass for the person signed in with `cookie`.
 async fn app_pass(service: &Service, cookie: &str) -> Result<String, Box<dyn Error>> {
     let challenge = URL_SAFE_NO_PAD.encode(Sha256::digest(VERIFIER.as_bytes()));
-    let sent = reqwest::Client::builder()
+    let sent = lys_http::builder()
+        .expect("lys-http builds the client")
         .redirect(reqwest::redirect::Policy::none())
         .build()?
         .get(format!("{}/oauth/authorize", service.base))
@@ -56,7 +57,8 @@ async fn app_pass(service: &Service, cookie: &str) -> Result<String, Box<dyn Err
         .find(|(key, _)| key == "code")
         .map(|(_, value)| value.into_owned())
         .ok_or("the app is given a code")?;
-    let answer: Value = reqwest::Client::new()
+    let answer: Value = lys_http::client()
+        .expect("lys-http builds the client")
         .post(format!("{}/oauth/token", service.base))
         .header(
             reqwest::header::AUTHORIZATION,
@@ -91,7 +93,8 @@ fn token_in(answer: &Value) -> Result<String, Box<dyn Error>> {
 
 /// Post `token` to prove, answering the status and the body.
 async fn prove(service: &Service, token: &str) -> Result<(u16, Value), Box<dyn Error>> {
-    let answer = reqwest::Client::new()
+    let answer = lys_http::client()
+        .expect("lys-http builds the client")
         .post(format!("{}/organisations/found/prove", service.base))
         .json(&json!({ "proof": token }))
         .send()

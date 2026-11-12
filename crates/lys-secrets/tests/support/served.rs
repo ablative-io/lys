@@ -218,7 +218,7 @@ impl Served {
             runtime: tokio::runtime::Builder::new_current_thread()
                 .enable_all()
                 .build()?,
-            client: reqwest::Client::new(),
+            client: lys_http::client().expect("lys-http builds the client"),
         };
         served.until_listening()?;
         Ok(served)

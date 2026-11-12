@@ -156,7 +156,7 @@ async fn installer_admission_kind_body_retirement_and_get_refuse_without_issuing
         assert_eq!(answer.1["refusal"], refusal);
     }
     for method in [reqwest::Method::GET, reqwest::Method::HEAD] {
-        let answer = reqwest::Client::new()
+        let answer = lys_http::client()?
             .request(method, format!("{}{route}", service.base))
             .header("cookie", &owner)
             .send()

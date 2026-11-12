@@ -232,7 +232,8 @@ async fn engine_call(
     body: &serde_json::Value,
 ) -> Result<serde_json::Value, Box<dyn std::error::Error>> {
     let key = std::fs::read_to_string(&settings.key_file)?;
-    let answer = reqwest::Client::new()
+    let answer = lys_http::client()
+        .expect("lys-http builds the client")
         .post(format!("http://{}{path}", settings.endpoint))
         .bearer_auth(key.trim())
         .header(reqwest::header::CONTENT_TYPE, "application/json")

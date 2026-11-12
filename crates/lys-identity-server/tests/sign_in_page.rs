@@ -76,7 +76,8 @@ async fn every_address_the_browser_is_sent_to_is_on_lys_origin() -> TestResult {
     service
         .issuer
         .hold(account("grace-subject", EMAIL, false))?;
-    let browser = reqwest::Client::builder()
+    let browser = lys_http::builder()
+        .expect("lys-http builds the client")
         .redirect(reqwest::redirect::Policy::none())
         .build()?;
     let first = browse(&browser, browser.get(format!("{}/login", service.base))).await?;
@@ -152,7 +153,7 @@ async fn a_wrong_password_and_an_unknown_email_are_one_refusal() -> TestResult {
     service
         .issuer
         .hold(account("grace-subject", EMAIL, false))?;
-    let client = reqwest::Client::new();
+    let client = lys_http::client().expect("lys-http builds the client");
     let mut answers = Vec::new();
     for (email, password) in [
         (EMAIL, "Not-The-Password-1"),
@@ -192,7 +193,8 @@ async fn an_account_asking_for_a_second_factor_is_refused_by_name() -> TestResul
     service
         .issuer
         .hold(account("passkey-subject", EMAIL, true))?;
-    let answer = reqwest::Client::new()
+    let answer = lys_http::client()
+        .expect("lys-http builds the client")
         .post(format!("{}/sign-in", service.base))
         .header(reqwest::header::CONTENT_TYPE, "application/json")
         .body(sign_in_body(EMAIL, PASSWORD))
@@ -259,7 +261,8 @@ async fn a_provider_sign_in_passes_through_the_provider_and_lys_only() -> TestRe
         subject: "google-subject".to_owned(),
         email: "g@example.test".to_owned(),
     })?;
-    let browser = reqwest::Client::builder()
+    let browser = lys_http::builder()
+        .expect("lys-http builds the client")
         .redirect(reqwest::redirect::Policy::none())
         .build()?;
     let mut visited = Vec::new();
@@ -313,7 +316,8 @@ async fn a_provider_sign_in_passes_through_the_provider_and_lys_only() -> TestRe
 #[tokio::test]
 async fn a_provider_the_issuer_does_not_hold_lands_on_lys_sign_in_by_name() -> TestResult {
     let service = Service::start().await?;
-    let browser = reqwest::Client::builder()
+    let browser = lys_http::builder()
+        .expect("lys-http builds the client")
         .redirect(reqwest::redirect::Policy::none())
         .build()?;
     let answer = browser
@@ -394,7 +398,7 @@ async fn the_served_sign_in_page_loads_nothing_from_the_issuer() -> TestResult {
 async fn lys_limits_attempts_even_when_the_issuer_accepts_every_password() -> TestResult {
     let service = Service::start().await?;
     service.issuer.hold(account("person", EMAIL, false))?;
-    let browser = reqwest::Client::new();
+    let browser = lys_http::client().expect("lys-http builds the client");
     for _ in 0..10 {
         let answer = browser
             .post(format!("{}/sign-in", service.base))

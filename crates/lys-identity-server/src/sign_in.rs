@@ -110,8 +110,10 @@ pub(crate) fn unreached(error: reqwest::Error) -> String {
 /// (actix-web's default, five seconds, unset in its server), and a call
 /// written onto one it has just closed fails as "connection closed before
 /// message completed". Every call opens its own loopback connection.
-pub(crate) fn issuer_client() -> reqwest::ClientBuilder {
-    crate::outbound::http()
+pub(crate) fn issuer_client(
+    configure: impl FnOnce(reqwest::ClientBuilder) -> reqwest::ClientBuilder,
+) -> Result<reqwest::Client, lys_http::Error> {
+    crate::outbound::client(configure)
 }
 
 /// The issuer's sign-in API, over its loopback address, and the sign-ins
@@ -339,11 +341,11 @@ impl IssuerSignIn {
     pub fn new(api: String, callback: String) -> Result<Self, ServerError> {
         // The issuer refuses a sign-in that names no User-Agent; the service
         // names itself.
-        let http = issuer_client()
-            .redirect(reqwest::redirect::Policy::none())
-            .user_agent(USER_AGENT)
-            .build()
-            .map_err(|error| failed(error.to_string()))?;
+        let http = issuer_client(|http| {
+            http.redirect(reqwest::redirect::Policy::none())
+                .user_agent(USER_AGENT)
+        })
+        .map_err(|error| failed(error.to_string()))?;
         Ok(Self {
             api,
             trusted_proxies: Vec::new(),

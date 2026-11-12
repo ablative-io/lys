@@ -6,7 +6,7 @@ use axum::extract::State;
 use axum::http::HeaderMap;
 use axum::routing::get;
 use axum::{Json, Router};
-use openidconnect::reqwest::Url;
+use reqwest::Url;
 use serde::Serialize;
 
 use crate::error::ServerError;

@@ -556,7 +556,8 @@ async fn a_start_with_a_cookie_and_signature_is_refused_before_recording() -> Te
     let path = format!("/agents/{}/start-command", table.agent());
     let body = start_body(&machine)?;
     let before = runtime_bytes(&table.service.dir.path().join("runtime"))?;
-    let response = reqwest::Client::new()
+    let response = lys_http::client()
+        .expect("lys-http builds the client")
         .post(format!("{}{path}", table.service.base))
         .header(reqwest::header::COOKIE, &table.ada)
         .header(lys_identity_server::agent_signature::HEADER, "present")
@@ -576,7 +577,8 @@ async fn a_start_with_a_cookie_and_signature_is_refused_before_recording() -> Te
 #[tokio::test(flavor = "multi_thread")]
 async fn another_cookie_route_refuses_the_same_mixed_credentials() -> TestResult {
     let table = Table::unprofiled().await?;
-    let response = reqwest::Client::new()
+    let response = lys_http::client()
+        .expect("lys-http builds the client")
         .get(format!("{}/configuration", table.service.base))
         .header(reqwest::header::COOKIE, &table.ada)
         .header(lys_identity_server::agent_signature::HEADER, "present")

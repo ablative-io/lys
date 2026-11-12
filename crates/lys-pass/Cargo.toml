@@ -11,7 +11,7 @@ rust-version.workspace = true
 [dependencies]
 base64.workspace = true
 ed25519-dalek.workspace = true
-reqwest = { workspace = true, features = ["json", "rustls-tls"], optional = true }
+reqwest = { workspace = true, features = ["json", "form"], optional = true }
 serde.workspace = true
 serde_json.workspace = true
 sha2.workspace = true
@@ -32,6 +32,8 @@ http = ["dep:reqwest"]
 [dev-dependencies]
 # The crate's own tests exercise the live client, so they build it with HTTP.
 lys-pass = { path = ".", features = ["http"] }
+# Its tests build their clients the one way Lys does.
+lys-http.workspace = true
 tokio = { workspace = true, features = ["io-util"] }
 
 [lints]

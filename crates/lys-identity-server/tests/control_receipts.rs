@@ -308,7 +308,7 @@ fn an_old_version_goals_snapshot_is_rebuilt_without_losing_goals_or_timers() -> 
 async fn control_routes_require_a_person_before_resolving_a_session_or_goal() -> TestResult {
     use identity_contract::harness::Service;
     let service = Service::start().await?;
-    let client = reqwest::Client::new();
+    let client = lys_http::client().expect("lys-http builds the client");
     for path in [
         "/runtime/sessions/unknown/controls",
         "/runtime/sessions/unknown/control-receipts",

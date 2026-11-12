@@ -180,7 +180,8 @@ async fn product_code(
     cookie: &str,
     verifier: &str,
 ) -> Result<String, Box<dyn Error>> {
-    let client = reqwest::Client::builder()
+    let client = lys_http::builder()
+        .expect("lys-http builds the client")
         .redirect(reqwest::redirect::Policy::none())
         .build()?;
     let challenge = URL_SAFE_NO_PAD.encode(Sha256::digest(verifier.as_bytes()));
@@ -217,7 +218,8 @@ async fn product_token(
     code: &str,
     verifier: &str,
 ) -> Result<(u16, Value), Box<dyn Error>> {
-    let answer = reqwest::Client::new()
+    let answer = lys_http::client()
+        .expect("lys-http builds the client")
         .post(format!("{}/oauth/token", service.base))
         .header(
             reqwest::header::AUTHORIZATION,
@@ -238,7 +240,8 @@ async fn product_token(
 }
 
 async fn product_user(service: &Service, token: &str) -> Result<(u16, Value), Box<dyn Error>> {
-    let answer = reqwest::Client::new()
+    let answer = lys_http::client()
+        .expect("lys-http builds the client")
         .get(format!("{}/oauth/userinfo", service.base))
         .bearer_auth(token)
         .send()
@@ -329,7 +332,8 @@ async fn a_callback_prepared_before_disable_cannot_create_a_new_session() -> Tes
         )
         .await?;
     assert_eq!(disabled.0, 200, "{}", disabled.1);
-    let client = reqwest::Client::builder()
+    let client = lys_http::builder()
+        .expect("lys-http builds the client")
         .redirect(reqwest::redirect::Policy::none())
         .build()?;
     let answer = client

@@ -331,7 +331,8 @@ async fn a_registration_needs_a_caller_and_the_responsible_person_never_moves() 
         "responsible": grace,
     })
     .to_string();
-    let refused = reqwest::Client::new()
+    let refused = lys_http::client()
+        .expect("lys-http builds the client")
         .post(format!("{}/agents", service.base))
         .header(reqwest::header::CONTENT_TYPE, "application/json")
         .header(reqwest::header::COOKIE, &cookie)

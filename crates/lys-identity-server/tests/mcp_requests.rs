@@ -18,7 +18,8 @@ async fn post(
     cookie: &str,
     body: &Value,
 ) -> Result<(u16, Value), Box<dyn Error>> {
-    let response = reqwest::Client::new()
+    let response = lys_http::client()
+        .expect("lys-http builds the client")
         .post(format!("{}{path}", service.base))
         .header(reqwest::header::COOKIE, cookie)
         .header(reqwest::header::CONTENT_TYPE, "application/json")

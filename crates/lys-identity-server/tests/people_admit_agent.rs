@@ -257,7 +257,8 @@ async fn call_as(
     let at = u64::try_from(SystemTime::now().duration_since(UNIX_EPOCH)?.as_millis())?;
     let nonce = hex(OperationId::generate()?.as_bytes());
     let cose = sign_attestation(&payload("POST", "/mcp", &bytes, at, &nonce), key).to_cose_bytes();
-    let answer = reqwest::Client::new()
+    let answer = lys_http::client()
+        .expect("lys-http builds the client")
         .post(format!("{}/mcp", service.base))
         .header(HEADER, format!("{agent} {at} {nonce} {}", hex(&cose)))
         .header(reqwest::header::CONTENT_TYPE, "application/json")

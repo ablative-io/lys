@@ -137,7 +137,10 @@ impl Table {
             .await?;
         let origin = reqwest::Url::parse(&self.service.base)?;
         self.service.base.push_str("/api");
-        Ok(lys_pass::Client::new(reqwest::Client::new(), origin)?)
+        Ok(lys_pass::Client::new(
+            lys_http::client().expect("lys-http builds the client"),
+            origin,
+        )?)
     }
 
     /// A root grant of `editor` on `fixture_notes.doc:id` to `holder` in `mode`.
@@ -184,7 +187,8 @@ impl Table {
             .origin()
             .ascii_serialization();
         let challenge = URL_SAFE_NO_PAD.encode(sha2::Sha256::digest(VERIFIER.as_bytes()));
-        let answer = reqwest::Client::builder()
+        let answer = lys_http::builder()
+            .expect("lys-http builds the client")
             .redirect(reqwest::redirect::Policy::none())
             .build()?
             .get(format!("{origin}/oauth/authorize"))
@@ -210,7 +214,8 @@ impl Table {
             .map(|(_, value)| value.into_owned())
             .ok_or("the app is given a code")?;
         let secret = identity_contract::app_custody::secret();
-        let token: Value = reqwest::Client::new()
+        let token: Value = lys_http::client()
+            .expect("lys-http builds the client")
             .post(format!("{origin}/oauth/token"))
             .header(
                 reqwest::header::AUTHORIZATION,

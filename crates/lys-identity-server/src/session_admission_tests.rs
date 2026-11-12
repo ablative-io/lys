@@ -16,7 +16,7 @@ async fn every_personal_exception_names_a_registered_method_and_template()
         "review the complete exception set"
     );
     let service = Service::start().await?;
-    let client = reqwest::Client::builder()
+    let client = lys_http::builder()?
         .redirect(reqwest::redirect::Policy::none())
         .build()?;
     for (method, template) in OWN_ACCOUNT_ROUTES {
