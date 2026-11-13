@@ -40,5 +40,11 @@
       ]
     },
     "reason": "dev_scripts runs the development binaries from the directory CARGO_BIN_EXE_dev_issuer names, where a workspace run of Cargo leaves lys-identity-server and lys-identity-dev-seed beside it (workspace_bins)."
+  },
+  "lys-http": {
+    "checkout_tests": [
+      "one_builder"
+    ],
+    "reason": "one_builder walks crates/ and tests/ from CARGO_MANIFEST_DIR at run time to refuse a reqwest client built outside lys-http; a bare client added to a file the test binary does not compile would leave the binary unchanged and a cached pass served, and the remote worker has no checkout."
   }
 }
