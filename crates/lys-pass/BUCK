@@ -37,11 +37,11 @@ rust_library(
         "CARGO_PKG_NAME": "lys-pass",
         "CARGO_PKG_README": "",
         "CARGO_PKG_REPOSITORY": "https://github.com/ablative-io/lys",
-        "CARGO_PKG_RUST_VERSION": "1.85",
-        "CARGO_PKG_VERSION": "0.3.4",
+        "CARGO_PKG_RUST_VERSION": "1.88",
+        "CARGO_PKG_VERSION": "0.4.0",
         "CARGO_PKG_VERSION_MAJOR": "0",
-        "CARGO_PKG_VERSION_MINOR": "3",
-        "CARGO_PKG_VERSION_PATCH": "4",
+        "CARGO_PKG_VERSION_MINOR": "4",
+        "CARGO_PKG_VERSION_PATCH": "0",
         "CARGO_PKG_VERSION_PRE": ""
     },
     features = [
@@ -97,6 +97,7 @@ rust_library(
     named_deps = {
         "base64": "//third-party:base64",
         "ed25519_dalek": "//third-party:ed25519_dalek",
+        "lys_http": "//crates/lys-http:lys-http",
         "reqwest": "//third-party:reqwest",
         "serde": "//third-party:serde",
         "serde_json": "//third-party:serde_json",
@@ -130,11 +131,11 @@ workspace_rust_test(
         "CARGO_PKG_NAME": "lys-pass",
         "CARGO_PKG_README": "",
         "CARGO_PKG_REPOSITORY": "https://github.com/ablative-io/lys",
-        "CARGO_PKG_RUST_VERSION": "1.85",
-        "CARGO_PKG_VERSION": "0.3.4",
+        "CARGO_PKG_RUST_VERSION": "1.88",
+        "CARGO_PKG_VERSION": "0.4.0",
         "CARGO_PKG_VERSION_MAJOR": "0",
-        "CARGO_PKG_VERSION_MINOR": "3",
-        "CARGO_PKG_VERSION_PATCH": "4",
+        "CARGO_PKG_VERSION_MINOR": "4",
+        "CARGO_PKG_VERSION_PATCH": "0",
         "CARGO_PKG_VERSION_PRE": ""
     },
     features = [
@@ -193,6 +194,7 @@ workspace_rust_test(
     named_deps = {
         "base64": "//third-party:base64",
         "ed25519_dalek": "//third-party:ed25519_dalek",
+        "lys_http": "//crates/lys-http:lys-http",
         "lys_pass": "//crates/lys-pass:lys-pass",
         "reqwest": "//third-party:reqwest",
         "serde": "//third-party:serde",
@@ -235,11 +237,11 @@ workspace_rust_test(
         "CARGO_PKG_NAME": "lys-pass",
         "CARGO_PKG_README": "",
         "CARGO_PKG_REPOSITORY": "https://github.com/ablative-io/lys",
-        "CARGO_PKG_RUST_VERSION": "1.85",
-        "CARGO_PKG_VERSION": "0.3.4",
+        "CARGO_PKG_RUST_VERSION": "1.88",
+        "CARGO_PKG_VERSION": "0.4.0",
         "CARGO_PKG_VERSION_MAJOR": "0",
-        "CARGO_PKG_VERSION_MINOR": "3",
-        "CARGO_PKG_VERSION_PATCH": "4",
+        "CARGO_PKG_VERSION_MINOR": "4",
+        "CARGO_PKG_VERSION_PATCH": "0",
         "CARGO_PKG_VERSION_PRE": ""
     },
     features = [
@@ -299,6 +301,7 @@ workspace_rust_test(
     named_deps = {
         "base64": "//third-party:base64",
         "ed25519_dalek": "//third-party:ed25519_dalek",
+        "lys_http": "//crates/lys-http:lys-http",
         "lys_pass": ":lys-pass",
         "reqwest": "//third-party:reqwest",
         "serde": "//third-party:serde",
@@ -341,11 +344,11 @@ workspace_rust_test(
         "CARGO_PKG_NAME": "lys-pass",
         "CARGO_PKG_README": "",
         "CARGO_PKG_REPOSITORY": "https://github.com/ablative-io/lys",
-        "CARGO_PKG_RUST_VERSION": "1.85",
-        "CARGO_PKG_VERSION": "0.3.4",
+        "CARGO_PKG_RUST_VERSION": "1.88",
+        "CARGO_PKG_VERSION": "0.4.0",
         "CARGO_PKG_VERSION_MAJOR": "0",
-        "CARGO_PKG_VERSION_MINOR": "3",
-        "CARGO_PKG_VERSION_PATCH": "4",
+        "CARGO_PKG_VERSION_MINOR": "4",
+        "CARGO_PKG_VERSION_PATCH": "0",
         "CARGO_PKG_VERSION_PRE": ""
     },
     features = [
@@ -405,6 +408,7 @@ workspace_rust_test(
     named_deps = {
         "base64": "//third-party:base64",
         "ed25519_dalek": "//third-party:ed25519_dalek",
+        "lys_http": "//crates/lys-http:lys-http",
         "lys_pass": ":lys-pass",
         "reqwest": "//third-party:reqwest",
         "serde": "//third-party:serde",
@@ -447,11 +451,11 @@ workspace_rust_test(
         "CARGO_PKG_NAME": "lys-pass",
         "CARGO_PKG_README": "",
         "CARGO_PKG_REPOSITORY": "https://github.com/ablative-io/lys",
-        "CARGO_PKG_RUST_VERSION": "1.85",
-        "CARGO_PKG_VERSION": "0.3.4",
+        "CARGO_PKG_RUST_VERSION": "1.88",
+        "CARGO_PKG_VERSION": "0.4.0",
         "CARGO_PKG_VERSION_MAJOR": "0",
-        "CARGO_PKG_VERSION_MINOR": "3",
-        "CARGO_PKG_VERSION_PATCH": "4",
+        "CARGO_PKG_VERSION_MINOR": "4",
+        "CARGO_PKG_VERSION_PATCH": "0",
         "CARGO_PKG_VERSION_PRE": ""
     },
     features = [
@@ -511,6 +515,7 @@ workspace_rust_test(
     named_deps = {
         "base64": "//third-party:base64",
         "ed25519_dalek": "//third-party:ed25519_dalek",
+        "lys_http": "//crates/lys-http:lys-http",
         "lys_pass": ":lys-pass",
         "reqwest": "//third-party:reqwest",
         "serde": "//third-party:serde",
@@ -553,11 +558,11 @@ workspace_rust_test(
         "CARGO_PKG_NAME": "lys-pass",
         "CARGO_PKG_README": "",
         "CARGO_PKG_REPOSITORY": "https://github.com/ablative-io/lys",
-        "CARGO_PKG_RUST_VERSION": "1.85",
-        "CARGO_PKG_VERSION": "0.3.4",
+        "CARGO_PKG_RUST_VERSION": "1.88",
+        "CARGO_PKG_VERSION": "0.4.0",
         "CARGO_PKG_VERSION_MAJOR": "0",
-        "CARGO_PKG_VERSION_MINOR": "3",
-        "CARGO_PKG_VERSION_PATCH": "4",
+        "CARGO_PKG_VERSION_MINOR": "4",
+        "CARGO_PKG_VERSION_PATCH": "0",
         "CARGO_PKG_VERSION_PRE": ""
     },
     features = [
@@ -617,6 +622,7 @@ workspace_rust_test(
     named_deps = {
         "base64": "//third-party:base64",
         "ed25519_dalek": "//third-party:ed25519_dalek",
+        "lys_http": "//crates/lys-http:lys-http",
         "lys_pass": ":lys-pass",
         "reqwest": "//third-party:reqwest",
         "serde": "//third-party:serde",
@@ -659,11 +665,11 @@ workspace_rust_test(
         "CARGO_PKG_NAME": "lys-pass",
         "CARGO_PKG_README": "",
         "CARGO_PKG_REPOSITORY": "https://github.com/ablative-io/lys",
-        "CARGO_PKG_RUST_VERSION": "1.85",
-        "CARGO_PKG_VERSION": "0.3.4",
+        "CARGO_PKG_RUST_VERSION": "1.88",
+        "CARGO_PKG_VERSION": "0.4.0",
         "CARGO_PKG_VERSION_MAJOR": "0",
-        "CARGO_PKG_VERSION_MINOR": "3",
-        "CARGO_PKG_VERSION_PATCH": "4",
+        "CARGO_PKG_VERSION_MINOR": "4",
+        "CARGO_PKG_VERSION_PATCH": "0",
         "CARGO_PKG_VERSION_PRE": ""
     },
     features = [
@@ -723,6 +729,7 @@ workspace_rust_test(
     named_deps = {
         "base64": "//third-party:base64",
         "ed25519_dalek": "//third-party:ed25519_dalek",
+        "lys_http": "//crates/lys-http:lys-http",
         "lys_pass": ":lys-pass",
         "reqwest": "//third-party:reqwest",
         "serde": "//third-party:serde",
@@ -765,11 +772,11 @@ workspace_rust_test(
         "CARGO_PKG_NAME": "lys-pass",
         "CARGO_PKG_README": "",
         "CARGO_PKG_REPOSITORY": "https://github.com/ablative-io/lys",
-        "CARGO_PKG_RUST_VERSION": "1.85",
-        "CARGO_PKG_VERSION": "0.3.4",
+        "CARGO_PKG_RUST_VERSION": "1.88",
+        "CARGO_PKG_VERSION": "0.4.0",
         "CARGO_PKG_VERSION_MAJOR": "0",
-        "CARGO_PKG_VERSION_MINOR": "3",
-        "CARGO_PKG_VERSION_PATCH": "4",
+        "CARGO_PKG_VERSION_MINOR": "4",
+        "CARGO_PKG_VERSION_PATCH": "0",
         "CARGO_PKG_VERSION_PRE": ""
     },
     features = [
@@ -829,6 +836,7 @@ workspace_rust_test(
     named_deps = {
         "base64": "//third-party:base64",
         "ed25519_dalek": "//third-party:ed25519_dalek",
+        "lys_http": "//crates/lys-http:lys-http",
         "lys_pass": ":lys-pass",
         "reqwest": "//third-party:reqwest",
         "serde": "//third-party:serde",
@@ -871,11 +879,11 @@ workspace_rust_test(
         "CARGO_PKG_NAME": "lys-pass",
         "CARGO_PKG_README": "",
         "CARGO_PKG_REPOSITORY": "https://github.com/ablative-io/lys",
-        "CARGO_PKG_RUST_VERSION": "1.85",
-        "CARGO_PKG_VERSION": "0.3.4",
+        "CARGO_PKG_RUST_VERSION": "1.88",
+        "CARGO_PKG_VERSION": "0.4.0",
         "CARGO_PKG_VERSION_MAJOR": "0",
-        "CARGO_PKG_VERSION_MINOR": "3",
-        "CARGO_PKG_VERSION_PATCH": "4",
+        "CARGO_PKG_VERSION_MINOR": "4",
+        "CARGO_PKG_VERSION_PATCH": "0",
         "CARGO_PKG_VERSION_PRE": ""
     },
     features = [
@@ -935,6 +943,7 @@ workspace_rust_test(
     named_deps = {
         "base64": "//third-party:base64",
         "ed25519_dalek": "//third-party:ed25519_dalek",
+        "lys_http": "//crates/lys-http:lys-http",
         "lys_pass": ":lys-pass",
         "reqwest": "//third-party:reqwest",
         "serde": "//third-party:serde",
@@ -977,11 +986,11 @@ workspace_rust_test(
         "CARGO_PKG_NAME": "lys-pass",
         "CARGO_PKG_README": "",
         "CARGO_PKG_REPOSITORY": "https://github.com/ablative-io/lys",
-        "CARGO_PKG_RUST_VERSION": "1.85",
-        "CARGO_PKG_VERSION": "0.3.4",
+        "CARGO_PKG_RUST_VERSION": "1.88",
+        "CARGO_PKG_VERSION": "0.4.0",
         "CARGO_PKG_VERSION_MAJOR": "0",
-        "CARGO_PKG_VERSION_MINOR": "3",
-        "CARGO_PKG_VERSION_PATCH": "4",
+        "CARGO_PKG_VERSION_MINOR": "4",
+        "CARGO_PKG_VERSION_PATCH": "0",
         "CARGO_PKG_VERSION_PRE": ""
     },
     features = [
@@ -1041,6 +1050,7 @@ workspace_rust_test(
     named_deps = {
         "base64": "//third-party:base64",
         "ed25519_dalek": "//third-party:ed25519_dalek",
+        "lys_http": "//crates/lys-http:lys-http",
         "lys_pass": ":lys-pass",
         "reqwest": "//third-party:reqwest",
         "serde": "//third-party:serde",
@@ -1083,11 +1093,11 @@ workspace_rust_test(
         "CARGO_PKG_NAME": "lys-pass",
         "CARGO_PKG_README": "",
         "CARGO_PKG_REPOSITORY": "https://github.com/ablative-io/lys",
-        "CARGO_PKG_RUST_VERSION": "1.85",
-        "CARGO_PKG_VERSION": "0.3.4",
+        "CARGO_PKG_RUST_VERSION": "1.88",
+        "CARGO_PKG_VERSION": "0.4.0",
         "CARGO_PKG_VERSION_MAJOR": "0",
-        "CARGO_PKG_VERSION_MINOR": "3",
-        "CARGO_PKG_VERSION_PATCH": "4",
+        "CARGO_PKG_VERSION_MINOR": "4",
+        "CARGO_PKG_VERSION_PATCH": "0",
         "CARGO_PKG_VERSION_PRE": ""
     },
     features = [
@@ -1147,6 +1157,7 @@ workspace_rust_test(
     named_deps = {
         "base64": "//third-party:base64",
         "ed25519_dalek": "//third-party:ed25519_dalek",
+        "lys_http": "//crates/lys-http:lys-http",
         "lys_pass": ":lys-pass",
         "reqwest": "//third-party:reqwest",
         "serde": "//third-party:serde",
@@ -1189,11 +1200,11 @@ workspace_rust_test(
         "CARGO_PKG_NAME": "lys-pass",
         "CARGO_PKG_README": "",
         "CARGO_PKG_REPOSITORY": "https://github.com/ablative-io/lys",
-        "CARGO_PKG_RUST_VERSION": "1.85",
-        "CARGO_PKG_VERSION": "0.3.4",
+        "CARGO_PKG_RUST_VERSION": "1.88",
+        "CARGO_PKG_VERSION": "0.4.0",
         "CARGO_PKG_VERSION_MAJOR": "0",
-        "CARGO_PKG_VERSION_MINOR": "3",
-        "CARGO_PKG_VERSION_PATCH": "4",
+        "CARGO_PKG_VERSION_MINOR": "4",
+        "CARGO_PKG_VERSION_PATCH": "0",
         "CARGO_PKG_VERSION_PRE": ""
     },
     features = [
@@ -1253,6 +1264,7 @@ workspace_rust_test(
     named_deps = {
         "base64": "//third-party:base64",
         "ed25519_dalek": "//third-party:ed25519_dalek",
+        "lys_http": "//crates/lys-http:lys-http",
         "lys_pass": ":lys-pass",
         "reqwest": "//third-party:reqwest",
         "serde": "//third-party:serde",
@@ -1295,11 +1307,11 @@ workspace_rust_test(
         "CARGO_PKG_NAME": "lys-pass",
         "CARGO_PKG_README": "",
         "CARGO_PKG_REPOSITORY": "https://github.com/ablative-io/lys",
-        "CARGO_PKG_RUST_VERSION": "1.85",
-        "CARGO_PKG_VERSION": "0.3.4",
+        "CARGO_PKG_RUST_VERSION": "1.88",
+        "CARGO_PKG_VERSION": "0.4.0",
         "CARGO_PKG_VERSION_MAJOR": "0",
-        "CARGO_PKG_VERSION_MINOR": "3",
-        "CARGO_PKG_VERSION_PATCH": "4",
+        "CARGO_PKG_VERSION_MINOR": "4",
+        "CARGO_PKG_VERSION_PATCH": "0",
         "CARGO_PKG_VERSION_PRE": ""
     },
     features = [
@@ -1359,6 +1371,7 @@ workspace_rust_test(
     named_deps = {
         "base64": "//third-party:base64",
         "ed25519_dalek": "//third-party:ed25519_dalek",
+        "lys_http": "//crates/lys-http:lys-http",
         "lys_pass": ":lys-pass",
         "reqwest": "//third-party:reqwest",
         "serde": "//third-party:serde",
@@ -1401,11 +1414,11 @@ workspace_rust_test(
         "CARGO_PKG_NAME": "lys-pass",
         "CARGO_PKG_README": "",
         "CARGO_PKG_REPOSITORY": "https://github.com/ablative-io/lys",
-        "CARGO_PKG_RUST_VERSION": "1.85",
-        "CARGO_PKG_VERSION": "0.3.4",
+        "CARGO_PKG_RUST_VERSION": "1.88",
+        "CARGO_PKG_VERSION": "0.4.0",
         "CARGO_PKG_VERSION_MAJOR": "0",
-        "CARGO_PKG_VERSION_MINOR": "3",
-        "CARGO_PKG_VERSION_PATCH": "4",
+        "CARGO_PKG_VERSION_MINOR": "4",
+        "CARGO_PKG_VERSION_PATCH": "0",
         "CARGO_PKG_VERSION_PRE": ""
     },
     features = [
@@ -1465,6 +1478,7 @@ workspace_rust_test(
     named_deps = {
         "base64": "//third-party:base64",
         "ed25519_dalek": "//third-party:ed25519_dalek",
+        "lys_http": "//crates/lys-http:lys-http",
         "lys_pass": ":lys-pass",
         "reqwest": "//third-party:reqwest",
         "serde": "//third-party:serde",
@@ -1507,11 +1521,11 @@ workspace_rust_test(
         "CARGO_PKG_NAME": "lys-pass",
         "CARGO_PKG_README": "",
         "CARGO_PKG_REPOSITORY": "https://github.com/ablative-io/lys",
-        "CARGO_PKG_RUST_VERSION": "1.85",
-        "CARGO_PKG_VERSION": "0.3.4",
+        "CARGO_PKG_RUST_VERSION": "1.88",
+        "CARGO_PKG_VERSION": "0.4.0",
         "CARGO_PKG_VERSION_MAJOR": "0",
-        "CARGO_PKG_VERSION_MINOR": "3",
-        "CARGO_PKG_VERSION_PATCH": "4",
+        "CARGO_PKG_VERSION_MINOR": "4",
+        "CARGO_PKG_VERSION_PATCH": "0",
         "CARGO_PKG_VERSION_PRE": ""
     },
     features = [
@@ -1571,6 +1585,7 @@ workspace_rust_test(
     named_deps = {
         "base64": "//third-party:base64",
         "ed25519_dalek": "//third-party:ed25519_dalek",
+        "lys_http": "//crates/lys-http:lys-http",
         "lys_pass": ":lys-pass",
         "reqwest": "//third-party:reqwest",
         "serde": "//third-party:serde",
@@ -1626,6 +1641,7 @@ file_check(
         "lys-anchor-cli",
         "lys-core",
         "lys-home",
+        "lys-http",
         "lys-identity",
         "lys-identity-server",
         "lys-log-store",

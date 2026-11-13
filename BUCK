@@ -180,6 +180,7 @@ file_check(
         "lys-anchor-cli",
         "lys-core",
         "lys-home",
+        "lys-http",
         "lys-identity",
         "lys-identity-server",
         "lys-log-store",

@@ -47,6 +47,8 @@
 //crates/lys-home:test-version
 //crates/lys-home:unit-lys-home
 //crates/lys-home:unit-lys-home-bin
+//crates/lys-http:test-one_builder
+//crates/lys-http:unit-lys-http
 //crates/lys-identity-server:test-accounts
 //crates/lys-identity-server:test-action_sentences
 //crates/lys-identity-server:test-add_agent_walk
