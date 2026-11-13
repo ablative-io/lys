@@ -22,7 +22,8 @@
 //!   `default()` builds one, unless the field holds it inside a container
 //!   whose own default is empty (`Option`, `Vec`, a map, a once-cell).
 //!
-//! Comments are not code: a line's text after `//` is not read.
+//! Comments are not code: a line's text after a `//` outside a string or
+//! character literal is not read.
 
 use std::error::Error;
 use std::fs;
@@ -51,9 +52,41 @@ fn is_ident(c: char) -> bool {
     c.is_alphanumeric() || c == '_'
 }
 
-/// `line` with any `//` comment removed.
+/// `line` up to its `//` comment, if it has one. A `//` inside a string or
+/// character literal (`"https://lys.example/"`, `'"'`) is code, not a
+/// comment, so a constructor after a URL on the same line is still read.
 fn code(line: &str) -> &str {
-    line.split("//").next().unwrap_or_default()
+    let mut in_string = false;
+    let mut escaped = false;
+    let mut skip = 0_usize;
+    let mut previous = None;
+    for (at, c) in line.char_indices() {
+        if skip > 0 {
+            skip -= 1;
+        } else if in_string {
+            if escaped {
+                escaped = false;
+            } else if c == '\\' {
+                escaped = true;
+            } else if c == '"' {
+                in_string = false;
+            }
+        } else if c == '"' {
+            in_string = true;
+        } else if c == '\'' {
+            // A quote as a character literal opens no string.
+            let rest = line.get(at..).unwrap_or_default();
+            if rest.starts_with("'\"'") {
+                skip = 2;
+            } else if rest.starts_with("'\\\"'") {
+                skip = 3;
+            }
+        } else if c == '/' && previous == Some('/') {
+            return line.get(..at.saturating_sub(1)).unwrap_or_default();
+        }
+        previous = Some(c);
+    }
+    line
 }
 
 /// The text before and after each place `name` occurs in `text` as a whole
@@ -359,6 +392,8 @@ fn the_scanner_fires_on_every_form_it_refuses() {
         "use reqwest::Client;\n#[derive(Default)]\npub struct Holder {\n    pub http: Client,\n    name: String,\n}",
         "#[derive(\n    Debug,\n    Default,\n)]\nstruct Holder {\n    http: std::sync::Arc<reqwest::Client>,\n}",
         "#[derive(Default)]\nstruct Holder(reqwest::Client);",
+        "let page = fetch(\"https://lys.example/\"); let http = reqwest::Client::new();",
+        "let quote = '\"'; let http = reqwest::Client::new(); // the one client",
         "#[derive(Default)]\n#[serde(\n    rename_all = \"snake_case\"\n)]\npub(crate) struct Holder {\n    /// The client.\n    http: reqwest::Client,\n}",
     ];
     for case in cases {
@@ -371,6 +406,7 @@ fn the_scanner_fires_on_every_form_it_refuses() {
         "use reqwest::Client;\nlet oidc = openidconnect::Client::new(id);",
         "let config = reqwest::ClientConfig::new();",
         "// reqwest::Client::new() is never called here",
+        "let page = \"https://lys.example/\"; // reqwest::Client::new() is not called",
         "use reqwest::{\n    Url,\n    header,\n};\nlet client = Client::new();",
         "#[derive(Default)]\nstruct Counts {\n    clients: usize,\n}",
         "#[derive(Clone)]\nstruct Holder {\n    http: reqwest::Client,\n}",
