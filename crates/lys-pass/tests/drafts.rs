@@ -119,7 +119,7 @@ async fn runner_pulls_approved_drafts_and_records_once_after_receipt_retry()
         Ok::<_, std::io::Error>(requests)
     });
     let client = lys_pass::Client::new(
-        lys_http::builder()
+        lys_pass::http::builder()
             .expect("lys-http builds the client")
             .no_proxy()
             .build()?,
@@ -146,7 +146,7 @@ async fn runner_pulls_approved_drafts_and_records_once_after_receipt_retry()
 #[tokio::test]
 async fn ordinary_refusal_cannot_become_a_draft() -> Result<(), Box<dyn std::error::Error>> {
     let client = lys_pass::Client::new(
-        lys_http::builder()
+        lys_pass::http::builder()
             .expect("lys-http builds the client")
             .no_proxy()
             .build()?,

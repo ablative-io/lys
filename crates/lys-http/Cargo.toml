@@ -12,9 +12,13 @@ rust-version.workspace = true
 # Built without reqwest's own crypto provider (its "rustls" feature is aws-lc-rs);
 # the TLS configuration is made in this crate on ring and handed to reqwest.
 reqwest = { workspace = true, features = ["rustls-no-provider"] }
-rustls = { version = "=0.23.45", default-features = false, features = ["ring", "std", "tls12"] }
+# Minimums, not exact pins: lys-http is published and built into products
+# (through lys-pass's `http` feature) that pin these two themselves, and two
+# exact versions of one crate cannot resolve. Lys's own lock holds the same
+# versions the products pin, so there is one of each across the estate.
+rustls = { version = "0.23.46", default-features = false, features = ["ring", "std", "tls12"] }
 thiserror.workspace = true
-webpki-roots = "=1.0.9"
+webpki-roots = "1.0.12"
 
 [dev-dependencies]
 # The refusal tests' own root and server certificates.

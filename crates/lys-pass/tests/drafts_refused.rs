@@ -89,7 +89,7 @@ async fn a_product_refusal_is_posted_as_its_own_name_and_reason()
     let address = listener.local_addr()?;
     let server = tokio::spawn(one_request(listener));
     let client = lys_pass::Client::new(
-        lys_http::builder()
+        lys_pass::http::builder()
             .expect("lys-http builds the client")
             .no_proxy()
             .build()?,
@@ -118,7 +118,7 @@ async fn a_product_refusal_is_posted_as_its_own_name_and_reason()
 async fn a_refusal_without_a_name_or_a_reason_is_not_sent() -> Result<(), Box<dyn std::error::Error>>
 {
     let client = lys_pass::Client::new(
-        lys_http::builder()
+        lys_pass::http::builder()
             .expect("lys-http builds the client")
             .no_proxy()
             .build()?,

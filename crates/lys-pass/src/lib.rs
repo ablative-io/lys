@@ -19,6 +19,21 @@ pub use refusal::Refusal;
 pub use rights::{Claims, Decision, Holder, Mode, Right, Target};
 pub use verify::{CLOCK_SKEW, KeySet, VerifiedPass};
 
+/// The one way a product builds the client it hands [`Client`] and
+/// [`signin::SignIn`]: `http::builder()` carries Lys's TLS (rustls on ring,
+/// the bundled webpki-roots, no process-wide provider), and the product sets
+/// its own timeouts, redirect policy and proxy on it before building.
+/// `http::client()` is that builder with nothing added. reqwest here is built
+/// without a crypto provider of its own, so a client built any other way is
+/// refused at build time.
+#[cfg(feature = "http")]
+pub use lys_http as http;
+/// The reqwest lys-pass is built against, for the types a product names when
+/// it sets its policy on [`http::builder`] (`reqwest::redirect::Policy`) or
+/// sends its own requests on the same client.
+#[cfg(feature = "http")]
+pub use reqwest;
+
 #[cfg(feature = "http")]
 use reqwest::Client as Http;
 use serde::{Deserialize, Serialize};
@@ -137,7 +152,8 @@ impl Error {
     }
 }
 
-/// A transport supplied by the product, holding no token or credential.
+/// A transport supplied by the product, holding no token or credential. The
+/// product builds it with [`http::builder`] or [`http::client`].
 #[cfg(feature = "http")]
 #[derive(Clone, Debug)]
 pub struct Client {
@@ -147,7 +163,8 @@ pub struct Client {
 
 #[cfg(feature = "http")]
 impl Client {
-    /// Use the product's configured transport and trusted Lys origin.
+    /// Use the product's configured transport, built with [`http::builder`],
+    /// and its trusted Lys origin.
     /// Provider routes live at its root; product API routes live under `/api`.
     ///
     /// # Errors

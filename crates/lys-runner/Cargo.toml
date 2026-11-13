@@ -29,7 +29,7 @@ regex-lite.workspace = true
 rustix = { workspace = true, features = ["net", "process"] }
 # The dial bridge's TLS: rustls with ring and the Mozilla roots, each pinned
 # at the version already in the lock, as lys-home pins them.
-rustls = { version = "=0.23.45", default-features = false, features = ["ring", "std", "tls12"] }
+rustls = { version = "=0.23.46", default-features = false, features = ["ring", "std", "tls12"] }
 serde.workspace = true
 sha2.workspace = true
 serde_json.workspace = true
@@ -40,7 +40,7 @@ tokio = { workspace = true, features = ["rt", "signal", "macros", "net", "sync"]
 url = "2.5"
 # The rotation's shape in the identity server's OpenAPI document.
 utoipa.workspace = true
-webpki-roots = "=1.0.9"
+webpki-roots = "=1.0.12"
 
 # A peer's ancestry is read from the macOS process records.
 [target.'cfg(target_os = "macos")'.dependencies]

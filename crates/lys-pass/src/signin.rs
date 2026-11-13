@@ -109,7 +109,8 @@ pub struct SignIn {
 impl SignIn {
     /// Read the discovery document of the Lys at `issuer` and sign people in
     /// to the app `audience` as the client `client_id` with `secret`, Lys
-    /// sending each browser back to `redirect`.
+    /// sending each browser back to `redirect`. `http` is the product's
+    /// client, built with [`crate::http::builder`].
     ///
     /// # Errors
     ///

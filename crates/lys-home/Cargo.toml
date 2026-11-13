@@ -25,7 +25,7 @@ hyper-util = { version = "=0.1.21", features = ["client-legacy", "http1", "tokio
 jiff.workspace = true
 lys-core.workspace = true
 rand.workspace = true
-rustls = { version = "=0.23.45", default-features = false, features = ["ring", "std", "tls12"] }
+rustls = { version = "=0.23.46", default-features = false, features = ["ring", "std", "tls12"] }
 serde.workspace = true
 serde_json.workspace = true
 sha1.workspace = true

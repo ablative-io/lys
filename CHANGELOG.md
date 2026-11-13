@@ -23,9 +23,15 @@ unreleased things cannot be used to tell what a published version contains.
   `rustls-tls` gave; reqwest 0.13 would otherwise verify through the
   machine's certificate store. No process-wide crypto provider is installed.
   A test refuses a reqwest client built anywhere else in the workspace.
-- `lys-pass`: `Client::new` takes a reqwest 0.13 `Client`. A product on
-  reqwest 0.12 cannot pass its client, so the next `lys-pass` release is a
-  breaking one.
+  It takes rustls 0.23.46 and webpki-roots 1.0.12 as minimums rather than
+  exact pins, so a product that pins them resolves; Lys's own crates pin
+  those same versions.
+- `lys-pass` 0.4.0 (breaking): `Client::new` and `SignIn::connect` take a
+  reqwest 0.13 `Client`. The `http` feature brings lys-http, re-exported as
+  `lys_pass::http`, and reqwest as `lys_pass::reqwest`: a product builds the
+  client it hands lys-pass with `lys_pass::http::builder()`, adding its own
+  timeouts, redirect policy and proxy setting before building. A client
+  built any other way has no crypto provider and is refused when built.
 - `lys-identity-server`: openidconnect is used without its "reqwest" feature;
   its HTTP calls go through `oidc_http::OidcHttp` over lys-http's client.
 - `lys-secrets`: `SecretsError::HttpClient` names a client lys-http could

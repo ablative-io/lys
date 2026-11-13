@@ -53,7 +53,7 @@ x509-parser.workspace = true
 zeroize.workspace = true
 # `lys mcp` over https (AGENTS-015 R3): the rustls lys-home and lys-runner already
 # carry, pinned the same, with ring; verification is rustls-webpki's, never off.
-rustls = { version = "=0.23.45", default-features = false, features = ["ring", "std", "tls12"] }
+rustls = { version = "=0.23.46", default-features = false, features = ["ring", "std", "tls12"] }
 # The system's trust roots for that check, read once from the platform store: the
 # root loader of the rustls project, a source of roots for the present stack, not a
 # TLS stack of its own.

@@ -61,7 +61,7 @@ async fn answer(
 
 fn client(origin: &str) -> Result<Client, Box<dyn std::error::Error>> {
     Ok(Client::new(
-        lys_http::builder()
+        lys_pass::http::builder()
             .expect("lys-http builds the client")
             .no_proxy()
             .build()?,
@@ -73,7 +73,7 @@ fn client(origin: &str) -> Result<Client, Box<dyn std::error::Error>> {
 fn an_api_mount_is_refused_as_an_origin_by_name() -> TestResult {
     for path in ["api", "api/", "prefix/api/", "other/"] {
         let error = Client::new(
-            lys_http::builder()
+            lys_pass::http::builder()
                 .expect("lys-http builds the client")
                 .no_proxy()
                 .build()?,
