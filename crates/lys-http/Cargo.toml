@@ -1,6 +1,7 @@
 [package]
 name = "lys-http"
 description = "The one way Lys builds an HTTP client: rustls on ring with the bundled webpki-roots"
+readme = "README.md"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
