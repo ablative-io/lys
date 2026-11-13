@@ -1,4 +1,9 @@
 {
+  "_fixups": {
+    "cmov": "the crate's src/lib.rs reads ../README.md through include_str!, and build//buck/buckgen/fixups at c5eefd0 has no entry for it (Apollo is adding it to the library, 13 Nov; this goes when lys pins that build).",
+    "cpubits": "the crate's src/lib.rs reads ../README.md through include_str!, and build//buck/buckgen/fixups at c5eefd0 has no entry for it (Apollo is adding it to the library, 13 Nov; this goes when lys pins that build).",
+    "rustls-platform-verifier": "the crate's src/lib.rs reads ../README.md through include_str!, and build//buck/buckgen/fixups at c5eefd0 has no entry for it (Apollo is adding it to the library, 13 Nov; this goes when lys pins that build)."
+  },
   "lys": {
     "checkout_git": true,
     "reason": "build.rs stamps the binary with the checkout's HEAD commit and whether it is dirty (build/provenance.rs), read from live Git as Cargo runs it. Its identity tests start Rauthy and Postgres in containers (container_runtime_missing without one), so they run only where the machine declares a container runtime.",

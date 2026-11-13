@@ -1,0 +1,4 @@
+# cmov: lys's own fixup, declared in buckgen.json _fixups until build//buck/buckgen/fixups carries one.
+
+# Files the crate reads at compile time beyond its Rust sources (include_str!("../README.md") in src/lib.rs).
+extra_srcs = ["README.md"]
