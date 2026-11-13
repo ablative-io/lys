@@ -22,10 +22,12 @@
 //!   `default()` builds one, unless the field holds it inside a container
 //!   whose own default is empty (`Option`, `Vec`, a map, a once-cell).
 //!
-//! Comments and literals are not code: a line's text after a `//` outside a
-//! string or character literal is not read, and the inside of a literal is
-//! blanked before it is read. So this file's own cases, which are strings,
-//! are not refused, and it is walked like any other file.
+//! Comments and literals are not code. Each file is read whole, and every
+//! comment (line or block, nested) and the inside of every string (over any
+//! number of lines, raw or not) and character literal is blanked before a
+//! line is read, newlines kept, so a line number still names the file's line.
+//! So this file's own cases, which are strings, are not refused, and it is
+//! walked like any other file.
 
 use std::error::Error;
 use std::fs;
@@ -54,56 +56,132 @@ fn is_ident(c: char) -> bool {
     c.is_alphanumeric() || c == '_'
 }
 
-/// The code of `line`: the text before its `//` comment, with the inside of
-/// every string and character literal blanked. A `//` inside a literal
-/// (`"https://lys.example/"`, `'"'`) is not a comment, so a constructor after
-/// a URL on the same line is still read; and text inside a literal is not
-/// code, so a string naming a constructor (as this file's cases do) builds
-/// nothing.
-fn code(line: &str) -> String {
-    let mut kept = String::with_capacity(line.len());
-    let mut in_string = false;
-    let mut escaped = false;
-    let mut skip = 0_usize;
-    let mut previous = None;
-    for (at, c) in line.char_indices() {
-        if skip > 0 {
-            skip -= 1;
-            kept.push(' ');
-        } else if in_string {
-            if escaped {
-                escaped = false;
+/// `text` with every comment and the inside of every string and character
+/// literal blanked to spaces, newlines kept, so each line of the result is the
+/// code of the same line of `text`. Read whole: line comments, nested block
+/// comments, strings over several lines, raw strings (`r"…"`, `r#"…"#`, `br`,
+/// `cr`, a backslash inside being no escape) and character literals (`'"'`,
+/// `'\''`). A lifetime (`'a`) is code.
+fn code(text: &str) -> String {
+    let chars: Vec<char> = text.chars().collect();
+    let at = |index: usize| chars.get(index).copied();
+    let blank = |c: char| if c == '\n' { '\n' } else { ' ' };
+    let mut kept = String::with_capacity(text.len());
+    let mut index = 0;
+    while let Some(c) = at(index) {
+        let next = at(index + 1);
+        if c == '/' && next == Some('/') {
+            while let Some(c) = at(index) {
+                if c == '\n' {
+                    break;
+                }
                 kept.push(' ');
-            } else if c == '\\' {
-                escaped = true;
-                kept.push(' ');
-            } else if c == '"' {
-                in_string = false;
-                kept.push(c);
-            } else {
-                kept.push(' ');
+                index += 1;
+            }
+        } else if c == '/' && next == Some('*') {
+            let mut depth = 0_usize;
+            while let Some(c) = at(index) {
+                if c == '/' && at(index + 1) == Some('*') {
+                    depth += 1;
+                    kept.push_str("  ");
+                    index += 2;
+                } else if c == '*' && at(index + 1) == Some('/') {
+                    depth = depth.saturating_sub(1);
+                    kept.push_str("  ");
+                    index += 2;
+                    if depth == 0 {
+                        break;
+                    }
+                } else {
+                    kept.push(blank(c));
+                    index += 1;
+                }
+            }
+        } else if let Some((hashes, opener)) = raw_string(&chars, index) {
+            kept.extend(chars.iter().skip(index).take(opener));
+            index += opener;
+            while let Some(c) = at(index) {
+                if c == '"' && (1..=hashes).all(|ahead| at(index + ahead) == Some('#')) {
+                    kept.push('"');
+                    kept.extend(std::iter::repeat_n('#', hashes));
+                    index += 1 + hashes;
+                    break;
+                }
+                kept.push(blank(c));
+                index += 1;
             }
         } else if c == '"' {
-            in_string = true;
-            kept.push(c);
-        } else if c == '\'' {
-            // A quote as a character literal opens no string.
-            let rest = line.get(at..).unwrap_or_default();
-            if rest.starts_with("'\"'") {
-                skip = 2;
-            } else if rest.starts_with("'\\\"'") {
-                skip = 3;
+            kept.push('"');
+            index += 1;
+            while let Some(c) = at(index) {
+                index += 1;
+                if c == '\\' {
+                    kept.push(' ');
+                    if let Some(escaped) = at(index) {
+                        kept.push(blank(escaped));
+                        index += 1;
+                    }
+                } else if c == '"' {
+                    kept.push('"');
+                    break;
+                } else {
+                    kept.push(blank(c));
+                }
             }
-            kept.push(c);
-        } else if c == '/' && previous == Some('/') {
-            kept.pop();
-            return kept;
+        } else if c == '\'' && (next == Some('\\') || at(index + 2) == Some('\'')) {
+            // A character literal; a lifetime has no closing quote two on.
+            kept.push('\'');
+            index += 1;
+            if next == Some('\\') {
+                // The backslash and the character it escapes.
+                for _ in 0..2 {
+                    if at(index).is_some() {
+                        kept.push(' ');
+                        index += 1;
+                    }
+                }
+            }
+            while let Some(c) = at(index) {
+                index += 1;
+                if c == '\'' {
+                    kept.push('\'');
+                    break;
+                }
+                kept.push(blank(c));
+            }
         } else {
             kept.push(c);
+            index += 1;
         }
-        previous = Some(c);
     }
     kept
+}
+
+/// Where a raw string literal opens at `index` (`r"`, `r#"`, `br"`, `cr#"`):
+/// its number of `#`, and the length of its opener, quote included. A raw
+/// identifier (`r#type`) and an identifier ending in `r` open none.
+fn raw_string(chars: &[char], index: usize) -> Option<(usize, usize)> {
+    if index
+        .checked_sub(1)
+        .and_then(|before| chars.get(before))
+        .is_some_and(|&before| is_ident(before))
+    {
+        return None;
+    }
+    let mut at = index;
+    if matches!(chars.get(at), Some('b' | 'c')) {
+        at += 1;
+    }
+    if chars.get(at) != Some(&'r') {
+        return None;
+    }
+    at += 1;
+    let mut hashes = 0;
+    while chars.get(at) == Some(&'#') {
+        hashes += 1;
+        at += 1;
+    }
+    (chars.get(at) == Some(&'"')).then_some((hashes, at + 1 - index))
 }
 
 /// The text before and after each place `name` occurs in `text` as a whole
@@ -124,14 +202,13 @@ fn occurrences<'t>(text: &'t str, name: &str) -> Vec<(&'t str, &'t str)> {
         .collect()
 }
 
-/// The bodies of the `use` statements of `text` (what follows `use `), each
+/// The bodies of the `use` statements of `code` (what follows `use `), each
 /// joined into one line up to its `;`.
-fn use_statements(text: &str) -> Vec<String> {
+fn use_statements(code: &str) -> Vec<String> {
     let mut statements = Vec::new();
     let mut open: Option<String> = None;
-    for line in text.lines() {
-        let code = code(line);
-        let line = code.trim();
+    for line in code.lines() {
+        let line = line.trim();
         let current = match open.take() {
             Some(mut joined) => {
                 joined.push(' ');
@@ -179,10 +256,10 @@ fn items<'s>(body: &'s str, krate: &str) -> Vec<(&'s str, &'s str)> {
         .collect()
 }
 
-/// The names `text` gives reqwest's client and its builder: their own paths,
+/// The names `code` gives reqwest's client and its builder: their own paths,
 /// the paths through any alias of the crate, and any name a `use` binds them to.
-fn client_names(text: &str) -> Vec<String> {
-    let statements = use_statements(text);
+fn client_names(code: &str) -> Vec<String> {
+    let statements = use_statements(code);
     let mut crates = vec!["reqwest".to_owned()];
     for body in &statements {
         if let Some(alias) = body.strip_prefix("reqwest as ") {
@@ -211,11 +288,9 @@ fn client_names(text: &str) -> Vec<String> {
     names
 }
 
-/// Whether `line` builds a client through one of `names`: a constructor called
-/// or passed on it, or `::default` on a line that names it.
+/// Whether the code `line` builds a client through one of `names`: a
+/// constructor called or passed on it, or `::default` on a line that names it.
 fn constructs(line: &str, names: &[String]) -> bool {
-    let line = code(line);
-    let line = line.as_str();
     names.iter().any(|name| {
         let found = occurrences(line, name);
         !found.is_empty()
@@ -245,12 +320,11 @@ fn holds_client(fields: &str, names: &[String]) -> bool {
     })
 }
 
-/// The line numbers of the structs in `text` that derive `Default` over a
+/// The line numbers of the structs in `code` that derive `Default` over a
 /// field holding a client. An attribute spread over lines is joined first, so
 /// `#[derive(\n    Debug,\n    Default,\n)]` is read as one.
-fn default_structs(text: &str, names: &[String]) -> Vec<usize> {
-    let codes: Vec<String> = text.lines().map(code).collect();
-    let lines: Vec<&str> = codes.iter().map(|line| line.trim()).collect();
+fn default_structs(code: &str, names: &[String]) -> Vec<usize> {
+    let lines: Vec<&str> = code.lines().map(str::trim).collect();
     let mut rest = lines.iter().enumerate();
     let mut found = Vec::new();
     let mut deriving_default = false;
@@ -313,15 +387,19 @@ fn default_structs(text: &str, names: &[String]) -> Vec<usize> {
 
 /// The lines of `text` that build a reqwest client, as `(line number, line)`.
 fn builds(text: &str) -> Vec<(usize, String)> {
-    let names = client_names(text);
+    let code = code(text);
+    let names = client_names(&code);
     let lines: Vec<&str> = text.lines().collect();
-    let mut found: Vec<(usize, String)> = lines
-        .iter()
+    let mut found: Vec<(usize, String)> = code
+        .lines()
         .enumerate()
         .filter(|(_, line)| constructs(line, &names))
-        .map(|(index, line)| (index + 1, line.trim().to_owned()))
+        .map(|(index, _)| {
+            let line = lines.get(index).map_or("", |line| line.trim());
+            (index + 1, line.to_owned())
+        })
         .collect();
-    for number in default_structs(text, &names) {
+    for number in default_structs(&code, &names) {
         let line = lines
             .get(number.saturating_sub(1))
             .map_or("", |line| line.trim());
@@ -414,6 +492,11 @@ fn the_scanner_fires_on_every_form_it_refuses() {
         "#[derive(Default)]\nstruct Holder(reqwest::Client);",
         "let page = fetch(\"https://lys.example/\"); let http = reqwest::Client::new();",
         "let quote = '\"'; let http = reqwest::Client::new(); // the one client",
+        "let doc = \"first\nsecond\";\nlet http = reqwest::Client::new();",
+        "/* a comment */ let http = reqwest::Client::new();",
+        "let said = r#\"say \"hi\" // not a comment\"#; let http = reqwest::Client::new();",
+        "let path = r\"C:\\\"; let http = reqwest::Client::new();",
+        "let quote = '\\''; let tick: &'static str = \"\"; let http = reqwest::Client::new();",
         "#[derive(Default)]\n#[serde(\n    rename_all = \"snake_case\"\n)]\npub(crate) struct Holder {\n    /// The client.\n    http: reqwest::Client,\n}",
     ];
     for case in cases {
@@ -427,6 +510,11 @@ fn the_scanner_fires_on_every_form_it_refuses() {
         "let config = reqwest::ClientConfig::new();",
         "// reqwest::Client::new() is never called here",
         "let refused = \"reqwest::Client::new() is refused\";",
+        "let doc = \"reqwest::Client::new()\nis refused\";",
+        "/*\nlet http = reqwest::Client::new();\n*/",
+        "/* outer /* inner */\nlet http = reqwest::Client::new();\n*/",
+        "let said = r#\"\nlet http = reqwest::Client::new();\n\"#;",
+        "let said = r#\"a \"quoted\" reqwest::Client::new()\"#;",
         "let page = \"https://lys.example/\"; // reqwest::Client::new() is not called",
         "use reqwest::{\n    Url,\n    header,\n};\nlet client = Client::new();",
         "#[derive(Default)]\nstruct Counts {\n    clients: usize,\n}",
