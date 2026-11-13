@@ -163,7 +163,7 @@ async fn fixture_with(
 
 fn client() -> &'static reqwest::Client {
     static CLIENT: std::sync::OnceLock<reqwest::Client> = std::sync::OnceLock::new();
-    CLIENT.get_or_init(reqwest::Client::new)
+    CLIENT.get_or_init(|| lys_http::client().expect("lys-http builds the client"))
 }
 
 async fn get(service: &Service, path: &str, pass: &str) -> TestResult<(u16, Value)> {

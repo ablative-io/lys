@@ -22,8 +22,10 @@
 //!   `default()` builds one, unless the field holds it inside a container
 //!   whose own default is empty (`Option`, `Vec`, a map, a once-cell).
 //!
-//! Comments are not code: a line's text after a `//` outside a string or
-//! character literal is not read.
+//! Comments and literals are not code: a line's text after a `//` outside a
+//! string or character literal is not read, and the inside of a literal is
+//! blanked before it is read. So this file's own cases, which are strings,
+//! are not refused, and it is walked like any other file.
 
 use std::error::Error;
 use std::fs;
@@ -52,10 +54,14 @@ fn is_ident(c: char) -> bool {
     c.is_alphanumeric() || c == '_'
 }
 
-/// `line` up to its `//` comment, if it has one. A `//` inside a string or
-/// character literal (`"https://lys.example/"`, `'"'`) is code, not a
-/// comment, so a constructor after a URL on the same line is still read.
-fn code(line: &str) -> &str {
+/// The code of `line`: the text before its `//` comment, with the inside of
+/// every string and character literal blanked. A `//` inside a literal
+/// (`"https://lys.example/"`, `'"'`) is not a comment, so a constructor after
+/// a URL on the same line is still read; and text inside a literal is not
+/// code, so a string naming a constructor (as this file's cases do) builds
+/// nothing.
+fn code(line: &str) -> String {
+    let mut kept = String::with_capacity(line.len());
     let mut in_string = false;
     let mut escaped = false;
     let mut skip = 0_usize;
@@ -63,16 +69,23 @@ fn code(line: &str) -> &str {
     for (at, c) in line.char_indices() {
         if skip > 0 {
             skip -= 1;
+            kept.push(' ');
         } else if in_string {
             if escaped {
                 escaped = false;
+                kept.push(' ');
             } else if c == '\\' {
                 escaped = true;
+                kept.push(' ');
             } else if c == '"' {
                 in_string = false;
+                kept.push(c);
+            } else {
+                kept.push(' ');
             }
         } else if c == '"' {
             in_string = true;
+            kept.push(c);
         } else if c == '\'' {
             // A quote as a character literal opens no string.
             let rest = line.get(at..).unwrap_or_default();
@@ -81,12 +94,16 @@ fn code(line: &str) -> &str {
             } else if rest.starts_with("'\\\"'") {
                 skip = 3;
             }
+            kept.push(c);
         } else if c == '/' && previous == Some('/') {
-            return line.get(..at.saturating_sub(1)).unwrap_or_default();
+            kept.pop();
+            return kept;
+        } else {
+            kept.push(c);
         }
         previous = Some(c);
     }
-    line
+    kept
 }
 
 /// The text before and after each place `name` occurs in `text` as a whole
@@ -113,7 +130,8 @@ fn use_statements(text: &str) -> Vec<String> {
     let mut statements = Vec::new();
     let mut open: Option<String> = None;
     for line in text.lines() {
-        let line = code(line).trim();
+        let code = code(line);
+        let line = code.trim();
         let current = match open.take() {
             Some(mut joined) => {
                 joined.push(' ');
@@ -197,6 +215,7 @@ fn client_names(text: &str) -> Vec<String> {
 /// or passed on it, or `::default` on a line that names it.
 fn constructs(line: &str, names: &[String]) -> bool {
     let line = code(line);
+    let line = line.as_str();
     names.iter().any(|name| {
         let found = occurrences(line, name);
         !found.is_empty()
@@ -230,7 +249,8 @@ fn holds_client(fields: &str, names: &[String]) -> bool {
 /// field holding a client. An attribute spread over lines is joined first, so
 /// `#[derive(\n    Debug,\n    Default,\n)]` is read as one.
 fn default_structs(text: &str, names: &[String]) -> Vec<usize> {
-    let lines: Vec<&str> = text.lines().map(|line| code(line).trim()).collect();
+    let codes: Vec<String> = text.lines().map(code).collect();
+    let lines: Vec<&str> = codes.iter().map(|line| line.trim()).collect();
     let mut rest = lines.iter().enumerate();
     let mut found = Vec::new();
     let mut deriving_default = false;
@@ -406,6 +426,7 @@ fn the_scanner_fires_on_every_form_it_refuses() {
         "use reqwest::Client;\nlet oidc = openidconnect::Client::new(id);",
         "let config = reqwest::ClientConfig::new();",
         "// reqwest::Client::new() is never called here",
+        "let refused = \"reqwest::Client::new() is refused\";",
         "let page = \"https://lys.example/\"; // reqwest::Client::new() is not called",
         "use reqwest::{\n    Url,\n    header,\n};\nlet client = Client::new();",
         "#[derive(Default)]\nstruct Counts {\n    clients: usize,\n}",
